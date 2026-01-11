@@ -1,0 +1,29 @@
+import React from 'react';
+
+const ErrorMessage = ({ errorReport }) => {
+    if (!errorReport) {
+        return null;
+    }
+
+    return (
+        <div style={{
+            backgroundColor: '#ffdddd',
+            border: '1px solid #f44336',
+            color: '#f44336',
+            padding: '15px',
+            margin: '20px 0',
+            borderRadius: '5px'
+        }}>
+            <h4 style={{ marginTop: 0 }}>{errorReport.title}</h4>
+            <p><strong>Details:</strong> {errorReport.originalError}</p>
+            <p><strong>Suggestions:</strong></p>
+            <ul>
+                {errorReport.suggestions.map((suggestion, index) => (
+                    <li key={index}>{suggestion}</li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+export default ErrorMessage;

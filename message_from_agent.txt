@@ -1,0 +1,11 @@
+**Project Status:**
+
+I have completed the necessary modifications to address the `mensa_chroma` container issue.
+
+1.  **`docker-compose.yml` updated:** The ChromaDB image version has been updated to `0.5.15`, and the volume configuration now uses a bind mount to `./data/chroma`.
+2.  **`LATEST_CHANGES.md` created:** This file summarizes the changes made.
+3.  **`NEXT_STEPS.md` updated:** This file contains detailed instructions for you to execute, including how to bring up the Docker services and troubleshoot further if needed.
+
+**Next Action Required (from you):**
+
+Please follow the instructions in `NEXT_STEPS.md` to restart your Docker services. I am currently awaiting your action to proceed.

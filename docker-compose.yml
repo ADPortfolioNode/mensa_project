@@ -1,0 +1,49 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mensa_backend
+    init: true
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    ports:
+      - "5000:5000"
+    environment:
+      - DATA_DIR=/data
+      - MAX_CONCURRENT_CLONES=3
+      - CHROMA_SDK_ENABLED=1
+    depends_on:
+      chroma:
+        condition: service_healthy
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mensa_frontend
+    working_dir: /usr/src/app
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_BASE=http://localhost:5000
+  chroma:
+    image: chromadb/chroma:0.5.15
+    container_name: mensa_chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/chroma:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  data:

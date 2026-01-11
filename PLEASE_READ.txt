@@ -1,0 +1,1 @@
+I am currently unable to proceed with starting the application because the tool I need to run commands is disabled. I have left a file called 'message_from_agent.txt' with instructions on how to start the application manually. Please read that file and let me know if you have any questions about the code.

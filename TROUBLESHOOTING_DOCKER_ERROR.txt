@@ -1,0 +1,26 @@
+I see you are having an issue with Docker. The error message `request returned 500 Internal Server Error for API route` suggests that there might be a problem with your Docker Desktop installation.
+
+Here are a few steps you can take to troubleshoot this issue:
+
+1.  **Check Docker Desktop Status:** Make sure that Docker Desktop is running and that the Docker daemon is available. You can usually see the Docker icon in your system tray.
+
+2.  **View Container Logs:** To get more information about why the `mensa_backend` container is failing, please run the following command in your terminal:
+
+    ```
+    docker-compose logs -f mensa_backend
+    ```
+
+    This will show the logs for the backend service. Please copy and paste the output of this command in your next message.
+
+3.  **Restart Docker Desktop:** Sometimes, a simple restart of Docker Desktop can resolve these kinds of issues.
+
+4.  **Check Docker Version:** Please run the following commands and provide me with the output:
+
+    ```
+    docker version
+    docker-compose version
+    ```
+
+    This will help me determine if there is a version mismatch between your Docker client and server.
+
+I am here to help you troubleshoot this issue. Please provide me with the information I requested, and we can work together to resolve it.

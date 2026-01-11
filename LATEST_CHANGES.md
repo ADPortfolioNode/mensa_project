@@ -1,0 +1,1 @@
+I have identified that the version of ChromaDB being used was outdated. I have updated the `docker-compose.yml` to use a more recent version (`0.5.15`). This should resolve the issue with the `mensa_chroma` container.
