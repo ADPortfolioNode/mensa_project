@@ -4,8 +4,7 @@
 # This avoids port conflicts and ensures a fresh start
 
 echo "Stopping and removing existing containers..."
-docker rm -f mensa_frontend mensa_backend mensa_chroma || true
-docker-compose down
+docker-compose down --remove-orphans
 
 # Conditional Docker image building:
 # By default, `docker-compose build` uses Docker's build cache.
@@ -16,7 +15,7 @@ docker-compose down
 # To force a complete rebuild *without* using the cache (e.g., if you suspect
 # a corrupted cache or want to ensure a pristine build environment),
 # set the environment variable FORCE_NO_CACHE to "true" before running this script:
-#   FORCE_NO_CACHE=true ./start.sh
+#   
 #
 if [ "$FORCE_NO_CACHE" = "true" ]; then
     echo "Building services with --no-cache (FORCE_NO_CACHE=true)..."

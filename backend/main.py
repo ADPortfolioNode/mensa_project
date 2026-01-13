@@ -4,6 +4,12 @@ from pydantic import BaseModel
 
 # Import your Gemini client
 from services.gemini_client import gemini_client
+from services.chroma_client import chroma_client
+from experiments.store import ExperimentStore
+from services.ingest import ingest_service
+from services.trainer import trainer_service
+from services.predictor import predictor_service
+import os
 
 app = FastAPI()
 
@@ -22,6 +28,20 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+
+class IngestRequest(BaseModel):
+    game: str
+
+class TrainRequest(BaseModel):
+    game: str
+
+class PredictRequest(BaseModel):
+    game: str
+    recent_k: int = 10
+
+class GameSummaryResponse(BaseModel):
+    game: str
+    draw_count: int
 
 # --- API Endpoints ---
 @app.get("/api")
@@ -45,27 +65,35 @@ async def get_all_predictions():
 
 @app.get("/api/chroma/status")
 async def get_chroma_status():
-    return {"message": "Endpoint not implemented yet."}
+    return chroma_client.get_chroma_status()
+
+@app.get("/api/chroma/collections")
+async def get_chroma_collections():
+    return chroma_client.list_collections()
 
 @app.post("/api/ingest")
-async def ingest_data():
-    return {"message": "Endpoint not implemented yet."}
+async def ingest_data(request: IngestRequest):
+    return ingest_service.fetch_and_sync(request.game)
 
 @app.post("/api/train")
-async def train_model():
-    return {"message": "Endpoint not implemented yet."}
+async def train_model(request: TrainRequest):
+    return trainer_service.train_model(request.game)
 
 @app.get("/api/experiments")
 async def get_experiments():
-    return {"message": "Endpoint not implemented yet."}
+    data_dir = os.environ.get('DATA_DIR', '/data')
+    store_path = os.path.join(data_dir, 'experiments', "experiments.json")
+    exp_store = ExperimentStore(store_path)
+    return exp_store.list_experiments()
 
-@app.get("/api/games/{game}/prediction")
-async def get_game_prediction(game: str):
-    return {"message": f"Endpoint for game {game} not implemented yet."}
+@app.post("/api/predict")
+async def predict(request: PredictRequest):
+    return predictor_service.predict_next_draw(request.game, request.recent_k)
 
-@app.get("/api/games/{game}/summary")
+@app.get("/api/games/{game}/summary", response_model=GameSummaryResponse)
 async def get_game_summary(game: str):
-    return {"message": f"Endpoint for game {game} not implemented yet."}
+    draw_count = chroma_client.count_documents(game)
+    return GameSummaryResponse(game=game, draw_count=draw_count)
 
 @app.get("/api/startup_status")
 async def get_startup_status():

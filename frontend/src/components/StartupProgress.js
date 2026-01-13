@@ -10,7 +10,7 @@ const StartupProgress = ({ onComplete }) => {
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/api/startup_status');
+                const response = await axios.get(`${process.env.REACT_APP_API_BASE}/api/startup_status`);
                 setErrorReport(null); // Clear previous errors on a successful connection
                 setStatus(response.data);
                 if (response.data.status === 'completed') {
