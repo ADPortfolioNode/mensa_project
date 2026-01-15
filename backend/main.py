@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Import your Gemini client
+from config import GAME_CONFIGS
 from services.gemini_client import gemini_client
 from services.chroma_client import chroma_client
 from experiments.store import ExperimentStore
@@ -69,7 +70,19 @@ async def get_chroma_status():
 
 @app.get("/api/chroma/collections")
 async def get_chroma_collections():
-    return chroma_client.list_collections()
+    # In Chroma v0.6.0, list_collections only returns collection names (strings).
+    # We need to get each collection by its name to access its attributes.
+    collection_names = chroma_client.list_collections() # This now returns a list of strings
+    collections_with_details = []
+    for collection_name in collection_names: # Iterate directly over names
+        collection = chroma_client.client.get_collection(collection_name)
+        collections_with_details.append({
+            "name": collection.name,
+            "id": collection.id,
+            "metadata": collection.metadata,
+            "count": collection.count()
+        })
+    return collections_with_details
 
 @app.post("/api/ingest")
 async def ingest_data(request: IngestRequest):
@@ -89,6 +102,11 @@ async def get_experiments():
 @app.post("/api/predict")
 async def predict(request: PredictRequest):
     return predictor_service.predict_next_draw(request.game, request.recent_k)
+
+@app.get("/api/games")
+async def get_games():
+    game_names = list(GAME_CONFIGS.keys())
+    return {"games": game_names}
 
 @app.get("/api/games/{game}/summary", response_model=GameSummaryResponse)
 async def get_game_summary(game: str):

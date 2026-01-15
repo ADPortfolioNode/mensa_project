@@ -58,8 +58,8 @@ export default function ChromaStatusPanel() {
             )}
             {!loading && collections.length > 0 && (
                 <ul className="list-group list-group-flush">
-                    {collections.map(collection => (
-                        <li key={collection.name} className="list-group-item d-flex justify-content-between align-items-center">
+                    {collections.map((collection, index) => (
+                        <li key={`${collection.name}-${index}`} className="list-group-item d-flex justify-content-between align-items-center">
                             {collection.name}
                             <span className="badge bg-info rounded-pill">
                                 {collection.count} documents

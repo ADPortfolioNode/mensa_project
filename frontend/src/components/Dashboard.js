@@ -33,23 +33,10 @@ export default function Dashboard() {
   }
   const [ingestStatus, setIngestStatus] = useState('idle');
   const [trainStatus, setTrainStatus] = useState('idle');
-  const [ingestProgress, setIngestProgress] = useState(0);
   const [trainProgress, setTrainProgress] = useState(0);
-  const [ingestActual, setIngestActual] = useState(0);
-  const [ingestExpected, setIngestExpected] = useState(0);
-  const [ingestHanged, setIngestHanged] = useState(false); // Can be removed later if new status is sufficient
   const [games, setGames] = useState([]);
   const [experiments, setExperiments] = useState([]);
-
-  // New state variables for job-based ingestion
-  const [ingestionJobId, setIngestionJobId] = useState(null);
-  const [ingestionJobStatus, setIngestionJobStatus] = useState('idle');
-  const [ingestionJobMessage, setIngestionJobMessage] = useState('');
-  const [ingestionJobProgress, setIngestionJobProgress] = useState(0);
-  const [ingestionJobError, setIngestionJobError] = useState(null);
-  const [ingestionJobCurrentProcessed, setIngestionJobCurrentProcessed] = useState(0);
-  const [ingestionJobTotalExpected, setIngestionJobTotalExpected] = useState(0);
-
+  const [selectedGame, setSelectedGame] = useState('');
 
   useEffect(() => {
     async function fetchGames() {
@@ -80,81 +67,30 @@ export default function Dashboard() {
     return () => clearInterval(experimentPollInterval); // Clear interval on unmount
   }, [API_BASE]);
 
-  // Polling for ingestion job status
-  useEffect(() => {
-    let pollInterval;
-    if (ingestionJobId && ingestionJobStatus !== 'COMPLETED' && ingestionJobStatus !== 'FAILED' && ingestionJobStatus !== 'COMPLETED_WITH_ERRORS') {
-      pollInterval = setInterval(async () => {
-        try {
-          const r = await axios.get(`${API_BASE}/api/ingest/status/${ingestionJobId}`);
-          const job = r.data;
-          setIngestionJobStatus(job.status);
-          setIngestionJobMessage(job.message);
-          setIngestionJobProgress(job.progress);
-          setIngestionJobError(job.error);
-          setIngestionJobCurrentProcessed(job.current_processed_items || 0);
-          setIngestionJobTotalExpected(job.total_expected_items || 0);
-
-          if (job.status === 'COMPLETED' || job.status === 'FAILED' || job.status === 'COMPLETED_WITH_ERRORS') {
-            clearInterval(pollInterval);
-            if (job.status === 'COMPLETED') {
-                setIngestStatus('completed');
-                // Refresh games after successful ingest
-                const gamesResponse = await axios.get(`${API_BASE}/api/games`);
-                setGames(gamesResponse.data.games || []);
-            } else {
-                setIngestStatus('error');
-            }
-          }
-        } catch (e) {
-          console.error("Error polling ingestion job status:", e);
-          setIngestionJobStatus('FAILED');
-          setIngestionJobMessage('Failed to fetch job status.');
-          setIngestionJobError(e.message);
-          clearInterval(pollInterval);
-          setIngestStatus('error');
-        }
-      }, 1000); // Poll every 1 second
-    } else if (ingestionJobId && (ingestionJobStatus === 'COMPLETED' || ingestionJobStatus === 'FAILED' || ingestionJobStatus === 'COMPLETED_WITH_ERRORS')) {
-        clearInterval(pollInterval);
-    }
-    return () => clearInterval(pollInterval);
-  }, [ingestionJobId, ingestionJobStatus, API_BASE]);
-
-
   const startIngest = async () => {
     if (!selectedGame) return;
     setIngestStatus('in progress');
-    setIngestProgress(0); // Reset old progress
-    setIngestActual(0); // Reset old actual
-    setIngestHanged(false); // Reset old hanged state
-
-    // Reset new job states
-    setIngestionJobId(null);
-    setIngestionJobStatus('idle');
-    setIngestionJobMessage('');
-    setIngestionJobProgress(0);
-    setIngestionJobError(null);
-    setIngestionJobCurrentProcessed(0);
-    setIngestionJobTotalExpected(0);
-
 
     try {
-        const response = await axios.post(`${API_BASE}/api/ingest/fetch_and_sync`, { dataset_key: selectedGame });
-        setIngestionJobId(response.data.job_id);
-        setIngestionJobStatus('PENDING'); // Set initial status based on response
-        setIngestionJobMessage('Ingestion job started.');
+        const response = await axios.post(`${API_BASE}/api/ingest`, { game: selectedGame });
+        if (response.data.status === 'success') {
+            setIngestStatus('completed');
+            alert(`Ingestion completed! Added ${response.data.added} documents.`);
+            // After successful ingest, we could automatically refresh other components,
+            // but for now an alert is sufficient to signal completion.
+        } else {
+            setIngestStatus('error');
+            alert(`Ingestion failed: ${response.data.message}`);
+        }
     } catch (e) {
-      console.error("Error starting ingestion job:", e);
+      console.error("Error starting ingestion:", e);
       setIngestStatus('error');
-      setIngestionJobStatus('FAILED');
-      setIngestionJobMessage('Failed to start ingestion job.');
-      setIngestionJobError(e.message);
+      alert(`Ingestion failed due to an error: ${e.response?.data?.detail || e.message}`);
     }
   };
 
   const startTrain = async () => {
-    if (ingestionJobStatus !== 'COMPLETED' || !selectedGame) {
+    if (ingestStatus !== 'completed' || !selectedGame) {
       alert('Please complete data ingestion first and select a game.');
       return;
     }
@@ -185,11 +121,6 @@ export default function Dashboard() {
   };
 
   const isTrained = experiments.length > 0;
-
-
-
-  const [selectedGame, setSelectedGame] = useState('');
-
   
   return (
     <div>
@@ -201,26 +132,9 @@ export default function Dashboard() {
             <span>1. Ingest Data</span>
             <span className={`badge ${ingestStatus === 'completed' ? 'bg-success' : ingestStatus === 'in progress' ? 'bg-warning' : ingestStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>{ingestStatus}</span>
           </div>
-          {(ingestionJobStatus === 'IN_PROGRESS' || ingestionJobStatus === 'PENDING') && (
-            <div>
-              <div className="progress mt-2" style={{height: '10px'}}>
-                <div className="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style={{width: `${ingestionJobProgress}%`}} aria-valuenow={ingestionJobProgress} aria-valuemin="0" aria-valuemax="100"></div>
-              </div>
-              <div className="text-center small">
-                {ingestionJobMessage}
-                {ingestionJobTotalExpected > 0 && ` (${ingestionJobCurrentProcessed} / ${ingestionJobTotalExpected})`}
-                {ingestionJobError && <span className="text-danger"> Error: {ingestionJobError}</span>}
-              </div>
-            </div>
-          )}
-          {ingestionJobStatus === 'FAILED' && (
-            <div className="alert alert-danger mt-2">
-                Ingestion Failed: {ingestionJobError || ingestionJobMessage}
-            </div>
-          )}
-          {ingestionJobStatus === 'COMPLETED_WITH_ERRORS' && (
-            <div className="alert alert-warning mt-2">
-                Ingestion Completed with Errors: {ingestionJobError || ingestionJobMessage}
+          {ingestStatus === 'in progress' && (
+            <div className="progress mt-2" style={{height: '10px'}}>
+              <div className="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style={{width: `100%`}}></div>
             </div>
           )}
         </div>

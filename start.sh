@@ -6,6 +6,14 @@
 echo "Stopping and removing existing containers..."
 docker-compose down --remove-orphans
 
+# Force remove any stale containers that might still be lingering
+echo "Cleaning up stale containers..."
+docker rm -f mensa_frontend mensa_backend mensa_chroma 2>/dev/null || true
+
+# Ensure ports are freed
+echo "Waiting for ports to be released..."
+sleep 3
+
 # Conditional Docker image building:
 # By default, `docker-compose build` uses Docker's build cache.
 # This means images are only rebuilt if their Dockerfile instructions or
@@ -22,7 +30,9 @@ if [ "$FORCE_NO_CACHE" = "true" ]; then
     docker-compose build --no-cache
 else
     echo "Building services (Docker cache will be used unless changes are detected)..."
-    docker-compose build
+    echo "Building backend without cache to ensure h11 HTTP implementation..."
+    docker-compose build --no-cache backend
+    docker-compose build frontend
 fi
 
 echo "Clearing ChromaDB data..."
@@ -30,5 +40,8 @@ rm -rf ./data/chroma
 
 echo "Starting services..."
 docker-compose up -d
+
+echo "Waiting for services to start..."
+sleep 10
 
 echo "Services started. Check logs with: docker-compose logs -f"
