@@ -18,10 +18,17 @@ services:
     depends_on:
       chroma:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
           memory: 4G
+    restart: unless-stopped
   frontend:
     build:
       context: ./frontend
@@ -34,10 +41,18 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - CHOKIDAR_USEPOLLING=true
       - REACT_APP_API_BASE=http://127.0.0.1:5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
   chroma:
     image: chromadb/chroma:0.6.3
     container_name: mensa_chroma
@@ -50,6 +65,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   data:

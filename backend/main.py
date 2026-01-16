@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import asyncio
+import threading
+import time
 
 # Import your Gemini client
 from config import GAME_CONFIGS
@@ -13,6 +16,91 @@ from services.predictor import predictor_service
 import os
 
 app = FastAPI()
+
+# --- Global startup state tracking for monitoring ---
+startup_state = {
+    "status": "initializing",
+    "progress": 0,
+    "total": len(GAME_CONFIGS),
+    "current_game": None,
+    "current_task": None,
+    "games": {game: "pending" for game in GAME_CONFIGS.keys()},
+    "started_at": None,
+    "completed_at": None
+}
+
+def start_background_ingestion():
+    """Start non-blocking background ingestion in a daemon thread.
+    
+    This allows the server to become responsive immediately while data ingestion
+    happens in the background. Non-blocking pattern for fast startup.
+    """
+    def ingest_all():
+        startup_state["started_at"] = time.time()
+        startup_state["status"] = "ingesting"
+        
+        for i, game in enumerate(GAME_CONFIGS.keys(), 1):
+            try:
+                startup_state["current_game"] = game
+                startup_state["current_task"] = "fetching"
+                startup_state["progress"] = i
+                
+                print(f"[{i}/{startup_state['total']}] Ingesting {game}...")
+                
+                # Run async ingestion in new event loop within thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(ingest_service.fetch_and_sync(game))
+                loop.close()
+                
+                startup_state["games"][game] = "completed"
+                print(f"✓ {game} ingested successfully")
+                
+            except Exception as e:
+                startup_state["games"][game] = f"failed: {str(e)}"
+                print(f"⚠ Failed to ingest {game}: {str(e)}")
+        
+        startup_state["status"] = "completed"
+        startup_state["completed_at"] = time.time()
+        elapsed = startup_state["completed_at"] - startup_state["started_at"]
+        print(f"\n✓ Background ingestion completed in {elapsed:.1f}s")
+    
+    # Daemon thread ensures it won't block shutdown
+    thread = threading.Thread(target=ingest_all, daemon=True, name="BackgroundIngestion")
+    thread.start()
+
+# Track if ingestion has been started
+_ingestion_started = False
+    print("Auto-ingestion complete!")
+# --- Background task for auto-ingestion (non-blocking) ---
+background_ingestion_started = False
+
+def start_background_ingestion():
+    """Start background ingestion without blocking startup."""
+    global background_ingestion_started
+    if background_ingestion_started:
+        return
+    background_ingestion_started = True
+    
+    import threading
+    def ingest_all_games():
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        print("Starting background ingestion for all configured games...")
+        for game in GAME_CONFIGS.keys():
+            try:
+                print(f"Ingesting {game}...")
+                loop.run_until_complete(ingest_service.fetch_and_sync(game))
+                print(f"✓ {game} ingested successfully")
+            except Exception as e:
+                print(f"⚠ Failed to ingest {game}: {str(e)}")
+        print("Background ingestion complete!")
+        loop.close()
+    
+    thread = threading.Thread(target=ingest_all_games, daemon=True)
+    thread.start()
 
 # --- Middleware ---
 app.add_middleware(
@@ -115,7 +203,22 @@ async def get_game_summary(game: str):
 
 @app.get("/api/startup_status")
 async def get_startup_status():
-    return {"status": "completed", "progress": 100, "total": 0, "current_game": None, "current_task": None, "games": {}}
+    """Get current startup status and trigger ingestion if not started."""
+    global _ingestion_started
+    
+    if not _ingestion_started:
+        _ingestion_started = True
+        start_background_ingestion()
+    
+    return {
+        "status": startup_state["status"],
+        "progress": startup_state["progress"],
+        "total": startup_state["total"],
+        "current_game": startup_state["current_game"],
+        "current_task": startup_state["current_task"],
+        "games": startup_state["games"],
+        "elapsed_s": round(time.time() - startup_state["started_at"], 1) if startup_state["started_at"] else 0
+    }
 
 if __name__ == "__main__":
     import uvicorn

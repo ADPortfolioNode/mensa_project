@@ -1,47 +1,44 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Script to optimize Docker startup sequence by ensuring clean shutdown before starting
-# This avoids port conflicts and ensures a fresh start
+# === Mensa Project Quick Start ===
+# Simplified startup for development: build → start → wait
+# For detailed progress monitoring, use: ./monitor_startup.sh
 
-echo "Stopping and removing existing containers..."
-docker-compose down --remove-orphans
+echo "Starting Mensa Project..."
+echo ""
 
-# Force remove any stale containers that might still be lingering
-echo "Cleaning up stale containers..."
+# Stop and remove old containers
+docker-compose down --remove-orphans 2>/dev/null || true
 docker rm -f mensa_frontend mensa_backend mensa_chroma 2>/dev/null || true
 
-# Ensure ports are freed
-echo "Waiting for ports to be released..."
-sleep 3
+# Build and start services with proper dependency ordering
+echo "Building and starting services (this may take a few minutes on first run)..."
+docker-compose up -d --build
 
-# Conditional Docker image building:
-# By default, `docker-compose build` uses Docker's build cache.
-# This means images are only rebuilt if their Dockerfile instructions or
-# build context files (e.g., source code, requirements.txt) have changed.
-# This leads to fast startup times when code is not modified.
-#
-# To force a complete rebuild *without* using the cache (e.g., if you suspect
-# a corrupted cache or want to ensure a pristine build environment),
-# set the environment variable FORCE_NO_CACHE to "true" before running this script:
-#   
-#
-if [ "$FORCE_NO_CACHE" = "true" ]; then
-    echo "Building services with --no-cache (FORCE_NO_CACHE=true)..."
-    docker-compose build --no-cache
-else
-    echo "Building services (Docker cache will be used unless changes are detected)..."
-    echo "Building backend without cache to ensure h11 HTTP implementation..."
-    docker-compose build --no-cache backend
-    docker-compose build frontend
-fi
+# Wait for services to be healthy
+echo "Waiting for services to be ready..."
+for i in {1..30}; do
+    if docker-compose ps | grep -q "healthy"; then
+        echo "✓ Services ready"
+        break
+    fi
+    sleep 2
+done
 
-echo "Clearing ChromaDB data..."
-rm -rf ./data/chroma
+# Show status
+echo ""
+echo "Container Status:"
+docker-compose ps
+echo ""
 
-echo "Starting services..."
-docker-compose up -d
-
-echo "Waiting for services to start..."
-sleep 10
-
-echo "Services started. Check logs with: docker-compose logs -f"
+# Show access points
+echo "✓ Application started"
+echo ""
+echo "Access your application:"
+echo "  Frontend: http://localhost:3000"
+echo "  Backend:  http://localhost:5000/api"
+echo ""
+echo "View logs:"
+echo "  docker-compose logs -f"
+echo ""

@@ -1,17 +1,32 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# Multi-stage build for optimized image size and layer caching
+FROM python:3.11-slim as builder
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file and install dependencies
+# Copy only requirements for dependency caching layer
+# This layer is cached unless requirements.txt changes, reducing rebuild time
 COPY requirements.txt .
-# Remove httptools if present in any dependency, and use h11 as HTTP implementation
-RUN pip install --no-cache-dir -r requirements.txt && pip uninstall -y httptools
 
-# Copy the rest of the backend code
+# Install with extended timeout and retries for network resilience
+# Remove httptools (C extension) and use h11 (pure Python HTTP) to avoid memory issues
+RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt && \
+    pip uninstall -y httptools
+
+# Final runtime stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed packages from builder stage
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
 COPY . .
 
-# Command to run the application
+# Add health check endpoint verification
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:5000/api', timeout=2)" || exit 1
+
 # Use h11 instead of httptools to avoid memory allocation issues
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--http", "h11"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--http", "h11", "--access-log"]
