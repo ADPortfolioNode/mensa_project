@@ -71,36 +71,6 @@ def start_background_ingestion():
 
 # Track if ingestion has been started
 _ingestion_started = False
-    print("Auto-ingestion complete!")
-# --- Background task for auto-ingestion (non-blocking) ---
-background_ingestion_started = False
-
-def start_background_ingestion():
-    """Start background ingestion without blocking startup."""
-    global background_ingestion_started
-    if background_ingestion_started:
-        return
-    background_ingestion_started = True
-    
-    import threading
-    def ingest_all_games():
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        print("Starting background ingestion for all configured games...")
-        for game in GAME_CONFIGS.keys():
-            try:
-                print(f"Ingesting {game}...")
-                loop.run_until_complete(ingest_service.fetch_and_sync(game))
-                print(f"✓ {game} ingested successfully")
-            except Exception as e:
-                print(f"⚠ Failed to ingest {game}: {str(e)}")
-        print("Background ingestion complete!")
-        loop.close()
-    
-    thread = threading.Thread(target=ingest_all_games, daemon=True)
-    thread.start()
 
 # --- Middleware ---
 app.add_middleware(
