@@ -24,7 +24,7 @@ startup_state = {
     "total": len(GAME_CONFIGS),
     "current_game": None,
     "current_task": None,
-    "games": {game: "pending" for game in GAME_CONFIGS.keys()},
+    "games": {game: {"status": "pending", "error": None} for game in GAME_CONFIGS.keys()},
     "started_at": None,
     "completed_at": None
 }
@@ -43,7 +43,9 @@ def start_background_ingestion():
             try:
                 startup_state["current_game"] = game
                 startup_state["current_task"] = "fetching"
-                startup_state["progress"] = i
+                startup_state["progress"] = i - 1  # Mark as in-progress before starting
+                startup_state["games"][game]["status"] = "ingesting"
+                startup_state["games"][game]["error"] = None
                 
                 print(f"[{i}/{startup_state['total']}] Ingesting {game}...")
                 
@@ -53,14 +55,20 @@ def start_background_ingestion():
                 loop.run_until_complete(ingest_service.fetch_and_sync(game))
                 loop.close()
                 
-                startup_state["games"][game] = "completed"
+                startup_state["games"][game]["status"] = "completed"
+                startup_state["games"][game]["error"] = None
+                startup_state["progress"] = i
                 print(f"✓ {game} ingested successfully")
                 
             except Exception as e:
-                startup_state["games"][game] = f"failed: {str(e)}"
+                startup_state["games"][game]["status"] = "failed"
+                startup_state["games"][game]["error"] = str(e)
+                startup_state["progress"] = i  # Still count this in progress even if failed
                 print(f"⚠ Failed to ingest {game}: {str(e)}")
         
         startup_state["status"] = "completed"
+        startup_state["current_game"] = None
+        startup_state["current_task"] = None
         startup_state["completed_at"] = time.time()
         elapsed = startup_state["completed_at"] - startup_state["started_at"]
         print(f"\n✓ Background ingestion completed in {elapsed:.1f}s")

@@ -6,13 +6,15 @@ import ErrorMessage from './ErrorMessage';
 const StartupProgress = ({ onComplete }) => {
     const [status, setStatus] = useState(null);
     const [errorReport, setErrorReport] = useState(null);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
     useEffect(() => {
         const fetchStatus = async () => {
             try {
                 const response = await axios.get(`${process.env.REACT_APP_API_BASE}/api/startup_status`);
-                setErrorReport(null); // Clear previous errors on a successful connection
+                setErrorReport(null);
                 setStatus(response.data);
+                setElapsedSeconds(response.data.elapsed_s || 0);
                 if (response.data.status === 'completed') {
                     onComplete();
                 }
@@ -20,15 +22,14 @@ const StartupProgress = ({ onComplete }) => {
                 console.error("Error fetching startup status:", error);
                 const report = analyzeError(error);
                 setErrorReport(report);
-                // If it's a connection error, stop polling
                 if (report.category === ErrorCategory.CONNECTION_ERROR) {
                     clearInterval(interval);
                 }
             }
         };
 
-        const interval = setInterval(fetchStatus, 2000); // Poll every 2 seconds
-        fetchStatus(); // Initial fetch
+        const interval = setInterval(fetchStatus, 2000);
+        fetchStatus();
 
         return () => clearInterval(interval);
     }, [onComplete]);
@@ -42,52 +43,162 @@ const StartupProgress = ({ onComplete }) => {
     }
 
     if (!status || status.status === 'pending') {
-        return <div>Initializing...</div>;
+        return <div style={{ padding: '20px' }}>Initializing...</div>;
     }
 
-    const overallProgress = status.total > 0 ? (status.progress / status.total) * 100 : 100;
+    const overallProgress = status.total > 0 ? (status.progress / status.total) * 100 : 0;
+    const isIngesting = status.status === 'ingesting';
+    const isCompleted = status.status === 'completed';
+    
+    const formatTime = (seconds) => {
+        if (seconds < 60) return `${seconds.toFixed(1)}s`;
+        return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`;
+    };
+
+    const getStatusIcon = (gameStatus) => {
+        if (gameStatus === 'completed') return '✓';
+        if (gameStatus === 'ingesting') return '↻';
+        if (gameStatus === 'failed') return '✗';
+        return '◯';
+    };
+
+    const getStatusColor = (gameStatus) => {
+        if (gameStatus === 'completed') return '#28a745';
+        if (gameStatus === 'ingesting') return '#ffc107';
+        if (gameStatus === 'failed') return '#dc3545';
+        return '#6c757d';
+    };
 
     return (
-        <div style={{ padding: '20px' }}>
-            <h2>Lottery App Initializing...</h2>
-            <p>Status: {status.status}</p>
-            {status.current_task && <p>{status.current_task}</p>}
+        <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+            <h2>🎰 Lottery Data Initialization</h2>
+            
+            {/* Status Header */}
+            <div style={{
+                padding: '15px',
+                backgroundColor: isCompleted ? '#d4edda' : '#fff3cd',
+                border: `2px solid ${isCompleted ? '#28a745' : '#ffc107'}`,
+                borderRadius: '5px',
+                marginBottom: '20px'
+            }}>
+                <p style={{ margin: '5px 0' }}>
+                    <strong>Status:</strong> 
+                    {isCompleted && <span style={{ color: '#28a745' }}>✓ Complete</span>}
+                    {isIngesting && <span style={{ color: '#ffc107' }}>⟳ Downloading Game Data...</span>}
+                    {!isCompleted && !isIngesting && <span>Pending</span>}
+                </p>
+                {status.current_game && (
+                    <p style={{ margin: '5px 0' }}>
+                        <strong>Currently Processing:</strong> {status.current_game.toUpperCase()}
+                        {status.current_task && <span> ({status.current_task})</span>}
+                    </p>
+                )}
+                <p style={{ margin: '5px 0' }}>
+                    <strong>Elapsed Time:</strong> {formatTime(elapsedSeconds)}
+                </p>
+            </div>
 
-            <h4>Overall Progress:</h4>
-            <progress value={overallProgress} max="100" style={{ width: '100%' }}></progress>
-            <p>{status.progress} of {status.total} games processed.</p>
+            {/* Progress Bar */}
+            <div style={{ marginBottom: '20px' }}>
+                <h4 style={{ marginBottom: '8px' }}>
+                    Download Progress: {status.progress} of {status.total} games
+                </h4>
+                <div style={{
+                    width: '100%',
+                    backgroundColor: '#e9ecef',
+                    borderRadius: '5px',
+                    overflow: 'hidden',
+                    height: '30px',
+                    display: 'flex',
+                    alignItems: 'center'
+                }}>
+                    <div style={{
+                        width: `${overallProgress}%`,
+                        backgroundColor: overallProgress === 100 ? '#28a745' : '#007bff',
+                        height: '100%',
+                        transition: 'width 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '14px'
+                    }}>
+                        {Math.round(overallProgress)}%
+                    </div>
+                </div>
+            </div>
 
-            <hr />
-
-            <h4>Game Status:</h4>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            {/* Game Status Table */}
+            <h4>Game Download Status</h4>
+            <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginBottom: '20px'
+            }}>
                 <thead>
-                    <tr style={{ borderBottom: '1px solid #ccc' }}>
-                        <th style={{ textAlign: 'left', padding: '8px' }}>Game</th>
-                        <th style={{ textAlign: 'left', padding: '8px' }}>Status</th>
-                        <th style={{ textAlign: 'left', padding: '8px' }}>Details</th>
+                    <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                        <th style={{ textAlign: 'left', padding: '12px' }}>Game</th>
+                        <th style={{ textAlign: 'center', padding: '12px', width: '80px' }}>Status</th>
+                        <th style={{ textAlign: 'left', padding: '12px' }}>Details</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {Object.entries(status.games).map(([game, gameStatus]) => (
-                        <tr key={game} style={{ borderBottom: '1px solid #ccc' }}>
-                            <td style={{ padding: '8px' }}>{game}</td>
-                            <td style={{ padding: '8px' }}>{gameStatus.status}</td>
-                            <td style={{ padding: '8px' }}>
-                                {gameStatus.error ? <span style={{ color: 'red' }}>{gameStatus.error}</span> : 
-                                 (
-                                    <span>
-                                        {gameStatus.ingestion && 'Ingestion ✔ '}
-                                        {gameStatus.training && 'Training ✔ '}
-                                        {gameStatus.prediction && 'Prediction ✔ '}
+                    {Object.entries(status.games).map(([game, gameData]) => (
+                        <tr
+                            key={game}
+                            style={{
+                                borderBottom: '1px solid #dee2e6',
+                                backgroundColor: game === status.current_game ? '#f0f8ff' : 'white',
+                                transition: 'background-color 0.3s ease'
+                            }}
+                        >
+                            <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                                {game.charAt(0).toUpperCase() + game.slice(1)}
+                            </td>
+                            <td style={{
+                                padding: '12px',
+                                textAlign: 'center',
+                                color: getStatusColor(gameData.status),
+                                fontSize: '18px',
+                                fontWeight: 'bold'
+                            }}>
+                                {getStatusIcon(gameData.status)}
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                                {gameData.status === 'completed' && (
+                                    <span style={{ color: '#28a745' }}>Downloaded ✓</span>
+                                )}
+                                {gameData.status === 'ingesting' && (
+                                    <span style={{ color: '#ffc107' }}>Downloading...</span>
+                                )}
+                                {gameData.status === 'pending' && (
+                                    <span style={{ color: '#6c757d' }}>Waiting...</span>
+                                )}
+                                {gameData.status === 'failed' && (
+                                    <span style={{ color: '#dc3545' }}>
+                                        Failed {gameData.error && `(${gameData.error})`}
                                     </span>
-                                 )
-                                }
+                                )}
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+
+            {isCompleted && (
+                <div style={{
+                    padding: '15px',
+                    backgroundColor: '#d4edda',
+                    border: '2px solid #28a745',
+                    borderRadius: '5px',
+                    color: '#155724',
+                    textAlign: 'center'
+                }}>
+                    <h3 style={{ margin: '10px 0' }}>✓ All games downloaded successfully!</h3>
+                    <p style={{ margin: '5px 0' }}>Launching dashboard...</p>
+                </div>
+            )}
         </div>
     );
 };
