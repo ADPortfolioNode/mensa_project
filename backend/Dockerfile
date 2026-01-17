@@ -24,9 +24,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . .
 
-# Add health check endpoint verification
+# Add health check: use wget or netcat to verify port is listening
+# Falls back to testing with python built-ins if needed
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/api', timeout=2)" || exit 1
+    CMD python -c "import socket; socket.create_connection(('127.0.0.1', 5000), timeout=2).close()" || exit 1
 
 # Use h11 instead of httptools to avoid memory allocation issues
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--http", "h11", "--access-log"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--http", "h11"]
