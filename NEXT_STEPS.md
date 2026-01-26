@@ -1,31 +1,17 @@
-I have updated the game lists to include all the additional lottery games that can be ingested from data.ny.gov.
+I have updated the `docker-compose.yml` file to fix the communication issue between the frontend and backend containers.
 
-**Summary of Changes**
+The `REACT_APP_API_BASE` environment variable for the frontend service has been changed to `http://backend:5000`. This allows the frontend to find the backend service on Docker's internal network.
 
-*   **Added New Games:** I have added the following games to both `DATASET_ENDPOINTS` and `GAME_CONFIGS` in `backend/config.py`:
-    *   Powerball
-    *   NY Lotto
-    *   Mega Millions
-    *   Pick 10
-    *   Cash 4 Life
-    *   Quick Draw
+**Next Steps:**
 
-**Next Steps**
+1.  **Rebuild and start the services:**
+    Open a terminal in the project root and run this command:
+    ```
+    docker-compose up -d --build
+    ```
 
-To apply these changes, you need to rebuild and restart the backend service. I am unable to do this for you.
+2.  **Verify the application:**
+    Once the containers are running, open your web browser and navigate to:
+    [http://localhost:3000](http://localhost:3000)
 
-Please run one of the following commands in your terminal:
-
-```bash
-# Option 1: Rebuild and restart only the backend service
-docker-compose build backend && docker-compose up -d backend
-```
-
-or
-
-```bash
-# Option 2: Run the start script to rebuild and restart all services
-./start.sh
-```
-
-After running one of these commands, the application should reflect the updated list of ingestible games.
+The application should now be working correctly.

@@ -1,0 +1,15 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv/
+
+# Data - mounted as a volume, should not be in build context
+data/

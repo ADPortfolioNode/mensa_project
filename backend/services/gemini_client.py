@@ -1,11 +1,14 @@
 import google.generativeai as genai
-from config import GEMINI_API_KEY
+from config import settings
 
 class GeminiClient:
+    """
+    Client for interacting with Google's Gemini API.
+    """
     def __init__(self):
-        if not GEMINI_API_KEY:
+        if not settings.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not found in environment variables.")
-        genai.configure(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel('gemini-pro')
 
     async def generate_text(self, prompt: str) -> str:

@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .env
+.env.*
 *.egg-info/
 dist/
 build/
@@ -20,7 +21,12 @@ frontend/build/
 # Data and logs
 data/
 *.log
+diag_output.log
 
 # IDE specific
 .vscode/
 .idea/
+
+# Temp directories
+Removed/
+Using/

@@ -1,14 +1,17 @@
 import chromadb
 from chromadb.config import Settings
+from config import settings
 
 class ChromaClient:
     def __init__(self):
-        # The ChromaDB server is running on the 'chroma' service, at port 8000.
-        self.client = chromadb.HttpClient(
-            host="chroma", 
-            port=8000, 
-            settings=Settings(anonymized_telemetry=False)
-        )
+        # Use REST (v2) client with explicit tenant/database to avoid deprecated v1 paths
+        self.client = chromadb.Client(Settings(
+            chroma_api_impl="rest",
+            chroma_server_host=settings.CHROMA_HOST,
+            chroma_server_http_port=settings.CHROMA_PORT,
+            tenant="default_tenant",
+            database="default_database",
+        ))
 
     def get_chroma_status(self):
         try:

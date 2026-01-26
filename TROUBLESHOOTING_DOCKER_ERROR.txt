@@ -1,26 +1,26 @@
-I see you are having an issue with Docker. The error message `request returned 500 Internal Server Error for API route` suggests that there might be a problem with your Docker Desktop installation.
+The error `unable to get image 'chromadb/chroma:latest': request returned 500 Internal Server Error` indicates a problem with your Docker environment's ability to pull the ChromaDB image from Docker Hub.
 
-Here are a few steps you can take to troubleshoot this issue:
+As the error message from the startup script suggested, the first and most common solution is to **restart Docker Desktop**.
 
-1.  **Check Docker Desktop Status:** Make sure that Docker Desktop is running and that the Docker daemon is available. You can usually see the Docker icon in your system tray.
+If a restart does not solve the problem, here are some other things you can try:
 
-2.  **View Container Logs:** To get more information about why the `mensa_backend` container is failing, please run the following command in your terminal:
-
+1.  **Manually pull the image:**
+    Open a terminal and run the following command to try and pull the image directly:
     ```
-    docker-compose logs -f mensa_backend
+    docker pull chromadb/chroma:latest
     ```
+    This can sometimes provide a more specific error message.
 
-    This will show the logs for the backend service. Please copy and paste the output of this command in your next message.
+2.  **Check Network / VPN / Firewall:**
+    Your network configuration, a VPN, or a firewall could be blocking the connection to Docker Hub. Try temporarily disabling them to see if the pull succeeds.
 
-3.  **Restart Docker Desktop:** Sometimes, a simple restart of Docker Desktop can resolve these kinds of issues.
+3.  **Check Docker's Network Settings:**
+    Go to Docker Desktop's settings, find the "Network" section, and ensure the DNS is configured correctly. You can try switching to a public DNS server like Google's (`8.8.8.8`).
 
-4.  **Check Docker Version:** Please run the following commands and provide me with the output:
+4.  **Check Docker Daemon Logs:**
+    The Docker daemon logs might contain more detailed information about the error. You can find the logs in Docker Desktop's "Troubleshoot" section.
 
-    ```
-    docker version
-    docker-compose version
-    ```
+5.  **ChromaDB on Docker Hub:**
+    You can find more information about the image, including available tags, on the official ChromaDB Docker Hub page: https://hub.docker.com/r/chromadb/chroma
 
-    This will help me determine if there is a version mismatch between your Docker client and server.
-
-I am here to help you troubleshoot this issue. Please provide me with the information I requested, and we can work together to resolve it.
+After trying these steps, run the startup command again. If the problem persists, it is likely an issue with your local Docker installation or network environment.

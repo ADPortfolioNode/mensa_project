@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Ignore node_modules directory
+node_modules
+
+# Ignore build artifacts
+build
+.DS_Store
+
+# Ignore IDE and OS files
+.vscode
+.idea
+*.suo
+*.user
+Thumbs.db
+
+# Ignore local env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

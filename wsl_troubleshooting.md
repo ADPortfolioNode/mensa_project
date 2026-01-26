@@ -1,50 +1,81 @@
-# Troubleshooting WSL 2 Networking Issues
+# WSL Troubleshooting Guide
 
-When you run servers inside Docker on WSL 2, they bind to `localhost` *within the WSL environment*. Sometimes, these ports are not automatically forwarded to `localhost` on your Windows host machine, which prevents you from accessing them in your browser.
+If you are running Docker on Windows with the WSL 2 backend, you might encounter performance issues or errors related to resource limits (memory and disk space). This is because Docker Desktop runs within a virtual machine managed by WSL 2. Over time, this VM's virtual disk can grow very large and it might not release memory back to the host system efficiently.
 
-Here is the recommended solution to ensure that ports are correctly forwarded.
+Here are some steps to reclaim disk space and reset Docker's resource usage on WSL.
 
-## Step 1: Edit your `.wslconfig` file
+## Step 1: Check WSL Status
 
-You need to ensure that WSL is configured to forward localhost ports.
+First, open PowerShell or Command Prompt and check the status of your WSL distributions.
 
-1.  Open Windows PowerShell or Command Prompt.
-2.  Open your WSL configuration file in notepad by running:
-    ```shell
-    notepad C:\Users\deois\.wslconfig
-    ```
-3.  Add the following content to the file. If the file already has a `[wsl2]` section, add the `localhostForwarding` key to it.
+```powershell
+wsl -l -v
+```
 
-    ```ini
-    [wsl2]
-    localhostForwarding=true
-    ```
+You should see output like this. The `docker-desktop` and `docker-desktop-data` distributions are the ones we are interested in.
 
-4.  Save the file and close the editor.
+```
+  NAME                   STATE           VERSION
+* Ubuntu-20.04           Running         2
+  docker-desktop-data    Running         2
+  docker-desktop         Running         2
+```
 
-## Step 2: Restart WSL
+## Step 2: Shut Down Docker and WSL
 
-For the changes in `.wslconfig` to take effect, you must shut down and restart the WSL instance.
+To safely perform maintenance, you need to shut down Docker Desktop and all running WSL instances.
 
-1.  Open Windows PowerShell or Command Prompt.
-2.  Run the following command:
-    ```shell
+1.  **Quit Docker Desktop:** Right-click the Docker icon in your system tray and select "Quit Docker Desktop".
+2.  **Shut down WSL:** In your terminal, run the following command. This will terminate all running distributions.
+
+    ```powershell
     wsl --shutdown
     ```
-    This command will stop all running WSL distributions.
 
-## Step 3: Restart Your Application
+    Wait a few moments for it to complete. You can run `wsl -l -v` again to confirm that all distributions are in the `Stopped` state.
 
-1.  Navigate back to your project directory (`e:\2024 RESET\mensa_project`) in your WSL terminal.
-2.  Start your Docker containers again:
-    ```shell
-    docker-compose up -d --build
+## Step 3: Reclaim Disk Space (Compact Virtual Disk)
+
+WSL 2 stores each distribution in its own virtual hard disk file (`.vhdx`). When you delete files inside WSL, the `.vhdx` file does not automatically shrink. You can manually compact it.
+
+1.  **Find the `diskpart` command-line tool.** It's a built-in Windows utility.
+2.  **Run the script:** You will need to find the path to your `docker-desktop-data` VHDX file. It's usually located in a path like:
+    `%LOCALAPPDATA%\Docker\wsl\data\ext4.vhdx`
+3.  **Open a Command Prompt as Administrator** and run the following commands, replacing the path with the correct one for your system if it's different.
+
+    ```batch
+    # First, start the diskpart utility
+    diskpart
+
+    # Inside diskpart, select the virtual disk
+    select vdisk file="%LOCALAPPDATA%\Docker\wsl\data\ext4.vhdx"
+
+    # Compact the disk
+    compact vdisk
+
+    # Exit diskpart
+    exit
     ```
 
-## Step 4: Access the Application
+This process can take a few minutes and will shrink the `.vhdx` file, reclaiming potentially gigabytes of space on your host machine.
 
-After the containers have started, open your web browser on Windows and navigate to:
+## Step 4: Restart Docker
 
-**http://localhost:3000**
+Once the process is complete, you can restart Docker Desktop. It will automatically restart the required WSL distributions.
 
-You should now be able to see your frontend application.
+Your Docker environment should now be in a cleaner state, with more available disk space and reset memory usage.
+
+## Optional: Limiting WSL Memory Usage
+
+By default, WSL 2 will consume up to 50% of your total RAM. If you find it's using too much memory, you can limit it by creating a `.wslconfig` file in your user profile directory (`C:\Users\<YourUsername>`).
+
+1.  Create a file named `.wslconfig` in `C:\Users\<YourUsername>\`.
+2.  Add the following content to limit memory, for example, to 4GB:
+
+    ```
+    [wsl2]
+    memory=4GB
+    processors=2
+    ```
+
+3.  Save the file and run `wsl --shutdown` for the changes to take effect. The next time WSL starts, it will respect these limits. Be aware that setting this too low can cause services like ChromaDB to fail, so you may need to experiment to find a good balance for your system.

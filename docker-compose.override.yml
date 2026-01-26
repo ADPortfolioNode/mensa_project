@@ -1,0 +1,6 @@
+services:
+  frontend:
+    environment:
+      - HOME=/app
+  backend:
+    volumes: []

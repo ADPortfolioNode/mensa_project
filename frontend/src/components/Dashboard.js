@@ -6,6 +6,7 @@ import WorkflowSummary from './WorkflowSummary';
 import ExperimentsPanel from './ExperimentsPanel';
 import GameSummaryPanel from './GameSummaryPanel';
 import ChromaStatusPanel from './ChromaStatusPanel';
+import GameSelector from './GameSelector';
 
 export default function Dashboard() {
   // Normalize API base: trim, strip trailing slashes, and ensure scheme when provided
@@ -165,11 +166,9 @@ export default function Dashboard() {
             <p>Fetch and sync lottery data.</p>
             <div className="mb-3">
                 <label htmlFor="gameSelect" className="form-label">Select Game</label>
-                <select id="gameSelect" className="form-select" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
-                    <option value="">-- Select a game --</option>
-                    {games.map(game => <option key={game} value={game}>{game}</option>)}
-                </select>
+                <GameSelector games={games} onGameSelect={setSelectedGame} />
             </div>
+            {selectedGame && <h2>Selected Game: {selectedGame}</h2>}
             <button className="btn btn-primary me-2" onClick={startIngest} disabled={ingestStatus === 'in progress' || !selectedGame}>Run Ingest</button>
             <button className="btn btn-secondary mt-2" onClick={startTrain} disabled={trainStatus === 'in progress' || ingestStatus !== 'completed' || !selectedGame}>Run Train</button>
           </div>

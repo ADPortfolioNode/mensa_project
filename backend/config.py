@@ -1,49 +1,42 @@
-import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
+class Settings(BaseSettings):
+    """
+    Centralized configuration for the application.
+    """
+    PROJECT_NAME: str = "Mensa Project"
+    
+    # OpenAI
+    OPENAI_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
+    
+    # ChromaDB
+    CHROMA_HOST: str = "mensa_chroma"
+    CHROMA_PORT: int = 8000
+    
+    model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+settings = Settings()
 
-DATASET_ENDPOINTS = {
-    "take5": ["https://data.ny.gov/api/views/6wrc-wmqa/rows.json"],
-    "pick3": ["https://data.ny.gov/api/views/n4w8-wxte/rows.json"],
-    "powerball": ["https://data.ny.gov/api/views/d6yy-54nr/rows.json"],
-
-    "megamillions": ["https://data.ny.gov/api/views/5xaw-6ayf/rows.json"],
-    "pick10": ["https://data.ny.gov/api/views/bycu-cw7c/rows.json"],
-    "cash4life": ["https://data.ny.gov/api/views/kwxv-fwze/rows.json"],
-    "quickdraw": ["https://data.ny.gov/api/views/7sqk-ycpk/rows.json"],
+# Game configurations (imported by main.py)
+GAME_CONFIGS = {
+    "take5": {},
+    "pick3": {},
+    "powerball": {},
+    "megamillions": {},
+    "pick10": {},
+    "cash4life": {},
+    "quickdraw": {},
+    "nylotto": {}
 }
 
-GAME_CONFIGS = {
-    "take5": {
-        "name": "Take 5",
-        "url": "https://data.ny.gov/Government-Finance/Take-5-Lottery-Winning-Numbers/6wrc-wmqa",
-    },
-    "pick3": {
-        "name": "Pick 3",
-        "url": "https://data.ny.gov/Government-Finance/Pick-3-Lottery-Winning-Numbers/n4w8-wxte",
-    },
-    "powerball": {
-        "name": "Powerball",
-        "url": "https://data.ny.gov/Government-Finance/Lottery-Powerball-Winning-Numbers-Beginning-2010/d6yy-54nr",
-    },
-
-    "megamillions": {
-        "name": "Mega Millions",
-        "url": "https://data.ny.gov/Government-Finance/Lottery-Mega-Millions-Winning-Numbers-Beginning-20/5xaw-6ayf",
-    },
-    "pick10": {
-        "name": "Pick 10",
-        "url": "https://data.ny.gov/Government-Finance/Lottery-Pick-10-Winning-Numbers-Beginning-1987/bycu-cw7c",
-    },
-    "cash4life": {
-        "name": "Cash 4 Life",
-        "url": "https://data.ny.gov/Government-Finance/Lottery-Cash-4-Life-Winning-Numbers/kwxv-fwze",
-    },
-    "quickdraw": {
-        "name": "Quick Draw",
-        "url": "https://data.ny.gov/Government-Finance/Lottery-Quick-Draw-Winning-Numbers-Beginning-2013/7sqk-ycpk",
-    },
+DATASET_ENDPOINTS = {
+    "take5": ["https://data.ny.gov/api/views/dg63-4siq/rows.json?accessType=DOWNLOAD"],
+    "pick3": ["https://data.ny.gov/api/views/fore-yqye/rows.json?accessType=DOWNLOAD"],
+    "powerball": ["https://data.ny.gov/api/views/d6yy-54nr/rows.json?accessType=DOWNLOAD"],
+    "megamillions": ["https://data.ny.gov/api/views/5xaw-6ayf/rows.json?accessType=DOWNLOAD"],
+    "pick10": ["https://data.ny.gov/api/views/bycu-cw7c/rows.json?accessType=DOWNLOAD"],
+    "cash4life": ["https://data.ny.gov/api/views/kwxv-fwze/rows.json?accessType=DOWNLOAD"],
+    "quickdraw": ["https://data.ny.gov/api/views/7sqk-ycpk/rows.json?accessType=DOWNLOAD"],
+    "nylotto": ["https://data.ny.gov/api/views/6nbc-h7bj/rows.json?accessType=DOWNLOAD"]
 }

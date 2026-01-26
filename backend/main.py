@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import asyncio
 import threading
 import time
 
@@ -20,10 +19,12 @@ app = FastAPI()
 # --- Global startup state tracking for monitoring ---
 startup_state = {
     "status": "initializing",
-    "progress": 0,
+    "progress": 0.0,  # Can be fractional (e.g., 1.5 of 7)
     "total": len(GAME_CONFIGS),
     "current_game": None,
     "current_task": None,
+    "current_game_rows_fetched": 0,  # Track rows fetched in current game
+    "current_game_rows_total": 0,    # Expected total rows (if known)
     "games": {game: {"status": "pending", "error": None} for game in GAME_CONFIGS.keys()},
     "started_at": None,
     "completed_at": None
@@ -43,21 +44,34 @@ def start_background_ingestion():
             try:
                 startup_state["current_game"] = game
                 startup_state["current_task"] = "fetching"
-                startup_state["progress"] = i - 1  # Mark as in-progress before starting
+                startup_state["progress"] = float(i - 1)  # Mark as in-progress before starting
+                startup_state["current_game_rows_fetched"] = 0
+                startup_state["current_game_rows_total"] = 0
                 startup_state["games"][game]["status"] = "ingesting"
                 startup_state["games"][game]["error"] = None
                 
                 print(f"[{i}/{startup_state['total']}] Ingesting {game}...")
                 
-                # Run async ingestion in new event loop within thread
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(ingest_service.fetch_and_sync(game))
-                loop.close()
+                # Define progress callback for this game
+                def update_game_progress(rows_fetched, total_rows):
+                    startup_state["current_game_rows_fetched"] = rows_fetched
+                    startup_state["current_game_rows_total"] = total_rows
+                    # Update overall progress with fractional value
+                    # e.g., if on game 1 and have fetched 500 of 1000 rows, progress = 0.5
+                    if total_rows and total_rows > 0:
+                        startup_state["progress"] = float(i - 1) + (rows_fetched / total_rows)
+                    else:
+                        # Fallback for unknown total, advance based on game number
+                        startup_state["progress"] = float(i - 1)
+                
+                # Call the synchronous ingest service with progress callback
+                ingest_service.fetch_and_sync(game, progress_callback=update_game_progress)
                 
                 startup_state["games"][game]["status"] = "completed"
                 startup_state["games"][game]["error"] = None
-                startup_state["progress"] = i
+                startup_state["progress"] = float(i)  # Mark as complete
+                startup_state["current_game_rows_fetched"] = 0
+                startup_state["current_game_rows_total"] = 0
                 print(f"✓ {game} ingested successfully")
                 
             except Exception as e:
@@ -136,12 +150,9 @@ async def get_chroma_status():
 
 @app.get("/api/chroma/collections")
 async def get_chroma_collections():
-    # In Chroma v0.6.0, list_collections only returns collection names (strings).
-    # We need to get each collection by its name to access its attributes.
-    collection_names = chroma_client.list_collections() # This now returns a list of strings
+    collections = chroma_client.list_collections()
     collections_with_details = []
-    for collection_name in collection_names: # Iterate directly over names
-        collection = chroma_client.client.get_collection(collection_name)
+    for collection in collections:
         collections_with_details.append({
             "name": collection.name,
             "id": collection.id,
@@ -200,4 +211,4 @@ async def get_startup_status():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

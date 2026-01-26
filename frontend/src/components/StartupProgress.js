@@ -101,7 +101,12 @@ const StartupProgress = ({ onComplete }) => {
             {/* Progress Bar */}
             <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ marginBottom: '8px' }}>
-                    Download Progress: {status.progress} of {status.total} games
+                    Download Progress: {status.progress.toFixed(1)} of {status.total} games
+                    {status.current_game_rows_fetched > 0 && (
+                        <span style={{ fontSize: '0.9em', color: '#666' }}>
+                            {' '}({status.current_game_rows_fetched.toLocaleString()} rows in {status.current_game})
+                        </span>
+                    )}
                 </h4>
                 <div style={{
                     width: '100%',
