@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS base
+﻿FROM python:3.11-slim AS base
 
 # Set workdir for all stages
 WORKDIR /app
@@ -24,7 +24,10 @@ COPY . .
 FROM base AS final
 
 # Create a non-root user and group
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN addgroup --system appgroup && \
+    adduser --system --ingroup appgroup appuser && \
+    mkdir -p /home/appuser && \
+    chown appuser:appgroup /home/appuser
 
 # Copy application code and venv from builder
 COPY --from=builder /app /app
@@ -33,18 +36,19 @@ COPY --from=builder /opt/venv /opt/venv
 # Set environment so the venv is used by default
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/home/appuser
 
 # Set permissions
-RUN chown -R appuser:appgroup /app /opt/venv && \
+RUN chown -R appuser:appgroup /app /opt/venv /home/appuser && \
     chmod +x /app/start.sh
 USER appuser
 
 # Verify venv and fastapi are available
 RUN python -c "import fastapi; print('FastAPI is available')"
 
-# Expose port (if your app listens on a specific port, e.g. 8000)
-EXPOSE 8000
+# Expose port 5000 for FastAPI backend
+EXPOSE 5000
 
 # Set entrypoint (adjust if your app uses a different entrypoint)
 CMD ["/app/start.sh"]

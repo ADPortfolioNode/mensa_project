@@ -1,17 +1,19 @@
 import chromadb
-from chromadb.config import Settings
 from config import settings
 
 class ChromaClient:
     def __init__(self):
-        # Use REST (v2) client with explicit tenant/database to avoid deprecated v1 paths
-        self.client = chromadb.Client(Settings(
-            chroma_api_impl="rest",
-            chroma_server_host=settings.CHROMA_HOST,
-            chroma_server_http_port=settings.CHROMA_PORT,
-            tenant="default_tenant",
-            database="default_database",
-        ))
+        self._client = None
+
+    @property
+    def client(self):
+        if self._client is None:
+            # Lazy initialization - only connect when first accessed
+            self._client = chromadb.HttpClient(
+                host=settings.CHROMA_HOST,
+                port=settings.CHROMA_PORT,
+            )
+        return self._client
 
     def get_chroma_status(self):
         try:

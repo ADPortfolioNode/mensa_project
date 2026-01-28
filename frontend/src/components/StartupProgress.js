@@ -46,9 +46,16 @@ const StartupProgress = ({ onComplete }) => {
         return <div style={{ padding: '20px' }}>Initializing...</div>;
     }
 
-    const overallProgress = status.total > 0 ? (status.progress / status.total) * 100 : 0;
+    const games = status.games || {};
+    const gameEntries = Object.entries(games);
+    const progressVal = Number(status.progress ?? 0);
+    // Fall back to the number of games if backend omits total
+    const totalVal = Number(status.total ?? gameEntries.length ?? 0);
+    const rowsFetched = Number(status.current_game_rows_fetched ?? 0);
+    const overallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : 0;
     const isIngesting = status.status === 'ingesting';
     const isCompleted = status.status === 'completed';
+    const hasGamesConfigured = gameEntries.length > 0;
     
     const formatTime = (seconds) => {
         if (seconds < 60) return `${seconds.toFixed(1)}s`;
@@ -101,13 +108,18 @@ const StartupProgress = ({ onComplete }) => {
             {/* Progress Bar */}
             <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ marginBottom: '8px' }}>
-                    Download Progress: {status.progress.toFixed(1)} of {status.total} games
-                    {status.current_game_rows_fetched > 0 && (
+                    Download Progress: {progressVal.toFixed(1)} of {totalVal} games
+                    {rowsFetched > 0 && (
                         <span style={{ fontSize: '0.9em', color: '#666' }}>
-                            {' '}({status.current_game_rows_fetched.toLocaleString()} rows in {status.current_game})
+                            {' '}({rowsFetched.toLocaleString()} rows in {status.current_game})
                         </span>
                     )}
                 </h4>
+                {!hasGamesConfigured && (
+                    <p style={{ marginTop: '-4px', color: '#6c757d' }}>
+                        No games reported by backend yet. This usually means ingestion has not started.
+                    </p>
+                )}
                 <div style={{
                     width: '100%',
                     backgroundColor: '#e9ecef',
@@ -149,7 +161,14 @@ const StartupProgress = ({ onComplete }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {Object.entries(status.games).map(([game, gameData]) => (
+                    {gameEntries.length === 0 && (
+                        <tr>
+                            <td colSpan="3" style={{ padding: '12px', textAlign: 'center', color: '#6c757d' }}>
+                                Waiting for backend to report game ingestion status...
+                            </td>
+                        </tr>
+                    )}
+                    {gameEntries.map(([game, gameData]) => (
                         <tr
                             key={game}
                             style={{

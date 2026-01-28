@@ -1,6 +1,5 @@
 import os
 import joblib
-from .chroma_client import chroma_client
 import numpy as np
 
 class PredictorService:
@@ -8,6 +7,9 @@ class PredictorService:
         self.models_dir = "/data/models"
 
     def predict_next_draw(self, game: str, recent_k: int = 10):
+        # Lazy import to avoid ChromaDB connection during module import
+        from .chroma_client import chroma_client
+        
         model_path = os.path.join(self.models_dir, f"{game}_model.joblib")
         if not os.path.exists(model_path):
             return {"status": "error", "message": f"Model for game '{game}' not found."}

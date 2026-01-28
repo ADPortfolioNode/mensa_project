@@ -150,16 +150,32 @@ async def get_chroma_status():
 
 @app.get("/api/chroma/collections")
 async def get_chroma_collections():
-    collections = chroma_client.list_collections()
-    collections_with_details = []
-    for collection in collections:
-        collections_with_details.append({
-            "name": collection.name,
-            "id": collection.id,
-            "metadata": collection.metadata,
-            "count": collection.count()
-        })
-    return collections_with_details
+    """Return a safe list of collections with counts without relying on Chroma's list_collections.
+    This avoids client/server version mismatches (e.g., missing 'dimension' field).
+    """
+    results = []
+    try:
+        # Start with configured game names; avoid list_collections() due to server/client mismatches
+        game_names = list(GAME_CONFIGS.keys())
+        for name in game_names:
+            try:
+                count = chroma_client.count_documents(name)
+                results.append({
+                    "name": name,
+                    "count": count,
+                })
+            except Exception as inner_e:
+                print(f"Error counting documents for {name}: {inner_e}")
+                results.append({
+                    "name": name,
+                    "count": 0,
+                    "error": str(inner_e),
+                })
+        status = chroma_client.get_chroma_status()
+        return {"status": status.get("status", "unknown"), "collections": results}
+    except Exception as e:
+        # Normalize error shape for frontend
+        return {"status": "error", "error": str(e), "collections": results}
 
 @app.post("/api/ingest")
 async def ingest_data(request: IngestRequest):

@@ -1,7 +1,6 @@
 import os
 import joblib
 from sklearn.ensemble import RandomForestClassifier
-from .chroma_client import chroma_client
 import pandas as pd
 
 class TrainerService:
@@ -10,6 +9,9 @@ class TrainerService:
         os.makedirs(self.models_dir, exist_ok=True)
 
     def train_model(self, game: str):
+        # Lazy import to avoid ChromaDB connection during module import
+        from .chroma_client import chroma_client
+        
         collection_name = game
         collection = chroma_client.client.get_collection(collection_name)
         data = collection.get()

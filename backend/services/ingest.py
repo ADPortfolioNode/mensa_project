@@ -3,8 +3,8 @@ import hashlib
 import time
 import signal
 from functools import wraps
-from .chroma_client import chroma_client
 from config import DATASET_ENDPOINTS
+from chromadb.utils import embedding_functions
 
 class TimeoutError(Exception):
     """Raised when an operation exceeds the time limit."""
@@ -56,7 +56,16 @@ class IngestService:
         batch_size = 500  # Process 500 records at a time
 
         collection_name = game
-        collection = chroma_client.client.get_or_create_collection(collection_name)
+        # Use default embedding function to avoid dimension mismatch
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+        
+        # Lazy import to avoid ChromaDB connection during module import
+        from .chroma_client import chroma_client
+        
+        collection = chroma_client.client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=default_ef
+        )
 
         # Estimate total rows for progress reporting, assuming 1000 per endpoint as a rough guess
         estimated_total_rows = len(endpoints) * 1000 

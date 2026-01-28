@@ -14,6 +14,8 @@ services:
       - MAX_CONCURRENT_CLONES=3
       - CHROMA_SDK_ENABLED=1
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CHROMA_HOST=mensa_chroma
+      - CHROMA_PORT=8000
     depends_on:
       chroma:
         condition: service_started
@@ -29,9 +31,6 @@ services:
       args:
         NODE_VERSION: 22.13.1
     container_name: mensa_frontend
-    working_dir: /usr/src/app
-    volumes:
-      - ./frontend:/usr/src/app
     ports:
       - "3000:3000"
     depends_on:
@@ -41,17 +40,15 @@ services:
       - REACT_APP_API_BASE=http://backend:5000
     restart: unless-stopped
   chroma:
-    image: chromadb/chroma:0.4.24
+    image: chromadb/chroma:0.5.3
     container_name: mensa_chroma
-    command: run --host 0.0.0.0 --port 8000 --path /chroma
     environment:
-      - HNSWLIB_NO_NATIVE=1
-      - IS_PERSISTENT="TRUE"
-      - ANONYMIZED_TELEMETRY="FALSE"
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
     ports:
       - "8000:8000"
     volumes:
-      - ./data/chroma:/chroma
+      - ./data/chroma:/chroma/chroma
     restart: on-failure
 
 volumes:
