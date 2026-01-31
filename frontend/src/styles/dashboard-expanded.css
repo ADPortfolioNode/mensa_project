@@ -1,0 +1,418 @@
+/* Enhanced Dashboard with Expandable Cards */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dashboard Header */
+.dashboard-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-xl);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-green-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.game-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  max-width: 300px;
+}
+
+.game-selector-wrapper .label {
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+.game-select {
+  flex: 1;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.game-select:hover {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+}
+
+.game-select:focus {
+  outline: none;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 16px rgba(0, 255, 136, 0.5);
+}
+
+/* Collection Update Banner */
+.collection-update-banner {
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 204, 102, 0.1));
+  border: 2px solid var(--accent-green);
+  border-radius: var(--radius-lg);
+  animation: slideDown 0.4s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.update-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  justify-content: space-between;
+}
+
+.update-icon {
+  font-size: 1.5rem;
+  color: var(--accent-green);
+  font-weight: bold;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.update-text {
+  flex: 1;
+  font-weight: 500;
+}
+
+.update-text strong {
+  color: var(--accent-green-light);
+}
+
+.update-time {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* Dashboard Grid - Masonry-style with Expansion */
+.dashboard-grid {
+  display: grid;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.dashboard-grid.grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-grid.grid-cols-2 {
+  grid-template-columns: 1fr;
+}
+
+/* Expandable Card System */
+.card {
+  position: relative;
+  transition: all var(--transition-normal);
+  cursor: pointer;
+}
+
+.card:not(.card-locked) {
+  cursor: pointer;
+}
+
+.card.card-expanded {
+  grid-column: 1 / -1;
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+  border-color: var(--accent-green);
+}
+
+.card.card-expanded .card-expand-hint {
+  display: none;
+}
+
+.card-expand-hint {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: rgba(0, 255, 136, 0.1);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  transition: all var(--transition-fast);
+  pointer-events: none;
+}
+
+.card:hover:not(.card-locked) .card-expand-hint {
+  color: var(--accent-green);
+  background: rgba(0, 255, 136, 0.2);
+  border-color: rgba(0, 255, 136, 0.6);
+}
+
+/* Collapse hint for expanded cards */
+.card.card-expanded .card-collapse-hint {
+  display: block;
+}
+
+.card-collapse-hint {
+  display: none;
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  font-size: 0.8rem;
+  color: var(--accent-green);
+  background: rgba(0, 255, 136, 0.2);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-green);
+  pointer-events: none;
+}
+
+/* Form Groups */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.form-input {
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  transition: all var(--transition-normal);
+}
+
+.form-input:hover {
+  border-color: var(--accent-green);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+  background: var(--bg-secondary);
+}
+
+/* Button States */
+.btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+  pointer-events: none;
+}
+
+.btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Badge Animations */
+.badge {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Loading State */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn:disabled .spinner {
+  border-color: var(--border-color);
+  border-top-color: var(--accent-green);
+}
+
+/* Responsive Grid - Mobile First */
+
+/* Mobile: 360px+ */
+@media (min-width: 360px) {
+  .dashboard-grid.grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tablet: 640px+ */
+@media (min-width: 640px) {
+  .dashboard-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .game-selector-wrapper {
+    width: auto;
+    max-width: none;
+  }
+
+  .dashboard-grid.grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .card.card-expanded {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Small Laptop: 1024px+ */
+@media (min-width: 1024px) {
+  .dashboard-grid.grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .card.card-expanded {
+    grid-column: 1 / -1;
+  }
+
+  .update-content {
+    flex-direction: row;
+    gap: var(--spacing-xl);
+  }
+}
+
+/* Large Laptop: 1280px+ */
+@media (min-width: 1280px) {
+  .dashboard {
+    gap: var(--spacing-2xl);
+  }
+
+  .dashboard-header {
+    gap: var(--spacing-xl);
+  }
+
+  .dashboard-grid.grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .card.card-expanded {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Ultra-wide: 1536px+ */
+@media (min-width: 1536px) {
+  .dashboard-grid.grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Small devices optimization */
+@media (max-width: 639px) {
+  .dashboard-header {
+    gap: var(--spacing-md);
+  }
+
+  .game-selector-wrapper {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .game-select {
+    width: 100%;
+  }
+
+  .card {
+    padding: var(--spacing-lg);
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .card-expand-hint,
+  .card-collapse-hint {
+    display: none;
+  }
+}
+
+/* Expanded state adjustments */
+.card.card-expanded .card-header {
+  padding-bottom: var(--spacing-lg);
+}
+
+.card.card-expanded .card-body {
+  max-height: none;
+  overflow: visible;
+}
+
+/* Smooth transition for expansion */
+.dashboard-grid {
+  transition: grid-template-columns var(--transition-normal);
+}
+
+/* Stagger animation for multiple expanded cards */
+@keyframes expandIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.card.card-expanded {
+  animation: expandIn 0.3s ease-out;
+}
