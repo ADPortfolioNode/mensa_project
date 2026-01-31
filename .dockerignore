@@ -1,7 +1,79 @@
-.venv
-__pycache__
-frontend/node_modules
-backend/.venv
+# Git
 .git
-.env
+.gitignore
+.gitattributes
+
+# Version Control
+.hg
+.svn
+
+# IDE / Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
 .DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.venv
+backend/.venv
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/node_modules
+npm-debug.log
+yarn-error.log
+coverage/
+
+# Build artifacts
+build/
+
+# OS
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Data & Models (keep local, don't include in image)
+data/
+models/
+*.joblib
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Testing
+tests/
+pytest.ini
+
+# Documentation
+*.md
+README*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Misc
+.turbo
+diag_output.log
+Removed/
+Using/

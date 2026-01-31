@@ -1,0 +1,27 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  default:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: default
+    stream: ext://sys.stdout
+
+root:
+  level: INFO
+  handlers: [console]
+
+loggers:
+  chromadb:
+    level: INFO
+    handlers: [console]
+    propagate: false
+  uvicorn:
+    level: INFO
+    handlers: [console]
+    propagate: false

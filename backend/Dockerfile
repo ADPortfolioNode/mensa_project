@@ -1,54 +1,33 @@
-﻿FROM python:3.11-slim AS base
+﻿# Multi-stage build for optimized image size and layer caching
+FROM python:3.11-slim as builder
 
-# Set workdir for all stages
 WORKDIR /app
 
-# --- Builder stage ---
-FROM base AS builder
+# Copy only requirements for dependency caching layer
+# This layer is cached unless requirements.txt changes, reducing rebuild time
+COPY requirements.txt .
 
-# Install build dependencies (if any are needed, e.g. gcc, build-essential, etc.)
-# Only install pip and venv-related tools if not present (python:3.11-slim has venv and pip)
+# Install with extended timeout and retries for network resilience
+# Remove httptools (C extension) and use h11 (pure Python HTTP) to avoid memory issues
+RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt && \
+    pip uninstall -y httptools
 
-# Copy only requirements.txt first for better cache usage
-COPY requirements.txt ./
+# Final runtime stage
+FROM python:3.11-slim
 
-# Create venv and install dependencies
-RUN python -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
 
-# Copy the rest of the application code (excluding files in .dockerignore)
+# Copy installed packages from builder stage
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
 COPY . .
 
-# --- Final stage ---
-FROM base AS final
+# Add health check: use wget or netcat to verify port is listening
+# Falls back to testing with python built-ins if needed
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import socket; socket.create_connection(('127.0.0.1', 5000), timeout=2).close()" || exit 1
 
-# Create a non-root user and group
-RUN addgroup --system appgroup && \
-    adduser --system --ingroup appgroup appuser && \
-    mkdir -p /home/appuser && \
-    chown appuser:appgroup /home/appuser
-
-# Copy application code and venv from builder
-COPY --from=builder /app /app
-COPY --from=builder /opt/venv /opt/venv
-
-# Set environment so the venv is used by default
-ENV PATH="/opt/venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    HOME=/home/appuser
-
-# Set permissions
-RUN chown -R appuser:appgroup /app /opt/venv /home/appuser && \
-    chmod +x /app/start.sh
-USER appuser
-
-# Verify venv and fastapi are available
-RUN python -c "import fastapi; print('FastAPI is available')"
-
-# Expose port 5000 for FastAPI backend
-EXPOSE 5000
-
-# Set entrypoint (adjust if your app uses a different entrypoint)
-CMD ["/app/start.sh"]
+# Use h11 instead of httptools to avoid memory allocation issues
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--http", "h11"]
