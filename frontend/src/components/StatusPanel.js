@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import getApiBase from '../utils/apiBase';
 
 export default function StatusPanel({ status: initial = {} }) {
   // Normalize API base: trim, strip trailing slashes, and ensure scheme when provided
@@ -12,15 +13,7 @@ export default function StatusPanel({ status: initial = {} }) {
     return v;
   }
 
-  const API_BASE = normalizeApiBase(process.env.REACT_APP_API_BASE);
-  try {
-    if (process.env.REACT_APP_API_BASE && API_BASE) {
-      const _u = new URL(API_BASE);
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn("REACT_APP_API_BASE looks malformed:", process.env.REACT_APP_API_BASE, "normalized:", API_BASE);
-  }
+  const API_BASE = getApiBase();
   const [status, setStatus] = useState(initial);
 
   useEffect(() => {

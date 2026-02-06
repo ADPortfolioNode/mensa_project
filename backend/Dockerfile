@@ -3,14 +3,15 @@ FROM python:3.11-slim as builder
 
 WORKDIR /app
 
-# Copy only requirements for dependency caching layer
-# This layer is cached unless requirements.txt changes, reducing rebuild time
-COPY requirements.txt .
+# Allow choosing a requirements file at build time for fast validation builds
+ARG REQUIREMENTS_FILE=requirements.txt
 
-# Install with extended timeout and retries for network resilience
-# Remove httptools (C extension) and use h11 (pure Python HTTP) to avoid memory issues
-RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt && \
-    pip uninstall -y httptools
+# Copy only requirements for dependency caching layer
+COPY ${REQUIREMENTS_FILE} requirements.txt
+
+# Install dependencies in builder stage with extended timeout and retries
+# Install to user site-packages to make them easier to copy
+RUN pip --default-timeout=300 --retries 5 install --no-cache-dir --user -r requirements.txt
 
 # Final runtime stage
 FROM python:3.11-slim
@@ -18,8 +19,10 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy installed packages from builder stage
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /root/.local /root/.local
+
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
 
 # Copy application code
 COPY . .

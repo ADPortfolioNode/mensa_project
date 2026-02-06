@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import getApiBase from '../utils/apiBase';
 import PredictionDisplay from './PredictionDisplay';
 import './PredictionDisplay.css';
 
@@ -14,7 +15,7 @@ function normalizeApiBase(raw) {
   return v;
 }
 
-const API_BASE = normalizeApiBase(process.env.REACT_APP_API_BASE);
+const API_BASE = getApiBase();
 
 export default function GamePrediction({ game }) {
   const [recentK, setRecentK] = useState(10);

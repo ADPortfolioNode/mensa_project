@@ -4,10 +4,10 @@
 
 # Ignore node_modules directory
 node_modules
-
-# Ignore build artifacts
-build
 .DS_Store
+
+# Ignore build artifacts when building in-container; keep `build/` available if present
+# To use the prebuilt copy approach, ensure `build/` is present and not excluded.
 
 # Ignore IDE and OS files
 .vscode

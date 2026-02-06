@@ -32,12 +32,12 @@ services:
         NODE_VERSION: 22.13.1
     container_name: mensa_frontend
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - backend
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - REACT_APP_API_BASE=http://backend:5000
+      - REACT_APP_API_BASE=http://localhost:5000
     restart: unless-stopped
   chroma:
     image: chromadb/chroma:0.5.3

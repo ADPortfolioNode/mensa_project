@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import getApiBase from '../utils/apiBase';
 import PredictionPanel from './PredictionPanel';
 import ChatPanel from './ChatPanel';
 import WorkflowSummary from './WorkflowSummary';
@@ -10,17 +11,7 @@ import chromaStateManager from '../utils/chromaStateManager';
 import '../styles/dashboard.css';
 
 export default function Dashboard() {
-  // Normalize API base
-  function normalizeApiBase(raw) {
-    const v = (raw || '').toString().trim().replace(/\/+$/, '');
-    if (!v) return '';
-    if (!/^https?:\/\//i.test(v)) {
-      return `http://${v}`;
-    }
-    return v;
-  }
-
-  const API_BASE = normalizeApiBase(process.env.REACT_APP_API_BASE);
+  const API_BASE = getApiBase();
   
   // Game and UI State
   const [games, setGames] = useState([]);

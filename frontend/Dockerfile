@@ -1,47 +1,19 @@
-﻿ARG NODE_VERSION
-# Build stage
+﻿ARG NODE_VERSION=22.13.1
+# Multi-stage build: build inside Node, serve static files with nginx
 FROM node:${NODE_VERSION}-slim AS builder
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json ./
-RUN npm install
-
-# Copy environment config and source files
-COPY .env* ./
-COPY public ./public
-COPY src ./src
-
-# Build the app (environment variables are baked in at build time)
+# Install deps and build
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps || npm ci
+COPY . .
 RUN npm run build
 
-# Production stage
-RUN echo "Building final stage with NODE_VERSION"
-ARG NODE_VERSION
-FROM node:${NODE_VERSION}-slim AS final
-WORKDIR /app
-
-# Create non-root user with home directory
-RUN addgroup --system appgroup && \
-    adduser --system --ingroup appgroup appuser && \
-    mkdir -p /home/appuser && \
-    chown appuser:appgroup /home/appuser
-
-# Copy built app and production dependencies
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/package-lock.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/build ./build
-
-# Fix npm cache permissions and ensure proper ownership
-RUN mkdir -p /app/.npm && \
-    chown -R appuser:appgroup /app /home/appuser
-
-ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-ENV HOME=/home/appuser
-USER appuser
-
-EXPOSE 3000
-CMD ["./node_modules/.bin/serve", "-s", "build", "-l", "3000"]
+FROM nginx:alpine
+# Copy build output from builder stage
+COPY --from=builder /app/build /usr/share/nginx/html
+# Use custom nginx config for API proxy
+COPY nginx.conf /etc/nginx/nginx.conf
+# Expose the standard HTTP port
+EXPOSE 80
+CMD ["/bin/sh", "-c", "nginx -g 'daemon off;' -c /etc/nginx/nginx.conf"]

@@ -3,8 +3,9 @@ import { marked } from 'marked';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanel.css';
+import getApiBase from '../utils/apiBase';
 
-const API_BASE = process.env.REACT_APP_API_BASE || '';
+const API_BASE = getApiBase();
 
 function renderMarkdown(text) {
     if (typeof text !== 'string') {

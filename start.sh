@@ -12,6 +12,20 @@ set -euxo pipefail
 
 # --- Helper Functions ---
 
+choose_compose_command() {
+    # Prefer 'docker compose' (v2) but fall back to 'docker-compose' (v1)
+    if docker compose version >/dev/null 2>&1; then
+        COMPOSE_CMD="docker compose"
+    elif command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+        COMPOSE_CMD="docker-compose"
+    else
+        echo "ERROR: Neither 'docker compose' nor 'docker-compose' commands are available." >&2
+        echo "Install Docker Compose (v2 is recommended) or ensure it's on PATH." >&2
+        exit 1
+    fi
+    echo "Using compose command: ${COMPOSE_CMD}"
+}
+
 check_docker_version() {
     echo "Checking Docker environment..."
     
@@ -58,17 +72,26 @@ check_docker_version() {
 run_compose_up_with_retries() {
     local attempts=3
     local delay=20 # Increased delay
-    local build_arg=""
-    if [ "${BUILD}" = true ]; then
-        build_arg="--build --no-cache"
-    fi
-
     for i in $(seq 1 ${attempts}); do
-        echo "Attempt ${i}/${attempts}: docker-compose up -d ${build_arg} --force-recreate"
-        if docker-compose up -d ${build_arg} --force-recreate; then
+        echo "Attempt ${i}/${attempts}: bring up compose stack"
+
+        # If BUILD requested, run an explicit build step first (supports --no-cache)
+        if [ "${BUILD}" = true ]; then
+            echo "Building images (no-cache)..."
+            if ! eval "${COMPOSE_CMD} build --no-cache"; then
+                echo "Compose build failed; retrying in ${delay}s..."
+                sleep ${delay}
+                delay=$((delay * 2))
+                continue
+            fi
+        fi
+
+        echo "Starting services..."
+        if eval "${COMPOSE_CMD} up -d --force-recreate"; then
             return 0
         fi
-        echo "docker-compose up failed; retrying in ${delay}s..."
+
+        echo "Compose up failed; retrying in ${delay}s..."
         sleep ${delay}
         delay=$((delay * 2))
     done
@@ -142,6 +165,7 @@ fi
 
 # 1. Check Docker environment first
 check_docker_version
+choose_compose_command
 echo ""
 
 # 2. Prune if requested
@@ -154,20 +178,30 @@ if [ "${PRUNE}" = true ]; then
     echo ""
 fi
 
-# 3. Install frontend dependencies on the host
-echo "Installing frontend dependencies on the host (this might take a moment)..."
-if (cd frontend && npm install); then
-    echo "✓ Frontend dependencies are up to date."
-else
-    echo "ERROR: 'npm install' in frontend/ directory failed." >&2
-    echo "Please check for errors in the output above. You may need to run 'npm install' manually in that directory." >&2
-    exit 1
+# 3. Install frontend dependencies on the host (only when useful)
+echo "Checking frontend build status..."
+if [ -d "frontend" ]; then
+    # If we are rebuilding images, the Docker build will handle frontend; skip host npm install.
+    if [ "${BUILD}" = true ]; then
+        echo "BUILD requested: skipping host 'npm' install; Docker build will handle frontend.";
+    else
+        if [ -d "frontend/build" ]; then
+            echo "Frontend build exists (frontend/build). Skipping host 'npm' install."
+        else
+            echo "No frontend build found — running 'npm ci' in frontend/ to speed local dev iteration."
+            if (cd frontend && npm ci); then
+                echo "✓ Frontend dependencies installed (host)."
+            else
+                echo "WARNING: 'npm ci' in frontend/ failed. Continuing; you can run 'npm ci' manually." >&2
+            fi
+        fi
+    fi
 fi
 echo ""
 
 # 4. Stop and remove old containers and orphans
 echo "Stopping and removing any old containers..."
-docker-compose down --remove-orphans || true
+eval "${COMPOSE_CMD} down --remove-orphans" || true
 echo ""
 
 # 4. Build and start services
@@ -276,7 +310,7 @@ monitor_ingestion_progress() {
     while ! curl -s -f "${api_endpoint}" > /dev/null; do
         if [[ ${retries} -ge ${max_retries} ]]; then
             echo "✗ ERROR: Timed out waiting for backend API at ${api_endpoint}" >&2
-            echo "Run 'docker-compose logs backend' to investigate." >&2
+            echo "Run '${COMPOSE_CMD} logs backend' to investigate." >&2
             return 1
         fi
         retries=$((retries+1))
@@ -384,13 +418,13 @@ echo "✓ Mensa Project Started Successfully"
 echo "================================================="
 echo ""
 echo "Container Status:"
-docker-compose ps
+eval "${COMPOSE_CMD} ps"
 echo ""
 echo "Access your application:"
 echo "  Frontend: http://localhost:3000"
 echo "  Backend API: http://localhost:5000/api"
 echo ""
 echo "To view live logs from all services, run:" 
-echo "  docker-compose logs -f"
+echo "  ${COMPOSE_CMD} logs -f"
 echo ""
 

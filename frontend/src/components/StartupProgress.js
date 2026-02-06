@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getApiBase } from '../utils/apiBase';
 import { analyzeError, ErrorCategory } from '../utils/errorUtils';
 import ErrorMessage from './ErrorMessage';
 
@@ -7,15 +8,17 @@ const StartupProgress = ({ onComplete }) => {
     const [status, setStatus] = useState(null);
     const [errorReport, setErrorReport] = useState(null);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
+    const [isStarting, setIsStarting] = useState(false);
 
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await axios.get(`${process.env.REACT_APP_API_BASE}/api/startup_status`);
+                const response = await axios.get(`${getApiBase()}/api/startup_status`);
                 setErrorReport(null);
                 setStatus(response.data);
                 setElapsedSeconds(response.data.elapsed_s || 0);
-                if (response.data.status === 'completed') {
+                // Complete on either 'completed' (auto-ingestion) or 'ready' (manual mode)
+                if (response.data.status === 'completed' || response.data.status === 'ready') {
                     onComplete();
                 }
             } catch (error) {
@@ -55,6 +58,7 @@ const StartupProgress = ({ onComplete }) => {
     const overallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : 0;
     const isIngesting = status.status === 'ingesting';
     const isCompleted = status.status === 'completed';
+    const isReady = status.status === 'ready';
     const hasGamesConfigured = gameEntries.length > 0;
     
     const formatTime = (seconds) => {
@@ -76,9 +80,38 @@ const StartupProgress = ({ onComplete }) => {
         return '#6c757d';
     };
 
+    const handleStartInitialization = async () => {
+        setIsStarting(true);
+        try {
+            await axios.post(`${getApiBase()}/api/startup_init`);
+        } catch (error) {
+            console.error("Error starting initialization:", error);
+        } finally {
+            setIsStarting(false);
+        }
+    };
+
     return (
         <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
             <h2>🎰 Lottery Data Initialization</h2>
+            {(isReady || status.status === 'pending') && (
+                <div style={{ marginBottom: '12px' }}>
+                    <button
+                        onClick={handleStartInitialization}
+                        disabled={isStarting}
+                        style={{
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            cursor: isStarting ? 'not-allowed' : 'pointer'
+                        }}
+                    >
+                        {isStarting ? 'Starting...' : 'Start Initialization'}
+                    </button>
+                </div>
+            )}
             
             {/* Status Header */}
             <div style={{

@@ -1,10 +1,79 @@
+/* Neon accent utility classes for Bootstrap/neon hybrid styling */
+.text-neon {
+  color: #0ff !important;
+  text-shadow: 0 0 4px #0ff, 0 0 8px #0ff8;
+}
+.border-neon {
+  border-color: #0ff !important;
+  box-shadow: 0 0 8px #0ff4;
+}
+.bg-neon {
+  background: linear-gradient(90deg, #0ff 0%, #f0f 100%) !important;
+}
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #f8f9fa;
+  background-color: #111;
+  color: #fff;
 }
 
 .card {
-  transition: transform 0.2s ease-in-out;
+  background: #181818;
+  border: 1px solid #0ff;
+  box-shadow: 0 0 16px #0ff2, 0 0 2px #fff1;
+  color: #fff;
+  border-radius: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+  box-shadow: 0 0 32px #0ff8, 0 0 8px #fff2;
+  transform: scale(1.02);
+}
+  background: #111;
+  color: #0ff;
+  border: 1px solid #0ff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 1rem;
+  margin-bottom: 12px;
+  outline: none;
+  box-shadow: 0 0 8px #0ff2;
+}
+  border-color: #f0f;
+  color: #f0f;
+  box-shadow: 0 0 16px #f0f2;
+}
+  color: #0ff;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+  background: linear-gradient(90deg, #0ff 0%, #f0f 100%);
+  color: #111;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: bold;
+  box-shadow: 0 0 8px #0ff2;
+  transition: background 0.2s, color 0.2s;
+}
+  background: linear-gradient(90deg, #f0f 0%, #0ff 100%);
+  color: #fff;
+}
+  background: #222;
+  border-left: 4px solid #0ff;
+  color: #0ff;
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 0 8px #0ff2;
+}
+  color: #f0f;
+  font-size: 1.5rem;
+  margin-right: 8px;
+}
+  background: linear-gradient(90deg, #0ff 0%, #f0f 100%);
+}
+  background: #330022;
+  color: #f0f;
+  border: 1px solid #f0f;
+}
 }
 
 /* Custom Scrollbar for Chat */
@@ -13,15 +82,15 @@ body {
 }
 
 .overflow-auto::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #222;
   border-radius: 4px;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #0ff;
   border-radius: 4px;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #f0f;
 }

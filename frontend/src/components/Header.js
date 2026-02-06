@@ -9,7 +9,8 @@ const Header = () => {
   useEffect(() => {
     const pollStartupStatus = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_BASE}/api/startup_status`);
+        const { getApiBase } = await import('../utils/apiBase');
+        const response = await axios.get(`${getApiBase()}/api/startup_status`);
         setStartupStatus(response.data);
         
         // Hide progress bar after completion

@@ -48,7 +48,7 @@ class IngestService:
             progress_callback: Optional callback function(rows_fetched, total_rows) for progress tracking
         """
         if game not in DATASET_ENDPOINTS:
-            raise ValueError(f"Game '{game}' not found in dataset endpoints.")
+            raise ValueError(f"Game '{game}' not found in dataset endpoints. Available games: {list(DATASET_ENDPOINTS.keys())}")
 
         endpoints = DATASET_ENDPOINTS[game]
         total_rows_processed = 0
@@ -62,61 +62,91 @@ class IngestService:
         # Lazy import to avoid ChromaDB connection during module import
         from .chroma_client import chroma_client
         
-        collection = chroma_client.client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=default_ef
-        )
+        try:
+            collection = chroma_client.client.get_or_create_collection(
+                name=collection_name,
+                embedding_function=default_ef
+            )
+            print(f"✓ Connected to collection '{collection_name}'")
+        except Exception as conn_error:
+            raise Exception(f"Failed to connect to ChromaDB collection '{collection_name}': {str(conn_error)}")
 
         # Estimate total rows for progress reporting, assuming 1000 per endpoint as a rough guess
         estimated_total_rows = len(endpoints) * 1000 
 
-        for i, endpoint in enumerate(endpoints):
+        for endpoint_idx, endpoint in enumerate(endpoints):
             success = False
             last_error = None
+            
+            print(f"[{game.upper()}] Endpoint {endpoint_idx + 1}/{len(endpoints)}: {endpoint}")
             
             for attempt in range(self.max_retries):
                 try:
                     print(f"  Fetching from {endpoint} (attempt {attempt + 1}/{self.max_retries})...")
                     response = requests.get(endpoint, timeout=self.request_timeout)
                     response.raise_for_status()
-                    data = response.json()
+                    
+                    # Validate response content
+                    if not response.content:
+                        last_error = "Empty response received"
+                        print(f"  ⚠ {last_error}")
+                        break
+                    
+                    try:
+                        data = response.json()
+                    except ValueError as json_error:
+                        last_error = f"Invalid JSON response: {str(json_error)}"
+                        print(f"  ⚠ {last_error}")
+                        print(f"  Response preview: {response.text[:200]}")
+                        break
                     
                     if not column_names:
                         # Try to extract columns from Socrata metadata
                         columns_meta = data.get('meta', {}).get('view', {}).get('columns', [])
                         if columns_meta:
                             column_names = [col.get('fieldName', f'col_{idx}') for idx, col in enumerate(columns_meta)]
+                            print(f"  ✓ Extracted {len(column_names)} column names from metadata")
+                        else:
+                            print(f"  ⚠ No column metadata found, will use generic names")
 
                     fetched_rows = data.get('data', [])
                     if not fetched_rows:
-                        print("  No data in this endpoint.")
+                        print(f"  ⚠ No data in this endpoint (empty 'data' array)")
                         success = True
                         break
 
-                    print(f"  ✓ Fetched {len(fetched_rows)} rows. Processing in batches...")
+                    print(f"  ✓ Fetched {len(fetched_rows)} rows. Processing in batches of {batch_size}...")
 
                     for j in range(0, len(fetched_rows), batch_size):
                         batch = fetched_rows[j:j + batch_size]
                         
-                        metadatas = []
-                        for row in batch:
-                            metadata_item = {col_name: (value if value is not None else "") for col_name, value in zip(column_names, row)}
-                            metadatas.append(metadata_item)
-                        
-                        documents = [str(item) for item in metadatas]
-                        ids = [hashlib.md5(str(row).encode()).hexdigest() for row in batch]
+                        try:
+                            metadatas = []
+                            for row_idx, row in enumerate(batch):
+                                if not isinstance(row, list):
+                                    print(f"  ⚠ Skipping row {j + row_idx}: not a list (type: {type(row)})")
+                                    continue
+                                metadata_item = {col_name: (str(value) if value is not None else "") for col_name, value in zip(column_names, row)} if column_names else {f"col_{idx}": str(val) for idx, val in enumerate(row)}
+                                metadatas.append(metadata_item)
+                            
+                            documents = [str(item) for item in metadatas]
+                            ids = [hashlib.md5(str(row).encode()).hexdigest() for row in batch]
 
-                        if ids:
-                            collection.add(
-                                documents=documents,
-                                metadatas=metadatas,
-                                ids=ids
-                            )
-                        
-                        total_rows_processed += len(batch)
-                        if progress_callback:
-                            # Report progress based on estimated total
-                            progress_callback(total_rows_processed, estimated_total_rows)
+                            if ids:
+                                collection.add(
+                                    documents=documents,
+                                    metadatas=metadatas,
+                                    ids=ids
+                                )
+                            
+                            total_rows_processed += len(batch)
+                            if progress_callback:
+                                # Report progress based on estimated total
+                                progress_callback(total_rows_processed, estimated_total_rows)
+                        except Exception as batch_error:
+                            print(f"  ⚠ Error processing batch {j}-{j+len(batch)}: {str(batch_error)}")
+                            # Continue with next batch instead of failing completely
+                            continue
 
                     print(f"  ✓ Processed and stored {len(fetched_rows)} rows from endpoint.")
                     success = True
@@ -128,15 +158,29 @@ class IngestService:
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay * (2 ** attempt))
                         
-                except requests.RequestException as e:
-                    last_error = f"Request error: {str(e)}"
+                except requests.RequestException as req_error:
+                    last_error = f"Request error: {str(req_error)}"
                     print(f"  ⚠ {last_error}")
+                    if hasattr(req_error, 'response') and req_error.response is not None:
+                        print(f"  Response status: {req_error.response.status_code}")
+                        print(f"  Response preview: {req_error.response.text[:200]}")
+                    break
+                except Exception as unexpected_error:
+                    last_error = f"Unexpected error: {str(unexpected_error)}"
+                    print(f"  ✗ {last_error}")
+                    import traceback
+                    traceback.print_exc()
                     break
             
             if not success and last_error:
                 print(f"  ✗ Failed to fetch from endpoint: {last_error}")
+                # Don't raise, just continue with next endpoint
                 continue
 
-        return {"status": "success", "added": total_rows_processed}
+        if total_rows_processed == 0:
+            raise Exception(f"No data was successfully ingested for game '{game}'. Check backend logs for details.")
+        
+        print(f"✓ [{game.upper()}] Ingestion complete: {total_rows_processed} total rows processed")
+        return {"status": "success", "added": total_rows_processed, "total": total_rows_processed}
 
 ingest_service = IngestService()

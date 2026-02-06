@@ -3,8 +3,9 @@ import { marked } from 'marked';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanel.css';
+import getApiBase from '../utils/apiBase';
 
-const API_BASE = process.env.REACT_APP_API_BASE || '';
+const API_BASE = getApiBase();
 
 function renderMarkdown(text) {
     if (typeof text !== 'string') {
@@ -67,7 +68,7 @@ const ChatPanel = ({ game = null }) => {
                 throw new Error('Network response was not ok');
             }
 
-            const data = response.json();
+            const data = await response.json();
             
             const botMessageText = data.response || "Sorry, I didn't understand that.";
             const botMessage = { 

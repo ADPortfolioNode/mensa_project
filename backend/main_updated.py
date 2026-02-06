@@ -14,6 +14,7 @@ from config import GAME_CONFIGS
 from services.gemini_client import gemini_client
 from services.chroma_client import chroma_client
 from services.rag_service import rag_service
+from services.visualization import visualization_service
 from experiments.store import ExperimentStore
 from services.ingest import ingest_service
 from services.trainer import trainer_service
@@ -140,10 +141,6 @@ class GameSummaryResponse(BaseModel):
 @app.get("/api")
 async def root():
     return {"message": "Mensa Lottery Backend with RAG is running"}
-
-@app.get("/api/health")
-async def health():
-    return {"status": "healthy"}
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):

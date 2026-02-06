@@ -1,44 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-
-function normalizeApiBase(raw) {
-  const v = (raw || '').toString().trim().replace(/\/+$/, '');
-  if (!v) return '';
-  if (!/^https?:\/\//i.test(v)) {
-    return `http://${v}`;
-  }
-  return v;
-}
-
-const API_BASE = normalizeApiBase(process.env.REACT_APP_API_BASE);
+import getApiBase from '../utils/apiBase';
 
 export default function GameSummaryPanel({ games }) {
   const [summaries, setSummaries] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const API_BASE = useMemo(() => getApiBase(), []);
 
   useEffect(() => {
-    if (games && games.length > 0) {
-      fetchSummaries();
+    let isMounted = true;
+    if (games && games.length > 0 && API_BASE) {
+      fetchSummaries(isMounted);
     }
-  }, [games]);
+    return () => { isMounted = false; };
+  }, [games, API_BASE]);
 
-  const fetchSummaries = async () => {
+  const fetchSummaries = async (isMounted = true) => {
+    if (!isMounted) return;
     setLoading(true);
     setError(null);
     const newSummaries = {};
     for (const game of games) {
       try {
-        const r = await axios.get(`${API_BASE}/api/games/${game}/summary`);
-        newSummaries[game] = r.data.draw_count;
+        const r = await axios.get(`${API_BASE}/api/games/${game}/summary`, { timeout: 5000 });
+        if (isMounted) {
+          newSummaries[game] = r.data.draw_count;
+        }
       } catch (e) {
         console.error(`Failed to fetch summary for ${game}:`, e);
-        newSummaries[game] = 'Error';
-        setError('Failed to fetch some game summaries.');
+        if (isMounted) {
+          newSummaries[game] = 'Error';
+          setError('Failed to fetch some game summaries.');
+        }
       }
     }
-    setSummaries(newSummaries);
-    setLoading(false);
+    if (isMounted) {
+      setSummaries(newSummaries);
+      setLoading(false);
+    }
   };
 
   return (
