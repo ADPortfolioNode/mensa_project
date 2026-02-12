@@ -49,7 +49,16 @@ class PredictorService:
         # Round to nearest integers
         predicted_numbers = [int(np.round(p)) for p in prediction[0]]
         
-        return {"prediction": predicted_numbers}
+        return {"predicted_numbers": predicted_numbers}
+
+    def predict_all_games(self, games, recent_k: int = 10):
+        results = {}
+        for game in games:
+            try:
+                results[game] = self.predict_next_draw(game, recent_k)
+            except Exception as exc:
+                results[game] = {"error": str(exc)}
+        return results
 
 # Export a module-level instance expected by main_rag and other modules
 predictor_service = PredictorService()

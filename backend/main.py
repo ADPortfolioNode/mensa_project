@@ -262,8 +262,24 @@ async def chat_endpoint(request: ChatRequest):
 # These endpoints are placeholders and need to be implemented.
 
 @app.get("/api/predictions/all")
-async def get_all_predictions():
-    return {"message": "Endpoint not implemented yet."}
+async def get_all_predictions(recent_k: int = 10):
+    """Legacy helper for all-games predictions."""
+    try:
+        from services.predictor import predictor_service
+        game_names = list(GAME_CONFIGS.keys())
+        predictions = predictor_service.predict_all_games(game_names, recent_k)
+        return {
+            "status": "success",
+            "game": "all",
+            "predictions": predictions,
+            "games": game_names,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "game": "all",
+            "message": str(e)
+        }
 
 @app.get("/api/chroma/status")
 async def get_chroma_status():
@@ -371,14 +387,76 @@ async def train_model(request: TrainRequest):
     try:
         # Lazy import to avoid TensorFlow overhead during app startup
         from services.trainer import trainer_service
+        data_dir = os.environ.get('DATA_DIR', '/data')
+        store_path = os.path.join(data_dir, 'experiments', "experiments.json")
+        exp_store = ExperimentStore(store_path)
+        timestamp = time.time()
+
+        if request.game == "all":
+            game_names = list(GAME_CONFIGS.keys())
+            results = {}
+            for game in game_names:
+                try:
+                    print(f"🎯 Training started for {game}")
+                    result = trainer_service.train_model(game)
+                    print(f"✅ Training completed for {game}")
+                    results[game] = result
+                    exp_store.save_experiment({
+                        "experiment_id": f"train-{game}-{int(timestamp)}",
+                        "game": game,
+                        "score": result.get("accuracy", 0),
+                        "timestamp": timestamp,
+                        "status": "COMPLETED",
+                        "type": "training"
+                    })
+                except Exception as inner_e:
+                    results[game] = {"status": "error", "message": str(inner_e)}
+                    exp_store.save_experiment({
+                        "experiment_id": f"train-{game}-{int(timestamp)}",
+                        "game": game,
+                        "score": 0,
+                        "timestamp": timestamp,
+                        "status": "error",
+                        "type": "training",
+                        "message": str(inner_e)
+                    })
+
+            exp_store.save_experiment({
+                "experiment_id": f"train-all-{int(timestamp)}",
+                "game": "all",
+                "score": 0,
+                "timestamp": timestamp,
+                "status": "COMPLETED",
+                "type": "training",
+                "results": results
+            })
+
+            return {
+                "status": "COMPLETED",
+                "game": "all",
+                "message": "Successfully trained models for all games",
+                "experiment_id": f"train-all-{int(timestamp)}",
+                "results": results
+            }
+
         print(f"🎯 Training started for {request.game}")
         result = trainer_service.train_model(request.game)
         print(f"✅ Training completed for {request.game}")
+
+        exp_store.save_experiment({
+            "experiment_id": f"train-{request.game}-{int(timestamp)}",
+            "game": request.game,
+            "score": result.get("accuracy", 0),
+            "timestamp": timestamp,
+            "status": "COMPLETED",
+            "type": "training"
+        })
+
         return {
             "status": "COMPLETED",
             "game": request.game,
             "message": f"Successfully trained model for {request.game}",
-            "experiment_id": request.game,
+            "experiment_id": f"train-{request.game}-{int(timestamp)}",
             "score": result.get("accuracy", 0),
             **result
         }
@@ -405,7 +483,40 @@ async def predict(request: PredictRequest):
     try:
         # Lazy import to avoid TensorFlow overhead during app startup
         from services.predictor import predictor_service
+        data_dir = os.environ.get('DATA_DIR', '/data')
+        store_path = os.path.join(data_dir, 'experiments', "experiments.json")
+        exp_store = ExperimentStore(store_path)
+        timestamp = time.time()
+
+        if request.game == "all":
+            game_names = list(GAME_CONFIGS.keys())
+            predictions = predictor_service.predict_all_games(game_names, request.recent_k)
+            exp_store.save_experiment({
+                "experiment_id": f"predict-all-{int(timestamp)}",
+                "game": "all",
+                "timestamp": timestamp,
+                "status": "COMPLETED",
+                "type": "prediction",
+                "recent_k": request.recent_k,
+                "predictions": predictions
+            })
+            return {
+                "status": "success",
+                "game": "all",
+                "predictions": predictions,
+                "games": game_names
+            }
+
         result = predictor_service.predict_next_draw(request.game, request.recent_k)
+        exp_store.save_experiment({
+            "experiment_id": f"predict-{request.game}-{int(timestamp)}",
+            "game": request.game,
+            "timestamp": timestamp,
+            "status": "COMPLETED",
+            "type": "prediction",
+            "recent_k": request.recent_k,
+            "prediction": result
+        })
         return {
             "status": "success",
             "game": request.game,
