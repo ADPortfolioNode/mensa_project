@@ -2,16 +2,11 @@
 import React from 'react';
 
 
-const GameSelector = ({ games, onGameSelect, value, includeAll = false }) => {
+const GameSelector = ({ games, onGameSelect }) => {
   // Support both string and object game lists
   const isObjectList = games.length > 0 && typeof games[0] === 'object';
   return (
-    <select
-      className="form-select mb-2"
-      value={value}
-      onChange={(e) => onGameSelect(e.target.value)}
-    >
-      {includeAll && <option value="all">All games</option>}
+    <select className="form-select mb-2" onChange={(e) => onGameSelect(e.target.value)}>
       <option value="">Select a game</option>
       {games.map((game) => (
         isObjectList ? (

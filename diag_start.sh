@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eu
 
 # === Mensa Project Diagnostic Start Script ===
-# This script attempts a minimal startup to get a clear error message from Docker Compose.
+# This script attempts a minimal startup to get a clear error message from docker-compose.
 # All output is redirected to 'diag_output.log'.
 # It does NOT perform any of the safety checks or retries of the main `start.sh`.
 
@@ -10,8 +10,8 @@ LOG_FILE="diag_output.log"
 
 echo "Running a diagnostic startup..."
 echo "This will attempt to start all services without any checks or retries."
-echo "The goal is to get a clear error message from Docker Compose."
-echo "Output is being saved to '${LOG_FILE}' and displayed below."
+echo "The goal is to get a clear error message from docker-compose."
+echo "All output is being redirected to the file '${LOG_FILE}'."
 echo ""
 
 # Create a separator in the log file
@@ -19,26 +19,14 @@ echo "" > "${LOG_FILE}"
 echo "--- Diagnostic Run at $(date) ---" >> "${LOG_FILE}"
 echo "" >> "${LOG_FILE}"
 
-# Determine compose command if not provided by the caller
-if [ -z "${COMPOSE_CMD:-}" ]; then
-    if docker compose version >/dev/null 2>&1; then
-        COMPOSE_CMD="docker compose"
-    elif command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
-        COMPOSE_CMD="docker-compose"
-    else
-        echo "ERROR: Neither 'docker compose' nor 'docker-compose' commands are available." >&2
-        exit 1
-    fi
-fi
-
 # Stop and remove old containers to ensure a clean start
 echo "--- Stopping and removing old containers ---" >> "${LOG_FILE}"
-eval "${COMPOSE_CMD} down --remove-orphans" 2>&1 | tee -a "${LOG_FILE}" || true
-docker rm -f mensa_frontend mensa_backend mensa_chroma 2>&1 | tee -a "${LOG_FILE}" || true
+docker-compose down --remove-orphans >> "${LOG_FILE}" 2>&1 || true
+docker rm -f mensa_frontend mensa_backend mensa_chroma >> "${LOG_FILE}" 2>&1 || true
 
 # Attempt to build and start (detached mode with loop detection)
 echo "--- Building and starting new containers ---" >> "${LOG_FILE}"
-if ! eval "${COMPOSE_CMD} up -d --build --force-recreate" 2>&1 | tee -a "${LOG_FILE}"; then
+if ! docker-compose up -d --build --force-recreate >> "${LOG_FILE}" 2>&1; then
     echo ""
     echo "---"
     echo "✗ Diagnostic startup FAILED during docker-compose up."
@@ -107,7 +95,7 @@ if [ ${LOOP_DETECTED} -ne 0 ]; then
     echo "  - Port conflicts" | tee -a "${LOG_FILE}"
     echo "  - Invalid command line arguments" | tee -a "${LOG_FILE}"
     echo "---" | tee -a "${LOG_FILE}"
-    eval "${COMPOSE_CMD} down" >> "${LOG_FILE}" 2>&1 || true
+    docker-compose down >> "${LOG_FILE}" 2>&1 || true
     exit 1
 fi
 

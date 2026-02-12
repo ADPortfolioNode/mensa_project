@@ -8,8 +8,6 @@ const errorPatterns = {
         /network error/i,
         /connection refused/i,
         /502 bad gateway/i,
-        /504 gateway time-out/i,
-        /gateway timeout/i,
     ],
 };
 

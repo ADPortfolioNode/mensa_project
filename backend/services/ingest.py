@@ -1,4 +1,3 @@
-import os
 import requests
 import hashlib
 import time
@@ -39,19 +38,6 @@ class IngestService:
         self.request_timeout = 30  # 30 second timeout per request
         self.max_retries = 3
         self.retry_delay = 2  # seconds
-        self.batch_size = int(os.getenv("INGEST_BATCH_SIZE", "1000"))
-        self.use_upsert = os.getenv("INGEST_USE_UPSERT", "1") != "0"
-
-    def _get_max_rows_for_game(self, game: str) -> int:
-        per_game_limit = os.getenv(f"INGEST_MAX_ROWS_{game.upper()}")
-        if per_game_limit and per_game_limit.isdigit():
-            return int(per_game_limit)
-
-        global_limit = os.getenv("INGEST_MAX_ROWS")
-        if global_limit and global_limit.isdigit():
-            return int(global_limit)
-
-        return 0
     
     def fetch_and_sync(self, game: str, progress_callback=None):
         """
@@ -67,8 +53,7 @@ class IngestService:
         endpoints = DATASET_ENDPOINTS[game]
         total_rows_processed = 0
         column_names = []
-        batch_size = self.batch_size  # Process records in batches
-        max_rows = self._get_max_rows_for_game(game)
+        batch_size = 500  # Process 500 records at a time
 
         collection_name = game
         # Use default embedding function to avoid dimension mismatch
@@ -83,18 +68,11 @@ class IngestService:
                 embedding_function=default_ef
             )
             print(f"✓ Connected to collection '{collection_name}'")
-            if max_rows:
-                existing_count = collection.count()
-                if existing_count >= max_rows:
-                    print(f"✓ {game} already has {existing_count} rows; skipping due to INGEST_MAX_ROWS_* limit")
-                    if progress_callback:
-                        progress_callback(existing_count, existing_count)
-                    return {"status": "skipped", "added": 0, "total": existing_count}
         except Exception as conn_error:
             raise Exception(f"Failed to connect to ChromaDB collection '{collection_name}': {str(conn_error)}")
 
-        # Estimate total rows for progress reporting
-        estimated_total_rows = 0
+        # Estimate total rows for progress reporting, assuming 1000 per endpoint as a rough guess
+        estimated_total_rows = len(endpoints) * 1000 
 
         for endpoint_idx, endpoint in enumerate(endpoints):
             success = False
@@ -131,26 +109,11 @@ class IngestService:
                         else:
                             print(f"  ⚠ No column metadata found, will use generic names")
 
-                    endpoint_total = data.get('meta', {}).get('view', {}).get('rows')
-                    if isinstance(endpoint_total, int) and endpoint_total > 0:
-                        estimated_total_rows += endpoint_total
-
                     fetched_rows = data.get('data', [])
                     if not fetched_rows:
                         print(f"  ⚠ No data in this endpoint (empty 'data' array)")
-                        if estimated_total_rows == 0:
-                            estimated_total_rows += 1
                         success = True
                         break
-
-                    if max_rows and len(fetched_rows) > max_rows:
-                        fetched_rows = fetched_rows[:max_rows]
-                        print(f"  ⚠ Limiting {game} to {max_rows} rows via INGEST_MAX_ROWS_* settings")
-
-                    if estimated_total_rows == 0:
-                        estimated_total_rows += len(fetched_rows)
-                    if max_rows:
-                        estimated_total_rows = min(estimated_total_rows, max_rows)
 
                     print(f"  ✓ Fetched {len(fetched_rows)} rows. Processing in batches of {batch_size}...")
 
@@ -170,23 +133,16 @@ class IngestService:
                             ids = [hashlib.md5(str(row).encode()).hexdigest() for row in batch]
 
                             if ids:
-                                if self.use_upsert and hasattr(collection, "upsert"):
-                                    collection.upsert(
-                                        documents=documents,
-                                        metadatas=metadatas,
-                                        ids=ids
-                                    )
-                                else:
-                                    collection.add(
-                                        documents=documents,
-                                        metadatas=metadatas,
-                                        ids=ids
-                                    )
+                                collection.add(
+                                    documents=documents,
+                                    metadatas=metadatas,
+                                    ids=ids
+                                )
                             
                             total_rows_processed += len(batch)
                             if progress_callback:
                                 # Report progress based on estimated total
-                                progress_callback(total_rows_processed, max(estimated_total_rows, total_rows_processed))
+                                progress_callback(total_rows_processed, estimated_total_rows)
                         except Exception as batch_error:
                             print(f"  ⚠ Error processing batch {j}-{j+len(batch)}: {str(batch_error)}")
                             # Continue with next batch instead of failing completely

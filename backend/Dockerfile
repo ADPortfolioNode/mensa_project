@@ -2,9 +2,6 @@
 FROM python:3.11-slim as builder
 
 WORKDIR /app
-# Make sure scripts in .local are usable during build
-ENV PATH=/root/.local/bin:$PATH
-
 
 # Allow choosing a requirements file at build time for fast validation builds
 ARG REQUIREMENTS_FILE=requirements.txt

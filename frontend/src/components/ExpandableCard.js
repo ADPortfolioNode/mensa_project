@@ -16,31 +16,17 @@ export default function ExpandableCard({
   neonBorder = false 
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-
-  const closeDelayMs = 240;
 
   const handleToggle = () => {
-    if (expanded) {
-      setIsClosing(true);
-      setTimeout(() => {
-        setExpanded(false);
-        setIsClosing(false);
-        if (onToggle) {
-          onToggle(false);
-        }
-      }, closeDelayMs);
-      return;
-    }
-
-    setExpanded(true);
+    const newState = !expanded;
+    setExpanded(newState);
     if (onToggle) {
-      onToggle(true);
+      onToggle(newState);
     }
   };
 
-  const cardClasses = `card p-3 mb-3 h-100 shadow-lg ${expanded ? 'card-expanded' : 'card-collapsed'} ${isClosing ? 'card-closing' : ''} ${neonBorder ? 'border-neon' : ''} ${className}`;
-  const headerClasses = expanded ? 'bg-primary text-white' : 'bg-neon-soft';
+  const cardClasses = `card p-3 mb-3 h-100 shadow-lg ${neonBorder ? 'border-neon' : ''} ${className}`;
+  const headerClasses = expanded ? 'bg-primary text-white' : '';
 
   return (
     <div className={cardClasses} style={{ 

@@ -1,7 +1,7 @@
 /* Modern Dark Theme with Neon Green Accents */
 :root {
   /* Colors */
-  --bg-primary: #060606;
+  --bg-primary: #0a0e27;
   --bg-secondary: #151a3a;
   --bg-tertiary: #1f2647;
   --text-primary: #f0f0f0;
@@ -34,8 +34,6 @@
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-neon: 0 0 18px rgba(0, 255, 136, 0.35);
-  --shadow-neon-strong: 0 0 28px rgba(0, 255, 136, 0.55);
 }
 
 * {
@@ -202,12 +200,12 @@ select option {
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   transition: all var(--transition-normal);
-  box-shadow: var(--shadow-md), var(--shadow-neon);
+  box-shadow: var(--shadow-md);
 }
 
 .card:hover {
   border-color: var(--accent-green);
-  box-shadow: 0 0 20px rgba(0, 255, 136, 0.2), var(--shadow-neon-strong);
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
   transform: translateY(-4px);
 }
 

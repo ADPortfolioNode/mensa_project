@@ -148,18 +148,6 @@
   position: relative;
   transition: all var(--transition-normal);
   cursor: pointer;
-  animation: cardSlideIn 220ms ease-out;
-}
-
-@keyframes cardSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .card:not(.card-locked) {
@@ -168,56 +156,8 @@
 
 .card.card-expanded {
   grid-column: 1 / -1;
-  box-shadow: 0 0 30px rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
   border-color: var(--accent-green);
-  animation: cardSlideExpanded 240ms ease-out;
-}
-
-.game-progress-segment .game-progress-label {
-  opacity: 0;
-  transition: opacity 160ms ease-in-out;
-}
-
-.game-progress-segment:hover .game-progress-label {
-  opacity: 1;
-}
-
-.game-progress-segment.is-current .game-progress-label {
-  opacity: 1;
-}
-
-.card.card-closing {
-  animation: cardSlideOut 200ms ease-in;
-}
-
-.card.card-collapsed .card-header {
-  background: rgba(0, 255, 136, 0.08);
-  border-bottom: 1px solid rgba(0, 255, 136, 0.2);
-}
-
-.card.bg-neon-soft,
-.card-header.bg-neon-soft {
-  background: rgba(0, 255, 136, 0.08);
-}
-
-@keyframes cardSlideExpanded {
-  from {
-    transform: translateY(8px) scale(0.995);
-  }
-  to {
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes cardSlideOut {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0.9;
-    transform: translateY(6px) scale(0.995);
-  }
 }
 
 .card.card-expanded .card-expand-hint {
