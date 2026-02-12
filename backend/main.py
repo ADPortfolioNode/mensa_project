@@ -1,18 +1,21 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import os
+import uuid
+import logging
 
 # Import services
-from config import GAME_CONFIGS
+from config import GAME_CONFIGS, settings
 from services.gemini_client import gemini_client
 from services.chroma_client import chroma_client
 from experiments.store import ExperimentStore
 from services.ingest import ingest_service
-from services.trainer import trainer_service
-from services.predictor import predictor_service
 from services.rag_service import rag_service
 
 # --- Global startup state tracking for initialization ---
@@ -24,7 +27,7 @@ startup_state = {
     "current_task": None,
     "current_game_rows_fetched": 0,
     "current_game_rows_total": 0,
-    "games": {game: {"status": "pending", "error": None} for game in GAME_CONFIGS.keys()},
+    "games": {game: {"status": "pending", "error": None, "rows_fetched": 0, "rows_total": 0} for game in GAME_CONFIGS.keys()},
     "started_at": None,
     "completed_at": None,
 }
@@ -33,53 +36,154 @@ startup_state = {
 manual_ingest_state = {}
 
 _ingestion_started = False
+_startup_lock = threading.Lock()
+
+def _recalculate_startup_progress():
+    total_games = len(GAME_CONFIGS)
+    progress = 0.0
+    for game, data in startup_state["games"].items():
+        if data["status"] == "completed":
+            progress += 1.0
+        elif data["status"] == "ingesting":
+            rows_total = data.get("rows_total") or 0
+            rows_fetched = data.get("rows_fetched") or 0
+            if rows_total > 0:
+                progress += min(rows_fetched / rows_total, 1.0)
+    startup_state["progress"] = min(progress, float(total_games))
 
 def start_background_ingestion():
     """Start non-blocking background ingestion in a daemon thread."""
     def ingest_all():
-        startup_state["started_at"] = time.time()
-        startup_state["status"] = "ingesting"
+        with _startup_lock:
+            startup_state["started_at"] = time.time()
+            startup_state["status"] = "ingesting"
 
-        for i, game in enumerate(GAME_CONFIGS.keys(), 1):
+        max_workers = int(os.getenv("INGEST_MAX_CONCURRENT", "2"))
+
+        def ingest_one(game):
             try:
-                startup_state["current_game"] = game
-                startup_state["current_task"] = "fetching"
-                startup_state["progress"] = float(i - 1)
-                startup_state["current_game_rows_fetched"] = 0
-                startup_state["current_game_rows_total"] = 0
-                startup_state["games"][game]["status"] = "ingesting"
-                startup_state["games"][game]["error"] = None
+                with _startup_lock:
+                    startup_state["current_game"] = game
+                    startup_state["current_task"] = "fetching"
+                    startup_state["current_game_rows_fetched"] = 0
+                    startup_state["current_game_rows_total"] = 0
+                    startup_state["games"][game]["status"] = "ingesting"
+                    startup_state["games"][game]["error"] = None
 
                 def update_game_progress(rows_fetched, total_rows):
-                    startup_state["current_game_rows_fetched"] = rows_fetched
-                    startup_state["current_game_rows_total"] = total_rows
-                    if total_rows and total_rows > 0:
-                        startup_state["progress"] = float(i - 1) + (rows_fetched / total_rows)
-                    else:
-                        startup_state["progress"] = float(i - 1)
+                    with _startup_lock:
+                        startup_state["current_game"] = game
+                        startup_state["current_task"] = "fetching"
+                        startup_state["current_game_rows_fetched"] = rows_fetched
+                        startup_state["current_game_rows_total"] = total_rows
+                        startup_state["games"][game]["rows_fetched"] = rows_fetched
+                        startup_state["games"][game]["rows_total"] = total_rows
+                        _recalculate_startup_progress()
 
                 ingest_service.fetch_and_sync(game, progress_callback=update_game_progress)
 
-                startup_state["games"][game]["status"] = "completed"
-                startup_state["games"][game]["error"] = None
-                startup_state["progress"] = float(i)
-                startup_state["current_game_rows_fetched"] = 0
-                startup_state["current_game_rows_total"] = 0
-
+                with _startup_lock:
+                    startup_state["games"][game]["status"] = "completed"
+                    startup_state["games"][game]["error"] = None
+                    startup_state["games"][game]["rows_fetched"] = startup_state["games"][game]["rows_total"]
+                    _recalculate_startup_progress()
             except Exception as e:
-                startup_state["games"][game]["status"] = "failed"
-                startup_state["games"][game]["error"] = str(e)
-                startup_state["progress"] = float(i)
+                with _startup_lock:
+                    startup_state["games"][game]["status"] = "failed"
+                    startup_state["games"][game]["error"] = str(e)
+                    _recalculate_startup_progress()
 
-        startup_state["status"] = "completed"
-        startup_state["current_game"] = None
-        startup_state["current_task"] = None
-        startup_state["completed_at"] = time.time()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(ingest_one, game) for game in GAME_CONFIGS.keys()]
+            for _ in as_completed(futures):
+                pass
+
+        with _startup_lock:
+            startup_state["status"] = "completed"
+            startup_state["current_game"] = None
+            startup_state["current_task"] = None
+            startup_state["completed_at"] = time.time()
 
     thread = threading.Thread(target=ingest_all, daemon=True, name="BackgroundIngestion")
     thread.start()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("mensa")
+
 app = FastAPI()
+
+@app.middleware("http")
+async def add_correlation_and_catch(request: Request, call_next):
+    correlation_id = str(uuid.uuid4())
+    request.state.correlation_id = correlation_id
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        logger.exception("Unhandled error", extra={"path": request.url.path, "correlation_id": correlation_id})
+        return JSONResponse(
+            status_code=500,
+            content={
+                "path": request.url.path,
+                "detail": "Internal server error",
+                "category": "server_error",
+                "correlation_id": correlation_id
+            }
+        )
+
+    response.headers["X-Correlation-Id"] = correlation_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    correlation_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "path": request.url.path,
+            "detail": exc.detail,
+            "category": "http_error",
+            "correlation_id": correlation_id
+        }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    correlation_id = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+    return JSONResponse(
+        status_code=422,
+        content={
+            "path": request.url.path,
+            "detail": exc.errors(),
+            "category": "validation_error",
+            "correlation_id": correlation_id
+        }
+    )
+
+# --- Startup Event ---
+@app.on_event("startup")
+async def startup_event():
+    """Log startup information and verify critical connections."""
+    print("="*80)
+    print("MENSA BACKEND STARTUP")
+    print("="*80)
+    print(f"Chroma Host: {settings.CHROMA_HOST}")
+    print(f"Chroma Port: {settings.CHROMA_PORT}")
+    print(f"Gemini API Key: {'SET' if settings.GEMINI_API_KEY else 'NOT SET'}")
+    print(f"Data Directory: {os.getenv('DATA_DIR', '/data')}")
+    print("="*80)
+    
+    # Verify Chroma connection
+    try:
+        status = chroma_client.get_chroma_status()
+        print(f"✓ ChromaDB Status: {status.get('status', 'unknown')}")
+    except Exception as e:
+        print(f"⚠ ChromaDB Connection Issue: {str(e)}")
+        print("  (Retrying with lazy initialization)")
+    
+    print("✓ Backend startup complete - API ready on 0.0.0.0:5000")
+    print("="*80)
 
 # --- Middleware ---
 app.add_middleware(
@@ -265,6 +369,8 @@ async def train_model(request: TrainRequest):
     Trains model for a single game.
     """
     try:
+        # Lazy import to avoid TensorFlow overhead during app startup
+        from services.trainer import trainer_service
         print(f"🎯 Training started for {request.game}")
         result = trainer_service.train_model(request.game)
         print(f"✅ Training completed for {request.game}")
@@ -297,6 +403,8 @@ async def predict(request: PredictRequest):
     Prediction endpoint for a specific game.
     """
     try:
+        # Lazy import to avoid TensorFlow overhead during app startup
+        from services.predictor import predictor_service
         result = predictor_service.predict_next_draw(request.game, request.recent_k)
         return {
             "status": "success",

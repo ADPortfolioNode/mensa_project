@@ -3,12 +3,14 @@ set -euxo pipefail
 
 # === Mensa Project Robust Start Script ===
 # Performs a safe reset and robust startup for development.
-# Usage: ./start.sh [--prune] [--yes] [--no-ingest-wait] [--build] [--diag]
+# Usage: ./start.sh [--prune] [--yes] [--no-ingest-wait] [--build] [--diag] [--monitor-startup] [--monitor-progress]
 #   --prune          : run `docker system prune -a -f` and `docker volume prune -f` before starting
 #   --yes            : auto-confirm prune (implies --prune)
 #   --no-ingest-wait : start containers but do not wait for data ingestion to complete.
 #   --build          : force a rebuild of the docker images
-#             : run a diagnostic-only startup, logging all output to 'diag_output.log'
+#   --diag           : run a diagnostic-only startup, logging all output to 'diag_output.log'
+#   --monitor-startup: run monitor_startup.sh when docker-compose is available
+#   --monitor-progress: use monitor_progress.* after startup (prefers .sh, then .py, then .ps1)
 
 # --- Helper Functions ---
 
@@ -130,6 +132,8 @@ AUTOMATIC_YES=false
 WAIT_FOR_INGEST=true
 BUILD=false
 DIAG_RUN=false
+MONITOR_STARTUP=false
+MONITOR_PROGRESS=false
 
 while [[ ${#} -gt 0 ]]; do
     case "$1" in
@@ -138,18 +142,61 @@ while [[ ${#} -gt 0 ]]; do
         --no-ingest-wait) WAIT_FOR_INGEST=false; shift ;;
         --build) BUILD=true; shift ;;
         --diag) DIAG_RUN=true; shift ;;
+        --monitor-startup) MONITOR_STARTUP=true; shift ;;
+        --monitor-progress) MONITOR_PROGRESS=true; shift ;;
         -h|--help) echo "Usage: $0 [--prune] [--yes] [--no-ingest-wait] [--build] [--diag]"; exit 0 ;;
         *) echo "Unknown arg: $1"; echo "Usage: $0 [--prune] [--yes] [--no-ingest-wait] [--build] [--diag]"; exit 2 ;;
     esac
 done
 
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+run_external_progress_monitor() {
+    if [ -f "./monitor_progress.sh" ] && command_exists curl; then
+        ./monitor_progress.sh
+        return $?
+    fi
+
+    if [ -f "./monitor_progress.py" ]; then
+        if command_exists python3; then
+            python3 ./monitor_progress.py
+            return $?
+        fi
+        if command_exists python; then
+            python ./monitor_progress.py
+            return $?
+        fi
+    fi
+
+    if [ -f "./monitor_progress.ps1" ] && command_exists pwsh; then
+        pwsh -File ./monitor_progress.ps1
+        return $?
+    fi
+
+    echo "WARNING: No compatible progress monitor found; using built-in monitor." >&2
+    monitor_ingestion_progress
+}
+
 # --- Execution Flow ---
 
-if [ "${DIAG_RUN}" = true ]; then
-    if [ -f "./diag_start.sh" ]; then
-        exec ./diag_start.sh
+if [ "${MONITOR_STARTUP}" = true ]; then
+    check_docker_version
+    if [ -f "./monitor_startup.sh" ]; then
+        export COMPOSE_CMD
+        if ! ./monitor_startup.sh; then
+            echo ""
+            echo "ERROR: Startup monitor failed. Try manual startup:" >&2
+            echo "  docker compose up --build" >&2
+            echo ""
+            echo "To see detailed errors:" >&2
+            echo "  docker compose logs --tail=100" >&2
+            exit 1
+        fi
+        exit 0
     else
-        echo "ERROR: diag_start.sh not found. Cannot run diagnostics." >&2
+        echo "ERROR: monitor_startup.sh not found in root directory" >&2
         exit 1
     fi
 fi
@@ -164,22 +211,46 @@ if [ -f "./diag_output.log" ]; then
 fi
 
 # 1. Check Docker environment first
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 1/5: Checking Docker environment..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 check_docker_version
 choose_compose_command
 echo ""
 
 # 2. Prune if requested
 if [ "${PRUNE}" = true ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Step 2/5: Pruning old containers and images..."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     if confirm_prune; then
         run_prune
     else
-        echo "Skipping prune.";
+        echo "Skipping prune."
     fi
+    echo ""
+else
+    echo "Step 2/5: Skipping prune (--no-prune)"
     echo ""
 fi
 
+if [ "${DIAG_RUN}" = true ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Diagnostic Mode Requested"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    export COMPOSE_CMD
+    if [ -f "./diag_start.sh" ]; then
+        exec bash ./diag_start.sh
+    else
+        echo "ERROR: diag_start.sh not found. Cannot run diagnostics." >&2
+        exit 1
+    fi
+fi
+
 # 3. Install frontend dependencies on the host (only when useful)
-echo "Checking frontend build status..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 3/5: Checking frontend dependencies..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ -d "frontend" ]; then
     # If we are rebuilding images, the Docker build will handle frontend; skip host npm install.
     if [ "${BUILD}" = true ]; then
@@ -200,18 +271,26 @@ fi
 echo ""
 
 # 4. Stop and remove old containers and orphans
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 4/5: Stopping old containers..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Stopping and removing any old containers..."
 eval "${COMPOSE_CMD} down --remove-orphans" || true
 echo ""
 
 # 4. Build and start services
-echo "Building and starting services (this may take a few minutes on first run)..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "Step 5/5: Building and starting services..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "This may take a few minutes on first run..."
 if ! run_compose_up_with_retries; then
+    echo ""
     echo "ERROR: docker-compose failed after retries. This is often a Docker environment issue." >&2
     echo "Suggestion: Restart Docker Desktop and try again." >&2
     echo "For a detailed error log, run this script with the --diag flag: ./start.sh --diag" >&2
     exit 1
 fi
+echo ""
 
 # Helper to check a service readiness
 wait_for_service() {
@@ -399,8 +478,14 @@ echo "✓ All services are running."
 
 # 6. Monitor ingestion or print next steps
 if [ "${WAIT_FOR_INGEST}" = true ]; then
-    if ! monitor_ingestion_progress; then
-        exit 1
+    if [ "${MONITOR_PROGRESS}" = true ]; then
+        if ! run_external_progress_monitor; then
+            exit 1
+        fi
+    else
+        if ! monitor_ingestion_progress; then
+            exit 1
+        fi
     fi
 else
     echo ""
@@ -408,6 +493,9 @@ else
     echo "✓ Services are running. Not waiting for data ingestion due to --no-ingest-wait flag."
     echo "The application may not be fully functional until ingestion completes."
     echo "To monitor progress, run: ./monitor_progress.sh"
+    if [ "${MONITOR_PROGRESS}" = true ]; then
+        run_external_progress_monitor || exit 1
+    fi
 fi
 
 
@@ -427,4 +515,3 @@ echo ""
 echo "To view live logs from all services, run:" 
 echo "  ${COMPOSE_CMD} logs -f"
 echo ""
-

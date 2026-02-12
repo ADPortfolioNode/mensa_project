@@ -54,8 +54,9 @@ const StartupProgress = ({ onComplete }) => {
     const progressVal = Number(status.progress ?? 0);
     // Fall back to the number of games if backend omits total
     const totalVal = Number(status.total ?? gameEntries.length ?? 0);
+    const cappedProgressVal = totalVal > 0 ? Math.min(progressVal, totalVal) : progressVal;
     const rowsFetched = Number(status.current_game_rows_fetched ?? 0);
-    const overallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : 0;
+    const overallProgress = totalVal > 0 ? Math.min((progressVal / totalVal) * 100, 100) : 0;
     const isIngesting = status.status === 'ingesting';
     const isCompleted = status.status === 'completed';
     const isReady = status.status === 'ready';
@@ -141,7 +142,7 @@ const StartupProgress = ({ onComplete }) => {
             {/* Progress Bar */}
             <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ marginBottom: '8px' }}>
-                    Download Progress: {progressVal.toFixed(1)} of {totalVal} games
+                    Download Progress: {cappedProgressVal.toFixed(1)} of {totalVal} games
                     {rowsFetched > 0 && (
                         <span style={{ fontSize: '0.9em', color: '#666' }}>
                             {' '}({rowsFetched.toLocaleString()} rows in {status.current_game})

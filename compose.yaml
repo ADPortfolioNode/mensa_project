@@ -16,9 +16,16 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CHROMA_HOST=mensa_chroma
       - CHROMA_PORT=8000
+      - INGEST_MAX_ROWS_QUICKDRAW=100000
     depends_on:
       chroma:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 5000), timeout=2).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -34,10 +41,17 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - CHOKIDAR_USEPOLLING=true
       - REACT_APP_API_BASE=http://localhost:5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
   chroma:
     image: chromadb/chroma:0.5.3
@@ -49,6 +63,12 @@ services:
       - "8000:8000"
     volumes:
       - ./data/chroma:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: on-failure
 
 volumes:

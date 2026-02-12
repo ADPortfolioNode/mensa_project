@@ -26,8 +26,12 @@ export default function Dashboard() {
   const [games, setGames] = useState([]);
   const [gameContents, setGameContents] = useState({});
   const [experiments, setExperiments] = useState([]);
-  const [selectedGame, setSelectedGame] = useState('');
+  const [selectedGame, setSelectedGame] = useState('all');
   const [expandedCard, setExpandedCard] = useState(null);
+  const [startupStatus, setStartupStatus] = useState(null);
+  const [startupError, setStartupError] = useState(null);
+  const [startupStarting, setStartupStarting] = useState(false);
+  const isAllGames = selectedGame === 'all';
   
   // Training parameters
   const [trainParams, setTrainParams] = useState({
@@ -66,21 +70,98 @@ export default function Dashboard() {
           }
         }
         setGameContents(contents);
-        // If no games or all draw counts are zero, prompt for auto-ingestion
-        if (gameList.length === 0 || Object.values(contents).every(c => c === 0)) {
-          if (window.confirm('No game data found. Would you like to auto-ingest the full spread?')) {
-            for (const game of gameList) {
-              await axios.post(`${API_BASE}/api/ingest`, { game });
-            }
-            window.location.reload();
-          }
-        }
       } catch (e) {
         // ignore
       }
     }
     fetchGamesAndContents();
   }, [API_BASE]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStartupStatus = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/api/startup_status`);
+        if (!isMounted) return;
+        setStartupStatus(response.data);
+        setStartupError(null);
+      } catch (e) {
+        if (!isMounted) return;
+        setStartupError('Failed to load startup status');
+      }
+    };
+
+    fetchStartupStatus();
+    const interval = setInterval(fetchStartupStatus, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [API_BASE]);
+
+  useEffect(() => {
+    if (!isAllGames || !startupStatus) {
+      return;
+    }
+
+    if (startupStatus.status === 'completed') {
+      if (ingestStatus !== 'completed') {
+        setIngestStatus('completed');
+        setIngestingGame(null);
+      }
+      axios.get(`${API_BASE}/api/games`)
+        .then(async (r) => {
+          const gameList = r.data.games || [];
+          const contents = {};
+          for (const game of gameList) {
+            try {
+              const res = await axios.get(`${API_BASE}/api/games/${game}/summary`);
+              contents[game] = res.data.draw_count;
+            } catch {
+              contents[game] = 0;
+            }
+          }
+          setGames(gameList);
+          setGameContents(contents);
+          window.dispatchEvent(new Event('chroma:refresh'));
+        })
+        .catch(() => {
+          // ignore refresh errors
+        });
+    } else if (startupStatus.status === 'ingesting') {
+      if (ingestStatus !== 'in progress') {
+        setIngestStatus('in progress');
+      }
+    } else if (startupStatus.status === 'failed' || startupStatus.status === 'error') {
+      if (ingestStatus !== 'error') {
+        setIngestStatus('error');
+        setIngestingGame(null);
+      }
+    } else if (startupStatus.status === 'ready' && ingestStatus !== 'idle') {
+      setIngestStatus('idle');
+      setIngestingGame(null);
+    }
+  }, [API_BASE, isAllGames, startupStatus, ingestStatus]);
+
+  useEffect(() => {
+    if (!selectedGame || selectedGame === 'all') {
+      return;
+    }
+    const draws = gameContents[selectedGame] || 0;
+    if (ingestStatus === 'error') {
+      setIngestStatus('idle');
+      setIngestingGame(null);
+    }
+    if (draws > 0 && ingestStatus !== 'completed') {
+      setIngestStatus('completed');
+      setIngestingGame(null);
+    }
+    if (draws === 0 && ingestStatus === 'completed') {
+      setIngestStatus('idle');
+      setIngestingGame(null);
+    }
+  }, [selectedGame, gameContents, ingestStatus]);
 
   // Polling for experiments
   useEffect(() => {
@@ -99,6 +180,24 @@ export default function Dashboard() {
     return () => clearInterval(experimentPollInterval); // Clear interval on unmount
   }, [API_BASE]);
 
+  const startFullIngest = useCallback(async () => {
+    setIngestStatus('in progress');
+    setIngestingGame('all');
+    setIngestStartTime(Date.now());
+    setExpandedCard('ingest');
+    setStartupStarting(true);
+
+    try {
+      await axios.post(`${API_BASE}/api/startup_init`);
+    } catch (e) {
+      console.error("Error starting full ingestion:", e);
+      setIngestStatus('error');
+      setIngestingGame(null);
+    } finally {
+      setStartupStarting(false);
+    }
+  }, [API_BASE]);
+
   const startIngest = useCallback(async () => {
     if (!selectedGame) return;
     setIngestStatus('in progress');
@@ -107,6 +206,11 @@ export default function Dashboard() {
     setExpandedCard('ingest');
 
     try {
+      if (selectedGame === 'all') {
+        await startFullIngest();
+        return;
+      }
+
       // Initiate ingestion - backend will handle progress async
       const response = await axios.post(`${API_BASE}/api/ingest`, { game: selectedGame });
       
@@ -126,15 +230,17 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error("Error starting ingestion:", e);
+      setStartupStarting(false);
       setIngestStatus('error');
       setIngestingGame(null);
     }
-  }, [selectedGame, API_BASE]);
+  }, [selectedGame, API_BASE, startFullIngest]);
 
   const handleIngestionComplete = useCallback((progress) => {
     if (progress.status === 'completed') {
       setIngestStatus('completed');
       setTimeout(() => setExpandedCard(null), 2000); // Auto-collapse after 2s
+      window.dispatchEvent(new Event('chroma:refresh'));
     } else if (progress.status === 'error') {
       setIngestStatus('error');
     }
@@ -148,6 +254,7 @@ export default function Dashboard() {
             ...prev,
             [selectedGame]: res.data.draw_count
           }));
+          window.dispatchEvent(new Event('chroma:refresh'));
         })
         .catch(e => console.error("Error refreshing game content:", e));
     }
@@ -198,16 +305,142 @@ export default function Dashboard() {
     return expandedCard === cardKey ? 'col-md-12' : 'col-md-6';
   };
   
+  const startupProgressValue = Number(startupStatus?.progress ?? 0);
+  const startupTotalValue = Number(startupStatus?.total ?? games.length ?? 0);
+  const clampedStartupProgress = startupTotalValue > 0
+    ? Math.min(startupProgressValue, startupTotalValue)
+    : startupProgressValue;
+  const startupStatusValue = startupStatus?.status || 'ready';
+  const startupProgressStatus = startupStatusValue === 'completed'
+    ? 'completed'
+    : startupStatusValue === 'ingesting'
+      ? 'active'
+      : 'idle';
+  const totalDraws = Object.values(gameContents).reduce((a, b) => a + b, 0);
+  const ingestDisplayStatus = isAllGames ? startupStatusValue : ingestStatus;
+  const ingestApiEndpoint = isAllGames ? `${API_BASE}/api/startup_init` : `${API_BASE}/api/ingest`;
+  const ingestDraws = isAllGames ? totalDraws : (gameContents[selectedGame] || 0);
+  const startupGameEntries = Object.entries(startupStatus?.games || {});
+  const currentGame = startupStatus?.current_game || null;
+  const currentRowsFetched = Number(startupStatus?.current_game_rows_fetched ?? 0);
+  const currentRowsTotal = Number(startupStatus?.current_game_rows_total ?? 0);
+
+  const getGameStatusColor = (status) => {
+    switch (status) {
+      case 'completed':
+        return '#00ff88';
+      case 'ingesting':
+        return '#ffc107';
+      case 'failed':
+        return '#ff5c5c';
+      default:
+        return '#6c757d';
+    }
+  };
+
+  const renderGameProgressBar = () => {
+    if (startupGameEntries.length === 0) {
+      return (
+        <div className="text-muted">No game status reported yet.</div>
+      );
+    }
+
+    const segmentWidth = 100 / startupGameEntries.length;
+    return (
+      <div style={{ marginTop: '12px' }}>
+        <div style={{
+          display: 'flex',
+          height: '22px',
+          width: '100%',
+          borderRadius: '10px',
+          overflow: 'hidden',
+          background: '#212529',
+          border: '1px solid rgba(255, 255, 255, 0.08)'
+        }}>
+          {startupGameEntries.map(([game, data]) => {
+            const status = data?.status || 'pending';
+            const color = getGameStatusColor(status);
+            const isCurrent = currentGame === game && status === 'ingesting';
+            const progressPct = isCurrent && currentRowsTotal > 0
+              ? Math.min((currentRowsFetched / currentRowsTotal) * 100, 100)
+              : status === 'completed'
+                ? 100
+                : 0;
+            const background = isCurrent
+              ? `linear-gradient(90deg, ${color} 0%, ${color} ${progressPct}%, #2b2f33 ${progressPct}%, #2b2f33 100%)`
+              : color;
+            const label = isCurrent && currentRowsTotal > 0
+              ? `${game.toUpperCase()} ${Math.min(Math.round((currentRowsFetched / currentRowsTotal) * 100), 100)}%`
+              : game.toUpperCase();
+
+            return (
+              <div
+                key={game}
+                title={`${game.toUpperCase()}: ${status}`}
+                className={`game-progress-segment${isCurrent ? ' is-current' : ''}`}
+                style={{
+                  width: `${segmentWidth}%`,
+                  background,
+                  transition: 'background 0.3s ease, width 0.3s ease',
+                  borderRight: '1px solid rgba(0, 0, 0, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  color: '#f8f9fa',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.6)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  padding: '0 4px'
+                }}
+              >
+                <span className="game-progress-label">{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container-fluid">
       <WorkflowSummary />
       <div className="mb-4">
+        <h4 className="text-neon">Lottery Data Initiation</h4>
+        <p className="text-muted mb-2">
+          Full ingestion runs across all games. Manual ingestion is also available below.
+        </p>
+        <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <button
+            className="btn btn-outline-primary"
+            onClick={startFullIngest}
+            disabled={ingestStatus === 'in progress' || startupStarting}
+          >
+            {startupStarting || ingestStatus === 'in progress' ? 'Starting...' : 'Run Full Ingestion'}
+          </button>
+          {startupError && <span className="text-danger">{startupError}</span>}
+        </div>
+        <ProgressiveProgressBar
+          current={clampedStartupProgress}
+          total={startupTotalValue || 1}
+          status={startupProgressStatus}
+          label="Full ingestion progress"
+          showMetadata={true}
+          startTime={ingestStartTime}
+          colorScheme="primary"
+        />
+        {renderGameProgressBar()}
+      </div>
+      <div className="mb-4">
         <h4 className="text-neon">Workflow Status</h4>
         <div className="mb-2">
           <ProgressiveProgressBar
-            current={ingestStatus === 'completed' ? 1 : ingestStatus === 'in progress' ? 0.5 : 0}
+            current={ingestDisplayStatus === 'completed' ? 1 : ingestDisplayStatus === 'ingesting' || ingestDisplayStatus === 'in progress' ? 0.5 : 0}
             total={1}
-            status={ingestStatus === 'completed' ? 'completed' : ingestStatus === 'in progress' ? 'active' : 'idle'}
+            status={ingestDisplayStatus === 'completed' ? 'completed' : ingestDisplayStatus === 'ingesting' || ingestDisplayStatus === 'in progress' ? 'active' : 'idle'}
             label="1. Ingest Data"
             showMetadata={false}
           />
@@ -241,14 +474,14 @@ export default function Dashboard() {
             neonBorder={true}
             isActive={ingestStatus === 'in progress'}
             metadata={selectedGame ? {
-              'Selected Game': selectedGame.toUpperCase(),
-              'Current Draws': `${gameContents[selectedGame] || 0} draws`,
-              'Status': ingestStatus,
-              'API Endpoint': `${API_BASE}/api/ingest`
+              'Selected Game': isAllGames ? 'ALL' : selectedGame.toUpperCase(),
+              'Current Draws': `${ingestDraws} draws`,
+              'Status': ingestDisplayStatus,
+              'API Endpoint': ingestApiEndpoint
             } : {}}
             statusBadge={
-              <span className={`badge ${ingestStatus === 'completed' ? 'bg-success' : ingestStatus === 'in progress' ? 'bg-warning' : ingestStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>
-                {ingestStatus}
+              <span className={`badge ${ingestDisplayStatus === 'completed' ? 'bg-success' : ingestDisplayStatus === 'ingesting' || ingestDisplayStatus === 'in progress' ? 'bg-warning' : ingestDisplayStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>
+                {ingestDisplayStatus}
               </span>
             }
             onToggle={(expanded) => setExpandedCard(expanded ? 'ingest' : null)}
@@ -256,11 +489,16 @@ export default function Dashboard() {
             <p>Fetch and sync lottery data from NY Open Data.</p>
             <div className="mb-3">
               <label htmlFor="gameSelect" className="form-label text-neon">Select Game</label>
-              <GameSelector games={games} onGameSelect={setSelectedGame} />
+              <GameSelector
+                games={games}
+                value={selectedGame}
+                onGameSelect={setSelectedGame}
+                includeAll={true}
+              />
             </div>
             {selectedGame && (
               <div className="alert alert-info">
-                <strong>{selectedGame.toUpperCase()}</strong>: {gameContents[selectedGame] || 0} draws currently stored
+                <strong>{isAllGames ? 'ALL GAMES' : selectedGame.toUpperCase()}</strong>: {ingestDraws} draws currently stored
               </div>
             )}
             <button 
@@ -273,8 +511,8 @@ export default function Dashboard() {
             
             {/* Ingestion Progress Panel */}
             <IngestionProgressPanel 
-              game={ingestingGame}
-              isActive={ingestStatus === 'in progress'}
+              game={isAllGames ? null : ingestingGame}
+              isActive={ingestStatus === 'in progress' && !isAllGames}
               onComplete={handleIngestionComplete}
             />
           </ExpandableCard>

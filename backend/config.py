@@ -32,7 +32,7 @@ GAME_CONFIGS = {
 
 DATASET_ENDPOINTS = {
     "take5": ["https://data.ny.gov/api/views/dg63-4siq/rows.json?accessType=DOWNLOAD"],
-    "pick3": ["https://data.ny.gov/api/views/fore-yqye/rows.json?accessType=DOWNLOAD"],
+    "pick3": ["https://data.ny.gov/api/views/hsys-3def/rows.json?accessType=DOWNLOAD"],
     "powerball": ["https://data.ny.gov/api/views/d6yy-54nr/rows.json?accessType=DOWNLOAD"],
     "megamillions": ["https://data.ny.gov/api/views/5xaw-6ayf/rows.json?accessType=DOWNLOAD"],
     "pick10": ["https://data.ny.gov/api/views/bycu-cw7c/rows.json?accessType=DOWNLOAD"],

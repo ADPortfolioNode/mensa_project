@@ -25,6 +25,9 @@ class ChromaClient:
     def list_collections(self):
         return self.client.list_collections()
 
+    def get_or_create_collection(self, collection_name: str):
+        return self.client.get_or_create_collection(collection_name)
+
     def count_documents(self, collection_name: str) -> int:
         try:
             collection = self.client.get_collection(collection_name)
