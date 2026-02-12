@@ -16,7 +16,6 @@ export default function PredictionPanel({ games = [] }) {
       {games.length > 0 ? (
         <>
           <select className="form-select mb-3" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
-            <option value="all">All games</option>
             {games.map(game => (
               <option key={game} value={game}>{game}</option>
             ))}

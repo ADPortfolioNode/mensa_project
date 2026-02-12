@@ -38,6 +38,8 @@ class IngestService:
         self.request_timeout = 30  # 30 second timeout per request
         self.max_retries = 3
         self.retry_delay = 2  # seconds
+        self.batch_size = int(os.getenv("INGEST_BATCH_SIZE", "500"))
+        self.use_upsert = os.getenv("INGEST_USE_UPSERT", "1") != "0"
     
     def fetch_and_sync(self, game: str, progress_callback=None):
         """
@@ -53,7 +55,7 @@ class IngestService:
         endpoints = DATASET_ENDPOINTS[game]
         total_rows_processed = 0
         column_names = []
-        batch_size = 500  # Process 500 records at a time
+        batch_size = self.batch_size
 
         collection_name = game
         # Use default embedding function to avoid dimension mismatch
@@ -133,11 +135,18 @@ class IngestService:
                             ids = [hashlib.md5(str(row).encode()).hexdigest() for row in batch]
 
                             if ids:
-                                collection.add(
-                                    documents=documents,
-                                    metadatas=metadatas,
-                                    ids=ids
-                                )
+                                if self.use_upsert and hasattr(collection, "upsert"):
+                                    collection.upsert(
+                                        documents=documents,
+                                        metadatas=metadatas,
+                                        ids=ids
+                                    )
+                                else:
+                                    collection.add(
+                                        documents=documents,
+                                        metadatas=metadatas,
+                                        ids=ids
+                                    )
                             
                             total_rows_processed += len(batch)
                             if progress_callback:
