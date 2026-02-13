@@ -11,6 +11,10 @@ import GameSelector from './GameSelector';
 import IngestionProgressPanel from './IngestionProgressPanel';
 import ExpandableCard from './ExpandableCard';
 import ProgressiveProgressBar from './ProgressiveProgressBar';
+import chromaStateManager from '../utils/chromaStateManager';
+
+const ALL_GAMES_VALUE = '__all_games__';
+const GAME_COLOR_SCHEMES = ['primary', 'success', 'warning', 'info', 'danger', 'secondary', 'dark'];
 
 export default function Dashboard() {
   const API_BASE = getApiBase();
@@ -27,7 +31,52 @@ export default function Dashboard() {
   const [gameContents, setGameContents] = useState({});
   const [experiments, setExperiments] = useState([]);
   const [selectedGame, setSelectedGame] = useState('');
+  const [selectedTrainGame, setSelectedTrainGame] = useState('');
   const [expandedCard, setExpandedCard] = useState(null);
+  const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
+  const [allGamesProgress, setAllGamesProgress] = useState({});
+
+  useEffect(() => {
+    if (
+      ingestStatus !== 'in progress' ||
+      selectedGame !== ALL_GAMES_VALUE ||
+      !ingestingGame
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const pollCurrentGameProgress = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/api/ingest_progress?game=${ingestingGame}`);
+        if (cancelled || !response?.data) return;
+
+        const rowsFetched = Number(response.data.rows_fetched || 0);
+        const totalRows = Number(response.data.total_rows || 0);
+
+        setAllGamesProgress((prev) => ({
+          ...prev,
+          [ingestingGame]: {
+            ...(prev[ingestingGame] || {}),
+            status: response.data.status === 'error' ? 'error' : 'active',
+            rowsFetched,
+            totalRows,
+          },
+        }));
+      } catch {
+        // keep existing progress state; transient poll failures are expected
+      }
+    };
+
+    pollCurrentGameProgress();
+    const interval = setInterval(pollCurrentGameProgress, 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [ingestStatus, selectedGame, ingestingGame, API_BASE]);
   
   // Training parameters
   const [trainParams, setTrainParams] = useState({
@@ -55,6 +104,7 @@ export default function Dashboard() {
         const r = await axios.get(`${API_BASE}/api/games`);
         const gameList = r.data.games || [];
         setGames(gameList);
+        setSelectedTrainGame((prev) => prev || gameList[0] || '');
         // Fetch draw counts for each game
         const contents = {};
         for (const game of gameList) {
@@ -102,34 +152,117 @@ export default function Dashboard() {
   const startIngest = useCallback(async () => {
     if (!selectedGame) return;
     setIngestStatus('in progress');
-    setIngestingGame(selectedGame);
     setIngestStartTime(Date.now());
     setExpandedCard('ingest');
 
     try {
-      // Initiate ingestion - backend will handle progress async
-      const response = await axios.post(`${API_BASE}/api/ingest`, { game: selectedGame });
-      
-      if (response.data.status === 'completed') {
-        setIngestStatus('completed');
+      if (selectedGame === ALL_GAMES_VALUE) {
+        setAllGamesProgress(
+          games.reduce((acc, game) => {
+            acc[game] = { status: 'pending', totalRows: 0, rowsFetched: 0 };
+            return acc;
+          }, {})
+        );
+        let hasAnyFailure = false;
+        for (const game of games) {
+          setIngestingGame(game);
+          setAllGamesProgress(prev => ({
+            ...prev,
+            [game]: {
+              ...(prev[game] || {}),
+              status: 'active'
+            }
+          }));
+
+          try {
+            const response = await axios.post(`${API_BASE}/api/ingest`, { game });
+            if (response.data.status !== 'completed') {
+              hasAnyFailure = true;
+              setAllGamesProgress(prev => ({
+                ...prev,
+                [game]: {
+                  ...(prev[game] || {}),
+                  status: 'error'
+                }
+              }));
+            } else {
+              setAllGamesProgress(prev => ({
+                ...prev,
+                [game]: {
+                  ...(prev[game] || {}),
+                  status: 'completed',
+                  rowsFetched: response.data.total || prev[game]?.rowsFetched || 0,
+                  totalRows: response.data.total || prev[game]?.totalRows || 0
+                }
+              }));
+            }
+          } catch (err) {
+            console.error(`Error ingesting ${game}:`, err);
+            hasAnyFailure = true;
+            setAllGamesProgress(prev => ({
+              ...prev,
+              [game]: {
+                ...(prev[game] || {}),
+                status: 'error'
+              }
+            }));
+          }
+
+          try {
+            const res = await axios.get(`${API_BASE}/api/games/${game}/summary`);
+            const drawCount = res.data.draw_count;
+            setGameContents(prev => ({
+              ...prev,
+              [game]: drawCount
+            }));
+            chromaStateManager.notifyCollectionUpdate(game, 0, drawCount);
+            setSummaryRefreshKey((prev) => prev + 1);
+            setAllGamesProgress(prev => ({
+              ...prev,
+              [game]: {
+                ...(prev[game] || {}),
+                rowsFetched: drawCount,
+                totalRows: drawCount
+              }
+            }));
+          } catch {
+            // ignore per-game summary refresh failures
+          }
+        }
+
         setIngestingGame(null);
-        // Refresh game contents to show updated counts
-        const res = await axios.get(`${API_BASE}/api/games/${selectedGame}/summary`);
-        setGameContents(prev => ({
-          ...prev,
-          [selectedGame]: res.data.draw_count
-        }));
-        setExpandedCard(null);
+        setIngestStatus(hasAnyFailure ? 'error' : 'completed');
+        if (!hasAnyFailure) {
+          setExpandedCard(null);
+        }
       } else {
-        setIngestStatus('error');
-        setIngestingGame(null);
+        setAllGamesProgress({});
+        setIngestingGame(selectedGame);
+        const response = await axios.post(`${API_BASE}/api/ingest`, { game: selectedGame });
+
+        if (response.data.status === 'completed') {
+          setIngestStatus('completed');
+          setIngestingGame(null);
+          const res = await axios.get(`${API_BASE}/api/games/${selectedGame}/summary`);
+          const drawCount = res.data.draw_count;
+          setGameContents(prev => ({
+            ...prev,
+            [selectedGame]: drawCount
+          }));
+          chromaStateManager.notifyCollectionUpdate(selectedGame, response.data.added || 0, drawCount);
+          setSummaryRefreshKey((prev) => prev + 1);
+          setExpandedCard(null);
+        } else {
+          setIngestStatus('error');
+          setIngestingGame(null);
+        }
       }
     } catch (e) {
       console.error("Error starting ingestion:", e);
       setIngestStatus('error');
       setIngestingGame(null);
     }
-  }, [selectedGame, API_BASE]);
+  }, [selectedGame, games, API_BASE]);
 
   const handleIngestionComplete = useCallback((progress) => {
     if (progress.status === 'completed') {
@@ -144,17 +277,20 @@ export default function Dashboard() {
     if (selectedGame) {
       axios.get(`${API_BASE}/api/games/${selectedGame}/summary`)
         .then(res => {
+          const drawCount = res.data.draw_count;
           setGameContents(prev => ({
             ...prev,
-            [selectedGame]: res.data.draw_count
+            [selectedGame]: drawCount
           }));
+          chromaStateManager.notifyCollectionUpdate(selectedGame, progress.added || 0, drawCount);
+          setSummaryRefreshKey((prev) => prev + 1);
         })
         .catch(e => console.error("Error refreshing game content:", e));
     }
   }, [selectedGame, API_BASE]);
 
   const startTrain = useCallback(async () => {
-    if (ingestStatus !== 'completed' || !selectedGame) {
+    if (ingestStatus !== 'completed' || !selectedTrainGame) {
       alert('Please complete data ingestion first and select a game.');
       return;
     }
@@ -166,7 +302,7 @@ export default function Dashboard() {
     const interval = setInterval(() => setTrainProgress(p => Math.min(p + 5, 95)), 2000);
     try {
       const response = await axios.post(`${API_BASE}/api/train`, { 
-        game: selectedGame,
+        game: selectedTrainGame,
         ...trainParams // Include training parameters
       });
       clearInterval(interval); // Clear interval regardless of outcome
@@ -177,7 +313,7 @@ export default function Dashboard() {
         // Refresh experiments
         const r = await axios.get(`${API_BASE}/api/experiments`);
         setExperiments(r.data.experiments || []);
-        alert(`Training completed successfully! Experiment ID: ${response.data.experiment_id}, Score: ${response.data.score}`);
+        alert(`Training completed successfully for ${selectedTrainGame.toUpperCase()}! Experiment ID: ${response.data.experiment_id}, Score: ${response.data.score}`);
         setTimeout(() => setExpandedCard(null), 2000);
       } else {
         setTrainStatus('error');
@@ -189,9 +325,28 @@ export default function Dashboard() {
       setTrainProgress(0);
       alert(`Training failed due to an error: ${e.response?.data?.detail || e.message}`);
     }
-  }, [ingestStatus, selectedGame, trainParams, API_BASE]);
+  }, [ingestStatus, selectedTrainGame, trainParams, API_BASE]);
 
   const isTrained = experiments.length > 0;
+
+  const getGameColorScheme = (gameName) => {
+    const idx = games.findIndex((name) => name === gameName);
+    if (idx < 0) return 'primary';
+    return GAME_COLOR_SCHEMES[idx % GAME_COLOR_SCHEMES.length];
+  };
+
+  const getGameLabelColor = (scheme) => {
+    switch (scheme) {
+      case 'primary': return '#0d6efd';
+      case 'success': return '#198754';
+      case 'warning': return '#996500';
+      case 'info': return '#0dcaf0';
+      case 'danger': return '#dc3545';
+      case 'secondary': return '#6c757d';
+      case 'dark': return '#212529';
+      default: return '#0d6efd';
+    }
+  };
 
   // Helper to determine if card should span 2 columns
   const getColSpan = (cardKey) => {
@@ -201,6 +356,35 @@ export default function Dashboard() {
   return (
     <div className="container-fluid">
       <WorkflowSummary />
+      <div className="row g-4 mb-4">
+        <div className="col-12 col-lg-4">
+          <div className="card h-100">
+            <div className="card-body">
+              <h4 className="text-neon mb-3">Mensa Concierge</h4>
+              <p className="mb-2">
+                Friendly, personable, and deeply technical support for Python, React, ChromaDB, and RAG workflows.
+              </p>
+              <p className="mb-0 text-muted">
+                Use built-in tools for file management, internet search, and self diagnostics directly from chat.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="col-12 col-lg-8">
+          <ExpandableCard
+            title="Concierge Chat"
+            neonBorder={true}
+            metadata={{
+              'Persona': 'Friendly Expert Developer',
+              'Tools': 'Files, Search, Diagnostics',
+              'Context': selectedGame ? selectedGame.toUpperCase() : 'All Games'
+            }}
+            onToggle={(expanded) => setExpandedCard(expanded ? 'chat' : null)}
+          >
+            <ChatPanelRAG game={selectedGame} />
+          </ExpandableCard>
+        </div>
+      </div>
       <div className="mb-4">
         <h4 className="text-neon">Workflow Status</h4>
         <div className="mb-2">
@@ -256,11 +440,15 @@ export default function Dashboard() {
             <p>Fetch and sync lottery data from NY Open Data.</p>
             <div className="mb-3">
               <label htmlFor="gameSelect" className="form-label text-neon">Select Game</label>
-              <GameSelector games={games} onGameSelect={setSelectedGame} />
+              <GameSelector games={games} onGameSelect={setSelectedGame} includeAllOption={true} allOptionValue={ALL_GAMES_VALUE} allOptionLabel="All Games" />
             </div>
             {selectedGame && (
               <div className="alert alert-info">
-                <strong>{selectedGame.toUpperCase()}</strong>: {gameContents[selectedGame] || 0} draws currently stored
+                {selectedGame === ALL_GAMES_VALUE ? (
+                  <><strong>ALL GAMES</strong>: Run ingestion sequentially for every available game</>
+                ) : (
+                  <><strong>{selectedGame.toUpperCase()}</strong>: {gameContents[selectedGame] || 0} draws currently stored</>
+                )}
               </div>
             )}
             <button 
@@ -272,11 +460,58 @@ export default function Dashboard() {
             </button>
             
             {/* Ingestion Progress Panel */}
-            <IngestionProgressPanel 
-              game={ingestingGame}
-              isActive={ingestStatus === 'in progress'}
-              onComplete={handleIngestionComplete}
-            />
+            {selectedGame !== ALL_GAMES_VALUE && (
+              <IngestionProgressPanel 
+                game={ingestingGame}
+                isActive={ingestStatus === 'in progress'}
+                onComplete={handleIngestionComplete}
+              />
+            )}
+
+            {selectedGame === ALL_GAMES_VALUE && Object.keys(allGamesProgress).length > 0 && (
+              <div className="mt-3">
+                <h6 style={{ marginBottom: '10px' }}>All Games Progress</h6>
+                <ProgressiveProgressBar
+                  current={games.filter((g) => allGamesProgress[g]?.status === 'completed').length}
+                  total={games.length || 1}
+                  status={ingestStatus === 'error' ? 'error' : ingestStatus === 'completed' ? 'completed' : 'active'}
+                  label="Overall All Games Ingestion"
+                  showMetadata={true}
+                  startTime={ingestStartTime}
+                  colorScheme="success"
+                />
+                {games.map((game) => {
+                  const gameProgress = allGamesProgress[game] || { status: 'pending', totalRows: 0, rowsFetched: 0 };
+                  const gameColorScheme = getGameColorScheme(game);
+                  const progressStatus = gameProgress.status === 'completed'
+                    ? 'completed'
+                    : gameProgress.status === 'error'
+                      ? 'error'
+                      : gameProgress.status === 'active'
+                        ? 'active'
+                        : 'idle';
+                  const hasRowProgress = Number(gameProgress.totalRows) > 0;
+                  const progressCurrent = hasRowProgress
+                    ? Number(gameProgress.rowsFetched || 0)
+                    : (gameProgress.status === 'completed' ? 1 : gameProgress.status === 'active' ? 0.5 : 0);
+                  const progressTotal = hasRowProgress ? Number(gameProgress.totalRows) : 1;
+
+                  return (
+                    <ProgressiveProgressBar
+                      key={game}
+                      current={progressCurrent}
+                      total={progressTotal}
+                      status={progressStatus}
+                      label={`Ingest ${game.toUpperCase()}${gameProgress.totalRows ? ` (${gameProgress.totalRows.toLocaleString()} draws)` : ''}`}
+                      labelColor={getGameLabelColor(gameColorScheme)}
+                      showMetadata={true}
+                      startTime={ingestStartTime}
+                      colorScheme={gameColorScheme}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </ExpandableCard>
         </div>
 
@@ -302,6 +537,22 @@ export default function Dashboard() {
             onToggle={(expanded) => setExpandedCard(expanded ? 'train' : null)}
           >
             <p>Train machine learning model on lottery draw history.</p>
+
+            <div className="mb-3">
+              <label htmlFor="trainGameSelect" className="form-label text-neon">Game for Training</label>
+              <select
+                id="trainGameSelect"
+                className="form-select"
+                value={selectedTrainGame}
+                onChange={(e) => setSelectedTrainGame(e.target.value)}
+                disabled={trainStatus === 'in progress'}
+              >
+                <option value="">Select game</option>
+                {games.map((game) => (
+                  <option key={game} value={game}>{game.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
             
             {/* Training Parameters */}
             <div className="mb-3" style={{
@@ -380,7 +631,7 @@ export default function Dashboard() {
             <button 
               className="btn btn-success" 
               onClick={startTrain} 
-              disabled={trainStatus === 'in progress' || ingestStatus !== 'completed' || !selectedGame}
+              disabled={trainStatus === 'in progress' || ingestStatus !== 'completed' || !selectedTrainGame}
             >
               {trainStatus === 'in progress' ? 'Training...' : 'Start Training'}
             </button>
@@ -413,22 +664,7 @@ export default function Dashboard() {
             }}
             onToggle={(expanded) => setExpandedCard(expanded ? 'games' : null)}
           >
-            <GameSummaryPanel games={games} />
-          </ExpandableCard>
-        </div>
-
-        {/* Chat Agent */}
-        <div className="col-12 col-md-6">
-          <ExpandableCard
-            title="Chat Agent (RAG)"
-            neonBorder={true}
-            metadata={{
-              'Context': selectedGame ? selectedGame.toUpperCase() : 'All Games',
-              'Backend': 'Gemini + ChromaDB'
-            }}
-            onToggle={(expanded) => setExpandedCard(expanded ? 'chat' : null)}
-          >
-            <ChatPanelRAG game={selectedGame} />
+            <GameSummaryPanel games={games} refreshKey={summaryRefreshKey} initialSummaries={gameContents} />
           </ExpandableCard>
         </div>
 

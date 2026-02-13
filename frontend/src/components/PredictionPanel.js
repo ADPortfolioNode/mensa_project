@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import GamePrediction from './GamePrediction';
 
-export default function PredictionPanel({ games = [] }) {
+export default function PredictionPanel({ games = [], disabled = false }) {
   const [selectedGame, setSelectedGame] = useState(games.length > 0 ? games[0] : '');
 
   React.useEffect(() => {
@@ -13,7 +13,11 @@ export default function PredictionPanel({ games = [] }) {
   return (
     <div className="card p-3 mb-3">
       <h5>Predictions</h5>
-      {games.length > 0 ? (
+      {disabled ? (
+        <div className="alert alert-warning mb-0">
+          <strong>Prediction unavailable:</strong> Train a model first for the selected game.
+        </div>
+      ) : games.length > 0 ? (
         <>
           <select className="form-select mb-3" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
             {games.map(game => (

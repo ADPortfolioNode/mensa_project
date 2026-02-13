@@ -155,6 +155,7 @@
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md) var(--radius-md) var(--radius-md) 4px;
+    color: var(--text-primary);
 }
 
 .chat-message-rag.bot .message-bubble.loading {
@@ -330,6 +331,14 @@
 }
 
 /* Markdown styling in chat */
+.chat-message-rag.bot .message-bubble h1,
+.chat-message-rag.bot .message-bubble h2,
+.chat-message-rag.bot .message-bubble h3,
+.chat-message-rag.bot .message-bubble h4 {
+    margin: 0.45rem 0;
+    line-height: 1.3;
+}
+
 .chat-message-rag.bot code {
     background: var(--bg-secondary);
     padding: 2px 6px;
@@ -347,13 +356,31 @@
 }
 
 .chat-message-rag.bot p {
-    margin: var(--spacing-sm) 0;
+    margin: 0.45rem 0;
+    line-height: 1.65;
 }
 
 .chat-message-rag.bot ul,
 .chat-message-rag.bot ol {
-    margin-left: var(--spacing-lg);
-    margin-top: var(--spacing-sm);
+    margin: 0.4rem 0 0.6rem var(--spacing-lg);
+    line-height: 1.6;
+}
+
+.chat-message-rag.bot li + li {
+    margin-top: 0.2rem;
+}
+
+.chat-message-rag.bot blockquote {
+    margin: 0.6rem 0;
+    padding: 0.1rem 0 0.1rem 0.7rem;
+    border-left: 3px solid var(--accent-green);
+    color: var(--text-secondary);
+}
+
+.chat-message-rag.bot pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
 }
 
 /* Scrollbar styling */

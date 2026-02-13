@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import StartupProgress from './components/StartupProgress';
 import Header from './components/Header';
+import './App.css';
 
 export default function App() {
   const [startupComplete, setStartupComplete] = useState(false);

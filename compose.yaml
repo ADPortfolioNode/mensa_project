@@ -3,10 +3,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        CACHE_BUSTER: ${BACKEND_CACHE_BUSTER:-stable}
     container_name: mensa_backend
     volumes:
-      - ./backend:/app
-      - ./data:/data
+      - backend_data:/data
     ports:
       - "5000:5000"
     environment:
@@ -48,8 +49,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data/chroma:/chroma/chroma
+      - chroma_data:/chroma/chroma
     restart: on-failure
 
 volumes:
   data:
+  backend_data:
+  chroma_data:

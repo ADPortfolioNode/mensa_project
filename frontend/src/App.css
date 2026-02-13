@@ -1,96 +1,75 @@
-/* Neon accent utility classes for Bootstrap/neon hybrid styling */
-.text-neon {
-  color: #0ff !important;
-  text-shadow: 0 0 4px #0ff, 0 0 8px #0ff8;
-}
-.border-neon {
-  border-color: #0ff !important;
-  box-shadow: 0 0 8px #0ff4;
-}
-.bg-neon {
-  background: linear-gradient(90deg, #0ff 0%, #f0f 100%) !important;
-}
 body {
-  font-family: 'Inter', sans-serif;
-  background-color: #111;
-  color: #fff;
+  font-family: 'Segoe UI', 'Inter', 'Roboto', sans-serif;
+  background: #000;
+  color: #e7ffe7;
+}
+
+.text-neon {
+  color: #39ff14 !important;
+  text-shadow: 0 0 6px rgba(57, 255, 20, 0.65), 0 0 14px rgba(57, 255, 20, 0.4);
+}
+
+.border-neon {
+  border-color: #39ff14 !important;
 }
 
 .card {
-  background: #181818;
-  border: 1px solid #0ff;
-  box-shadow: 0 0 16px #0ff2, 0 0 2px #fff1;
-  color: #fff;
+  background: #ffffff;
+  color: #141414;
+  border: 1px solid rgba(57, 255, 20, 0.45);
   border-radius: 12px;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-  box-shadow: 0 0 32px #0ff8, 0 0 8px #fff2;
-  transform: scale(1.02);
-}
-  background: #111;
-  color: #0ff;
-  border: 1px solid #0ff;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 1rem;
-  margin-bottom: 12px;
-  outline: none;
-  box-shadow: 0 0 8px #0ff2;
-}
-  border-color: #f0f;
-  color: #f0f;
-  box-shadow: 0 0 16px #f0f2;
-}
-  color: #0ff;
-  font-weight: bold;
-  margin-bottom: 6px;
-}
-  background: linear-gradient(90deg, #0ff 0%, #f0f 100%);
-  color: #111;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-weight: bold;
-  box-shadow: 0 0 8px #0ff2;
-  transition: background 0.2s, color 0.2s;
-}
-  background: linear-gradient(90deg, #f0f 0%, #0ff 100%);
-  color: #fff;
-}
-  background: #222;
-  border-left: 4px solid #0ff;
-  color: #0ff;
-  padding: 8px 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 0 8px #0ff2;
-}
-  color: #f0f;
-  font-size: 1.5rem;
-  margin-right: 8px;
-}
-  background: linear-gradient(90deg, #0ff 0%, #f0f 100%);
-}
-  background: #330022;
-  color: #f0f;
-  border: 1px solid #f0f;
-}
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45), 0 0 24px rgba(57, 255, 20, 0.2);
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-/* Custom Scrollbar for Chat */
+.card.card-selected {
+  box-shadow: 0 0 10px rgba(170, 170, 170, 0.55), 0 0 24px rgba(120, 120, 120, 0.35);
+  border-color: rgba(150, 150, 150, 0.9);
+}
+
+.card .card-header {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(57, 255, 20, 0.2);
+}
+
+.form-control,
+.form-select {
+  background: #ffffff;
+  color: #141414;
+  border: 1px solid rgba(57, 255, 20, 0.55);
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #39ff14;
+  box-shadow: 0 0 0 0.2rem rgba(57, 255, 20, 0.2);
+}
+
+.btn-primary,
+.btn-success {
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.35);
+}
+
+.btn-outline-secondary {
+  border-color: #8a8a8a;
+  color: #3a3a3a;
+}
+
+.alert-info {
+  background: #f3fff0;
+  color: #114111;
+  border-color: rgba(57, 255, 20, 0.5);
+}
+
 .overflow-auto::-webkit-scrollbar {
   width: 8px;
 }
 
 .overflow-auto::-webkit-scrollbar-track {
-  background: #222;
-  border-radius: 4px;
+  background: #111;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: #0ff;
+  background: #39ff14;
   border-radius: 4px;
-}
-
-.overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: #f0f;
 }

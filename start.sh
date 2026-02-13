@@ -26,6 +26,97 @@ choose_compose_command() {
     echo "Using compose command: ${COMPOSE_CMD}"
 }
 
+configure_build_backend() {
+    # BuildKit can intermittently fail on some Docker Desktop setups with:
+    # "failed to receive status ... EOF" during large layer operations.
+    # Default to classic builder for stability unless explicitly opted in.
+    if [ "${FORCE_BUILDKIT:-false}" = "true" ]; then
+        export DOCKER_BUILDKIT=1
+        export COMPOSE_DOCKER_CLI_BUILD=1
+        echo "Build mode: BuildKit enabled (FORCE_BUILDKIT=true)."
+    else
+        export DOCKER_BUILDKIT=0
+        export COMPOSE_DOCKER_CLI_BUILD=0
+        echo "Build mode: BuildKit disabled for stability (set FORCE_BUILDKIT=true to enable)."
+    fi
+}
+
+configure_backend_cache_buster() {
+    if [ "${BUILD}" = true ]; then
+        local ts
+        ts=$(date +%s)
+        export BACKEND_CACHE_BUSTER="${ts}-${RANDOM}"
+        echo "Backend cache-buster enabled: ${BACKEND_CACHE_BUSTER}"
+    else
+        export BACKEND_CACHE_BUSTER="stable"
+    fi
+}
+
+verify_backend_source_sync() {
+    local files=("main.py" "services/trainer.py" "services/predictor.py")
+    local mismatch=0
+
+    if ! docker ps --filter "name=mensa_backend" --format "{{.Names}}" | grep -q "^mensa_backend$"; then
+        echo "WARNING: backend container is not running; cannot verify source sync."
+        return 1
+    fi
+
+    for rel_path in "${files[@]}"; do
+        local host_file="backend/${rel_path}"
+        if [ ! -f "${host_file}" ]; then
+            echo "WARNING: expected host file missing: ${host_file}"
+            mismatch=1
+            continue
+        fi
+
+        local host_hash container_hash
+        host_hash=$(sha256sum "${host_file}" | awk '{print $1}')
+        container_hash=$(docker exec mensa_backend sh -lc "sha256sum /app/${rel_path} 2>/dev/null | awk '{print \\\$1}'" 2>/dev/null || true)
+
+        if [ -z "${container_hash}" ] || [ "${host_hash}" != "${container_hash}" ]; then
+            echo "WARNING: backend source mismatch detected for ${rel_path}"
+            mismatch=1
+        fi
+    done
+
+    if [ ${mismatch} -eq 0 ]; then
+        echo "✓ Backend source verification passed."
+        return 0
+    fi
+
+    return 1
+}
+
+repair_backend_source_sync_once() {
+    local ts
+    ts=$(date +%s)
+    export BACKEND_CACHE_BUSTER="repair-${ts}-${RANDOM}"
+    echo "Attempting one-time backend rebuild/repair with cache-buster: ${BACKEND_CACHE_BUSTER}"
+
+    if ! eval "${COMPOSE_CMD} build --no-cache backend"; then
+        echo "ERROR: backend repair build failed." >&2
+        return 1
+    fi
+
+    if ! eval "${COMPOSE_CMD} up -d --force-recreate backend"; then
+        echo "ERROR: backend repair recreate failed." >&2
+        return 1
+    fi
+
+    if ! wait_for_service "backend" 12 5; then
+        echo "ERROR: backend failed readiness check after repair." >&2
+        return 1
+    fi
+
+    if ! verify_backend_source_sync; then
+        echo "ERROR: backend source still mismatched after repair." >&2
+        return 1
+    fi
+
+    echo "✓ Backend source repair successful."
+    return 0
+}
+
 check_docker_version() {
     echo "Checking Docker environment..."
     
@@ -87,7 +178,7 @@ run_compose_up_with_retries() {
         fi
 
         echo "Starting services..."
-        if eval "${COMPOSE_CMD} up -d --force-recreate"; then
+        if run_compose_with_timeout 5400 sh -lc "${COMPOSE_CMD} up -d --force-recreate"; then
             return 0
         fi
 
@@ -96,6 +187,16 @@ run_compose_up_with_retries() {
         delay=$((delay * 2))
     done
     return 1
+}
+
+run_compose_with_timeout() {
+    local seconds="$1"
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${seconds}"s "$@"
+    else
+        "$@"
+    fi
 }
 
 confirm_prune() {
@@ -166,6 +267,8 @@ fi
 # 1. Check Docker environment first
 check_docker_version
 choose_compose_command
+configure_build_backend
+configure_backend_cache_buster
 echo ""
 
 # 2. Prune if requested
@@ -201,7 +304,9 @@ echo ""
 
 # 4. Stop and remove old containers and orphans
 echo "Stopping and removing any old containers..."
-eval "${COMPOSE_CMD} down --remove-orphans" || true
+if ! run_compose_with_timeout 180 sh -lc "${COMPOSE_CMD} down --remove-orphans"; then
+    echo "WARNING: compose down timed out; continuing startup." >&2
+fi
 echo ""
 
 # 4. Build and start services
@@ -395,6 +500,17 @@ if [ ${FAILED} -ne 0 ]; then
     exit 2
 fi
 echo "✓ All services are running."
+
+if [ "${BUILD}" = true ]; then
+    echo ""
+    echo "Verifying backend source sync..."
+    if ! verify_backend_source_sync; then
+        if ! repair_backend_source_sync_once; then
+            echo "ERROR: deterministic backend source sync check failed." >&2
+            exit 2
+        fi
+    fi
+fi
 
 
 # 6. Monitor ingestion or print next steps

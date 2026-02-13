@@ -14,6 +14,7 @@ export default function ProgressiveProgressBar({
   total = 100,
   status = 'idle', // idle, active, completed, error
   label = 'Progress',
+  labelColor = null,
   showMetadata = true,
   rate = null, // items per second
   startTime = null, // timestamp when started
@@ -76,7 +77,7 @@ export default function ProgressiveProgressBar({
         alignItems: 'center',
         marginBottom: '6px'
       }}>
-        <span style={{ fontWeight: '600', fontSize: '14px' }}>
+        <span style={{ fontWeight: '600', fontSize: '14px', color: labelColor || undefined }}>
           {getStatusIcon()} {label}
         </span>
         <span style={{ fontSize: '13px', color: '#6c757d' }}>

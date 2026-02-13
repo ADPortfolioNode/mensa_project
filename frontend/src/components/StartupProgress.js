@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getApiBase } from '../utils/apiBase';
 import { analyzeError, ErrorCategory } from '../utils/errorUtils';
@@ -9,11 +9,13 @@ const StartupProgress = ({ onComplete }) => {
     const [errorReport, setErrorReport] = useState(null);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [isStarting, setIsStarting] = useState(false);
+    const transientErrorCountRef = useRef(0);
 
     useEffect(() => {
         const fetchStatus = async () => {
             try {
                 const response = await axios.get(`${getApiBase()}/api/startup_status`);
+                transientErrorCountRef.current = 0;
                 setErrorReport(null);
                 setStatus(response.data);
                 setElapsedSeconds(response.data.elapsed_s || 0);
@@ -22,12 +24,24 @@ const StartupProgress = ({ onComplete }) => {
                     onComplete();
                 }
             } catch (error) {
-                console.error("Error fetching startup status:", error);
                 const report = analyzeError(error);
-                setErrorReport(report);
-                if (report.category === ErrorCategory.CONNECTION_ERROR) {
-                    clearInterval(interval);
+                const statusCode = error?.response?.status;
+                const isTransientGateway = statusCode === 502 || statusCode === 503 || statusCode === 504;
+                const isConnectionIssue = report.category === ErrorCategory.CONNECTION_ERROR;
+
+                if (isTransientGateway || isConnectionIssue) {
+                    transientErrorCountRef.current += 1;
+                    if (transientErrorCountRef.current >= 5) {
+                        setErrorReport(report);
+                    } else {
+                        setErrorReport(null);
+                    }
+                    return;
                 }
+
+                console.error("Error fetching startup status:", error);
+                setErrorReport(report);
+                clearInterval(interval);
             }
         };
 
@@ -49,8 +63,18 @@ const StartupProgress = ({ onComplete }) => {
         return <div style={{ padding: '20px' }}>Initializing...</div>;
     }
 
+    const availableGames = Array.isArray(status.available_games) ? status.available_games : [];
     const games = status.games || {};
-    const gameEntries = Object.entries(games);
+    const normalizedGames = availableGames.length > 0
+        ? availableGames.reduce((acc, game) => {
+            acc[game] = {
+                status: games?.[game]?.status || 'pending',
+                error: games?.[game]?.error || null,
+            };
+            return acc;
+        }, {})
+        : games;
+    const gameEntries = Object.entries(normalizedGames);
     const progressVal = Number(status.progress ?? 0);
     // Fall back to the number of games if backend omits total
     const totalVal = Number(status.total ?? gameEntries.length ?? 0);
@@ -79,6 +103,10 @@ const StartupProgress = ({ onComplete }) => {
         if (gameStatus === 'failed') return '#dc3545';
         return '#6c757d';
     };
+
+    const formatGameLabel = (game) => game
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 
     const handleStartInitialization = async () => {
         setIsStarting(true);
@@ -177,6 +205,35 @@ const StartupProgress = ({ onComplete }) => {
                         {Math.round(overallProgress)}%
                     </div>
                 </div>
+                {hasGamesConfigured && (
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '8px',
+                        marginTop: '10px'
+                    }}>
+                        {gameEntries.map(([game, gameData]) => (
+                            <div
+                                key={game}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '4px 10px',
+                                    borderRadius: '999px',
+                                    border: `1px solid ${getStatusColor(gameData.status)}`,
+                                    backgroundColor: game === status.current_game ? '#f0f8ff' : '#ffffff',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    color: '#212529'
+                                }}
+                            >
+                                <span style={{ color: getStatusColor(gameData.status) }}>{getStatusIcon(gameData.status)}</span>
+                                <span>{formatGameLabel(game)}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Game Status Table */}
@@ -211,7 +268,7 @@ const StartupProgress = ({ onComplete }) => {
                             }}
                         >
                             <td style={{ padding: '12px', fontWeight: 'bold' }}>
-                                {game.charAt(0).toUpperCase() + game.slice(1)}
+                                {formatGameLabel(game)}
                             </td>
                             <td style={{
                                 padding: '12px',

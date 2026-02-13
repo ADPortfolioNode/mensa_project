@@ -20,7 +20,16 @@ export default function GamePrediction({ game }) {
         game: game,
         recent_k: parseInt(recentK, 10)
       });
-      setPrediction(r.data);
+      const payload = r.data || {};
+      if (payload.status === 'error') {
+        setError(payload.message || 'Prediction failed');
+        return;
+      }
+      if (!payload.predicted_numbers) {
+        setError('Prediction response did not include predicted numbers.');
+        return;
+      }
+      setPrediction(payload);
     } catch (e) {
       setError(e.response?.data?.detail || e.message || 'Prediction failed');
     } finally {

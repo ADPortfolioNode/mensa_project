@@ -2,6 +2,8 @@ import requests
 import hashlib
 import time
 import signal
+import os
+import re
 from functools import wraps
 from config import DATASET_ENDPOINTS
 from chromadb.utils import embedding_functions
@@ -40,6 +42,129 @@ class IngestService:
         self.retry_delay = 2  # seconds
         self.batch_size = int(os.getenv("INGEST_BATCH_SIZE", "500"))
         self.use_upsert = os.getenv("INGEST_USE_UPSERT", "1") != "0"
+        self.socrata_catalog_url = os.getenv("SOCRATA_CATALOG_URL", "https://api.us.socrata.com/api/catalog/v1")
+        self.socrata_domain = os.getenv("SOCRATA_DOMAIN", "data.ny.gov")
+        self.game_search_hints = {
+            "take5": "take 5 lottery",
+            "pick3": "pick 3 lottery",
+            "powerball": "powerball lottery",
+            "megamillions": "mega millions lottery",
+            "pick10": "pick 10 lottery",
+            "cash4life": "cash4life lottery",
+            "quickdraw": "quick draw lottery",
+            "nylotto": "new york lotto lottery",
+        }
+
+    def _normalize_text(self, value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+    def _extract_rows_and_columns(self, data):
+        """Normalize Socrata responses to (rows, column_names) for ingestion."""
+        if isinstance(data, dict):
+            rows = data.get("data")
+            if isinstance(rows, list):
+                columns_meta = data.get("meta", {}).get("view", {}).get("columns", [])
+                column_names = [col.get("fieldName", f"col_{idx}") for idx, col in enumerate(columns_meta)]
+                return rows, column_names
+
+            # Fallback for flat-object payloads where records are under common keys
+            for key in ("results", "records", "rows"):
+                candidate = data.get(key)
+                if isinstance(candidate, list):
+                    if candidate and isinstance(candidate[0], dict):
+                        all_keys = set()
+                        for item in candidate:
+                            all_keys.update(item.keys())
+                        return candidate, list(all_keys)
+                    return candidate, []
+
+        if isinstance(data, list):
+            if data and isinstance(data[0], dict):
+                all_keys = set()
+                for item in data:
+                    all_keys.update(item.keys())
+                return data, list(all_keys)
+            return data, []
+
+        return [], []
+
+    def _fetch_catalog_endpoints(self, game: str):
+        """Discover fallback dataset endpoints from Socrata catalog for a game."""
+        hint = self.game_search_hints.get(game, game)
+        query = f"new york lottery {hint}"
+
+        try:
+            response = requests.get(
+                self.socrata_catalog_url,
+                params={
+                    "domains": self.socrata_domain,
+                    "search_context": self.socrata_domain,
+                    "q": query,
+                    "limit": 20,
+                },
+                timeout=self.request_timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            results = payload.get("results", [])
+        except Exception as exc:
+            print(f"⚠ Catalog lookup failed for {game}: {exc}")
+            return []
+
+        game_token = self._normalize_text(game).replace(" ", "")
+        ranked = []
+
+        for item in results:
+            resource = item.get("resource") or {}
+            dataset_id = resource.get("id")
+            if not dataset_id:
+                continue
+
+            name = self._normalize_text(resource.get("name", ""))
+            description = self._normalize_text(resource.get("description", ""))
+            combined = f"{name} {description}"
+
+            score = 0
+            if "lottery" in combined:
+                score += 3
+            if game_token and game_token in combined.replace(" ", ""):
+                score += 5
+            if "new york" in combined:
+                score += 2
+
+            # Skip unrelated catalog hits
+            if score <= 0:
+                continue
+
+            endpoint = f"https://{self.socrata_domain}/api/views/{dataset_id}/rows.json?accessType=DOWNLOAD"
+            ranked.append((score, endpoint, resource.get("name", dataset_id)))
+
+        ranked.sort(key=lambda x: x[0], reverse=True)
+
+        deduped_endpoints = []
+        seen = set()
+        for _, endpoint, title in ranked:
+            if endpoint in seen:
+                continue
+            seen.add(endpoint)
+            deduped_endpoints.append(endpoint)
+            print(f"  ↳ Catalog candidate for {game}: {title} -> {endpoint}")
+
+        return deduped_endpoints
+
+    def _resolve_game_endpoints(self, game: str):
+        configured = DATASET_ENDPOINTS.get(game, [])
+        catalog_candidates = self._fetch_catalog_endpoints(game)
+
+        ordered = []
+        seen = set()
+        for endpoint in configured + catalog_candidates:
+            if endpoint in seen:
+                continue
+            seen.add(endpoint)
+            ordered.append(endpoint)
+
+        return ordered
     
     def fetch_and_sync(self, game: str, progress_callback=None):
         """
@@ -49,10 +174,12 @@ class IngestService:
             game: Game name
             progress_callback: Optional callback function(rows_fetched, total_rows) for progress tracking
         """
-        if game not in DATASET_ENDPOINTS:
-            raise ValueError(f"Game '{game}' not found in dataset endpoints. Available games: {list(DATASET_ENDPOINTS.keys())}")
-
-        endpoints = DATASET_ENDPOINTS[game]
+        endpoints = self._resolve_game_endpoints(game)
+        if not endpoints:
+            raise ValueError(
+                f"Game '{game}' endpoint not found in configured datasets or Socrata catalog. "
+                f"Available configured games: {list(DATASET_ENDPOINTS.keys())}"
+            )
         total_rows_processed = 0
         column_names = []
         batch_size = self.batch_size
@@ -102,16 +229,14 @@ class IngestService:
                         print(f"  Response preview: {response.text[:200]}")
                         break
                     
-                    if not column_names:
-                        # Try to extract columns from Socrata metadata
-                        columns_meta = data.get('meta', {}).get('view', {}).get('columns', [])
-                        if columns_meta:
-                            column_names = [col.get('fieldName', f'col_{idx}') for idx, col in enumerate(columns_meta)]
-                            print(f"  ✓ Extracted {len(column_names)} column names from metadata")
-                        else:
-                            print(f"  ⚠ No column metadata found, will use generic names")
+                    fetched_rows, extracted_columns = self._extract_rows_and_columns(data)
 
-                    fetched_rows = data.get('data', [])
+                    if not column_names and extracted_columns:
+                        column_names = extracted_columns
+                        print(f"  ✓ Extracted {len(column_names)} column names from payload")
+                    elif not column_names:
+                        print(f"  ⚠ No column metadata found, will use generic names")
+
                     if not fetched_rows:
                         print(f"  ⚠ No data in this endpoint (empty 'data' array)")
                         success = True
@@ -124,15 +249,26 @@ class IngestService:
                         
                         try:
                             metadatas = []
+                            ids = []
                             for row_idx, row in enumerate(batch):
-                                if not isinstance(row, list):
-                                    print(f"  ⚠ Skipping row {j + row_idx}: not a list (type: {type(row)})")
+                                if isinstance(row, dict):
+                                    metadata_item = {
+                                        key: (str(value) if value is not None else "")
+                                        for key, value in row.items()
+                                    }
+                                elif isinstance(row, list):
+                                    metadata_item = (
+                                        {col_name: (str(value) if value is not None else "") for col_name, value in zip(column_names, row)}
+                                        if column_names else
+                                        {f"col_{idx}": (str(val) if val is not None else "") for idx, val in enumerate(row)}
+                                    )
+                                else:
+                                    print(f"  ⚠ Skipping row {j + row_idx}: unsupported row type {type(row)}")
                                     continue
-                                metadata_item = {col_name: (str(value) if value is not None else "") for col_name, value in zip(column_names, row)} if column_names else {f"col_{idx}": str(val) for idx, val in enumerate(row)}
                                 metadatas.append(metadata_item)
+                                ids.append(hashlib.md5(str(row).encode()).hexdigest())
                             
                             documents = [str(item) for item in metadatas]
-                            ids = [hashlib.md5(str(row).encode()).hexdigest() for row in batch]
 
                             if ids:
                                 if self.use_upsert and hasattr(collection, "upsert"):

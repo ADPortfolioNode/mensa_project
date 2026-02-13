@@ -8,6 +8,43 @@ set -eu
 
 LOG_FILE="diag_output.log"
 
+choose_compose_command() {
+    if docker compose version >/dev/null 2>&1; then
+        COMPOSE_CMD="docker compose"
+    elif command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+        COMPOSE_CMD="docker-compose"
+    else
+        echo "ERROR: Neither 'docker compose' nor 'docker-compose' commands are available." >&2
+        exit 1
+    fi
+}
+
+configure_build_backend() {
+    if [ "${FORCE_BUILDKIT:-false}" = "true" ]; then
+        export DOCKER_BUILDKIT=1
+        export COMPOSE_DOCKER_CLI_BUILD=1
+    else
+        export DOCKER_BUILDKIT=0
+        export COMPOSE_DOCKER_CLI_BUILD=0
+    fi
+}
+
+configure_backend_cache_buster() {
+    local ts
+    ts=$(date +%s)
+    export BACKEND_CACHE_BUSTER="diag-${ts}-${RANDOM}"
+}
+
+run_compose_with_timeout() {
+    local seconds="$1"
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${seconds}"s "$@"
+    else
+        "$@"
+    fi
+}
+
 echo "Running a diagnostic startup..."
 echo "This will attempt to start all services without any checks or retries."
 echo "The goal is to get a clear error message from docker-compose."
@@ -19,14 +56,23 @@ echo "" > "${LOG_FILE}"
 echo "--- Diagnostic Run at $(date) ---" >> "${LOG_FILE}"
 echo "" >> "${LOG_FILE}"
 
+choose_compose_command
+configure_build_backend
+configure_backend_cache_buster
+echo "Using compose command: ${COMPOSE_CMD}" >> "${LOG_FILE}"
+echo "Build mode: DOCKER_BUILDKIT=${DOCKER_BUILDKIT}, COMPOSE_DOCKER_CLI_BUILD=${COMPOSE_DOCKER_CLI_BUILD}" >> "${LOG_FILE}"
+echo "Backend cache-buster: ${BACKEND_CACHE_BUSTER}" >> "${LOG_FILE}"
+
 # Stop and remove old containers to ensure a clean start
 echo "--- Stopping and removing old containers ---" >> "${LOG_FILE}"
-docker-compose down --remove-orphans >> "${LOG_FILE}" 2>&1 || true
+if ! run_compose_with_timeout 180 sh -lc "${COMPOSE_CMD} down --remove-orphans" >> "${LOG_FILE}" 2>&1; then
+    echo "ERROR: timed out or failed while stopping old containers" >> "${LOG_FILE}"
+fi
 docker rm -f mensa_frontend mensa_backend mensa_chroma >> "${LOG_FILE}" 2>&1 || true
 
 # Attempt to build and start (detached mode with loop detection)
 echo "--- Building and starting new containers ---" >> "${LOG_FILE}"
-if ! docker-compose up -d --build --force-recreate >> "${LOG_FILE}" 2>&1; then
+if ! run_compose_with_timeout 5400 sh -lc "${COMPOSE_CMD} up -d --build --force-recreate" >> "${LOG_FILE}" 2>&1; then
     echo ""
     echo "---"
     echo "✗ Diagnostic startup FAILED during docker-compose up."
@@ -95,7 +141,7 @@ if [ ${LOOP_DETECTED} -ne 0 ]; then
     echo "  - Port conflicts" | tee -a "${LOG_FILE}"
     echo "  - Invalid command line arguments" | tee -a "${LOG_FILE}"
     echo "---" | tee -a "${LOG_FILE}"
-    docker-compose down >> "${LOG_FILE}" 2>&1 || true
+    eval "${COMPOSE_CMD} down" >> "${LOG_FILE}" 2>&1 || true
     exit 1
 fi
 

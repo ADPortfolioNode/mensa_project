@@ -4,6 +4,11 @@ from pydantic import BaseModel
 import threading
 import time
 import os
+import json
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import requests
 
 # Import services
 from config import GAME_CONFIGS
@@ -11,8 +16,6 @@ from services.gemini_client import gemini_client
 from services.chroma_client import chroma_client
 from experiments.store import ExperimentStore
 from services.ingest import ingest_service
-from services.trainer import trainer_service
-from services.predictor import predictor_service
 from services.rag_service import rag_service
 
 # --- Global startup state tracking for initialization ---
@@ -95,12 +98,15 @@ class ChatRequest(BaseModel):
     text: str
     game: str = None
     use_rag: bool = True
+    tool: Optional[Dict[str, Any]] = None
 
 class ChatResponse(BaseModel):
     response: str
     sources: list = []
     context_used: bool = False
     sources_count: int = 0
+    tool_name: str = None
+    tool_result: dict = None
 
 class IngestRequest(BaseModel):
     game: str
@@ -115,6 +121,211 @@ class PredictRequest(BaseModel):
 class GameSummaryResponse(BaseModel):
     game: str
     draw_count: int
+
+
+def _workspace_roots() -> list[Path]:
+    candidates = [
+        Path(os.getcwd()),
+        Path("/app"),
+        Path("/data"),
+    ]
+    return [path.resolve() for path in candidates if path.exists()]
+
+
+def _resolve_safe_path(raw_path: str) -> Path:
+    if not raw_path:
+        raise ValueError("Path is required")
+
+    p = Path(raw_path)
+    roots = _workspace_roots()
+    if not roots:
+        raise ValueError("No accessible workspace roots are available")
+
+    if p.is_absolute():
+        resolved = p.resolve()
+    else:
+        resolved = (roots[0] / p).resolve()
+
+    for root in roots:
+        try:
+            resolved.relative_to(root)
+            return resolved
+        except ValueError:
+            continue
+
+    raise ValueError("Path is outside allowed workspace roots")
+
+
+def _tool_list_files(params: Dict[str, Any]) -> Dict[str, Any]:
+    directory = _resolve_safe_path(params.get("path", "."))
+    if not directory.exists() or not directory.is_dir():
+        raise ValueError(f"Directory not found: {directory}")
+
+    entries = []
+    for child in sorted(directory.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))[:300]:
+        entries.append({
+            "name": child.name,
+            "type": "dir" if child.is_dir() else "file",
+            "size": child.stat().st_size if child.is_file() else None,
+        })
+
+    return {
+        "path": str(directory),
+        "count": len(entries),
+        "entries": entries,
+    }
+
+
+def _tool_read_file(params: Dict[str, Any]) -> Dict[str, Any]:
+    file_path = _resolve_safe_path(params.get("path"))
+    if not file_path.exists() or not file_path.is_file():
+        raise ValueError(f"File not found: {file_path}")
+
+    text = file_path.read_text(encoding="utf-8", errors="replace")
+    start_line = max(1, int(params.get("start_line", 1)))
+    end_line = int(params.get("end_line", 0))
+    lines = text.splitlines()
+    if end_line <= 0:
+        end_line = min(start_line + 199, len(lines))
+    end_line = min(end_line, len(lines))
+
+    selected = lines[start_line - 1:end_line]
+    return {
+        "path": str(file_path),
+        "start_line": start_line,
+        "end_line": end_line,
+        "content": "\n".join(selected),
+        "total_lines": len(lines),
+    }
+
+
+def _tool_write_file(params: Dict[str, Any]) -> Dict[str, Any]:
+    file_path = _resolve_safe_path(params.get("path"))
+    content = params.get("content", "")
+    mode = str(params.get("mode", "overwrite")).lower()
+
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    if mode == "append" and file_path.exists():
+        with file_path.open("a", encoding="utf-8") as handle:
+            handle.write(content)
+    else:
+        file_path.write_text(content, encoding="utf-8")
+
+    return {
+        "path": str(file_path),
+        "bytes_written": len(content.encode("utf-8")),
+        "mode": mode,
+    }
+
+
+def _tool_internet_search(params: Dict[str, Any]) -> Dict[str, Any]:
+    query = str(params.get("query", "")).strip()
+    if not query:
+        raise ValueError("Search query is required")
+
+    url = "https://api.duckduckgo.com/"
+    response = requests.get(
+        url,
+        params={
+            "q": query,
+            "format": "json",
+            "no_html": 1,
+            "no_redirect": 1,
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+
+    results = []
+    abstract = payload.get("AbstractText")
+    if abstract:
+        results.append({
+            "title": payload.get("Heading") or query,
+            "snippet": abstract,
+            "url": payload.get("AbstractURL"),
+        })
+
+    for item in payload.get("RelatedTopics", [])[:6]:
+        if isinstance(item, dict) and item.get("Text"):
+            results.append({
+                "title": item.get("Text", "")[:80],
+                "snippet": item.get("Text"),
+                "url": item.get("FirstURL"),
+            })
+
+    return {
+        "query": query,
+        "results": results[:8],
+        "result_count": len(results[:8]),
+    }
+
+
+def _tool_self_diagnostics(params: Dict[str, Any]) -> Dict[str, Any]:
+    game_names = list(GAME_CONFIGS.keys())
+    collections = chroma_client.get_collections_snapshot(game_names)
+    chroma_status = chroma_client.get_chroma_status()
+
+    models_dir = Path(os.environ.get("DATA_DIR", "/data")) / "models"
+    model_files = []
+    if models_dir.exists():
+        for model_file in sorted(models_dir.glob("*_model.joblib")):
+            model_files.append({
+                "name": model_file.name,
+                "bytes": model_file.stat().st_size,
+                "is_valid": model_file.stat().st_size > 0,
+            })
+
+    return {
+        "api": {"status": "healthy", "timestamp": time.time()},
+        "startup": {
+            "status": startup_state.get("status"),
+            "progress": startup_state.get("progress"),
+            "total": startup_state.get("total"),
+            "current_game": startup_state.get("current_game"),
+        },
+        "chroma": {
+            "status": chroma_status,
+            "collections": collections,
+            "expected_games": len(game_names),
+        },
+        "models": {
+            "path": str(models_dir),
+            "count": len(model_files),
+            "files": model_files,
+        },
+        "manual_ingest": manual_ingest_state,
+    }
+
+
+def _run_chat_tool(tool_payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(tool_payload, dict):
+        raise ValueError("tool payload must be an object")
+
+    name = str(tool_payload.get("name", "")).strip().lower()
+    params = tool_payload.get("params", {}) or {}
+
+    handlers = {
+        "list_files": _tool_list_files,
+        "read_file": _tool_read_file,
+        "write_file": _tool_write_file,
+        "internet_search": _tool_internet_search,
+        "self_diagnostics": _tool_self_diagnostics,
+    }
+
+    if name not in handlers:
+        raise ValueError(f"Unknown tool '{name}'. Available: {', '.join(sorted(handlers.keys()))}")
+
+    return {"name": name, "result": handlers[name](params)}
+
+
+def _render_tool_response(tool_name: str, tool_result: Dict[str, Any]) -> str:
+    pretty = json.dumps(tool_result, indent=2, ensure_ascii=False)
+    return (
+        f"✅ Tool executed: **{tool_name}**\n\n"
+        "I ran your requested tool and returned structured output below:\n\n"
+        f"```json\n{pretty}\n```"
+    )
 
 # --- API Endpoints ---
 @app.get("/api")
@@ -133,10 +344,26 @@ async def chat_endpoint(request: ChatRequest):
     Supports both RAG-augmented and standard responses.
     """
     try:
+        if request.tool:
+            executed = _run_chat_tool(request.tool)
+            return ChatResponse(
+                response=_render_tool_response(executed["name"], executed["result"]),
+                sources=[],
+                context_used=False,
+                sources_count=0,
+                tool_name=executed["name"],
+                tool_result=executed["result"],
+            )
+
+        concierge_prefix = (
+            "You are Mensa Concierge: friendly, personable, very helpful, and an expert Python/React/ChromaDB RAG developer. "
+            "Be concise, practical, and provide actionable steps."
+        )
+
         if request.use_rag:
             # Use RAG service for context-aware responses
             result = await rag_service.query_with_rag(
-                user_query=request.text,
+                user_query=f"{concierge_prefix}\n\nUser request: {request.text}",
                 game=request.game,
                 use_all_games=request.game is None
             )
@@ -148,11 +375,13 @@ async def chat_endpoint(request: ChatRequest):
             )
         else:
             # Standard response without RAG
-            response_text = await gemini_client.generate_text(request.text)
+            response_text = await gemini_client.generate_text(
+                f"{concierge_prefix}\n\nUser request: {request.text}"
+            )
             return ChatResponse(response=response_text)
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
-        return ChatResponse(response=f"Error: {str(e)}")
+        return ChatResponse(response=f"Error: {str(e)}", tool_result={"error": str(e)})
 
 # --- Placeholder Endpoints ---
 # These endpoints are placeholders and need to be implemented.
@@ -167,32 +396,45 @@ async def get_chroma_status():
 
 @app.get("/api/chroma/collections")
 async def get_chroma_collections():
-    """Return a safe list of collections with counts without relying on Chroma's list_collections.
-    This avoids client/server version mismatches (e.g., missing 'dimension' field).
-    """
-    results = []
+    """Return resilient Chroma collection snapshot with metadata and stable record index."""
+    game_names = list(GAME_CONFIGS.keys())
     try:
-        # Start with configured game names; avoid list_collections() due to server/client mismatches
-        game_names = list(GAME_CONFIGS.keys())
-        for name in game_names:
-            try:
-                count = chroma_client.count_documents(name)
-                results.append({
-                    "name": name,
-                    "count": count,
-                })
-            except Exception as inner_e:
-                print(f"Error counting documents for {name}: {inner_e}")
-                results.append({
-                    "name": name,
-                    "count": 0,
-                    "error": str(inner_e),
-                })
+        results = chroma_client.get_collections_snapshot(game_names)
         status = chroma_client.get_chroma_status()
-        return {"status": status.get("status", "unknown"), "collections": results}
+        return {
+            "status": status.get("status", "unknown"),
+            "collections": results,
+            "meta": {
+                "record_index_basis": "GAME_CONFIGS order",
+                "total_expected": len(game_names),
+                "resolved": len(results),
+                "has_partial_errors": any(item.get("state") in {"error", "timeout"} for item in results),
+            }
+        }
     except Exception as e:
         # Normalize error shape for frontend
-        return {"status": "error", "error": str(e), "collections": results}
+        fallback = [
+            {
+                "name": name,
+                "record_index": idx + 1,
+                "count": 0,
+                "metadata": {},
+                "state": "error",
+                "error": "Fallback snapshot due to endpoint failure",
+            }
+            for idx, name in enumerate(game_names)
+        ]
+        return {
+            "status": "error",
+            "error": str(e),
+            "collections": fallback,
+            "meta": {
+                "record_index_basis": "GAME_CONFIGS order",
+                "total_expected": len(game_names),
+                "resolved": len(fallback),
+                "has_partial_errors": True,
+            },
+        }
 
 @app.post("/api/ingest")
 async def ingest_data(request: IngestRequest):
@@ -274,6 +516,24 @@ async def train_model(request: TrainRequest):
 
         print(f"🎯 Training started for {request.game}")
         result = trainer_service.train_model(request.game)
+        if result.get("status") != "success":
+            print(f"❌ Training failed for {request.game}: {result.get('message', 'unknown error')}")
+            exp_store.save_experiment({
+                "experiment_id": f"train-{request.game}-{int(timestamp)}",
+                "game": request.game,
+                "score": 0,
+                "timestamp": timestamp,
+                "status": "FAILED",
+                "type": "training",
+                "error": result.get("message", "unknown error")
+            })
+            return {
+                "status": "error",
+                "game": request.game,
+                "message": result.get("message", "Training failed"),
+                **result
+            }
+
         print(f"✅ Training completed for {request.game}")
 
         exp_store.save_experiment({

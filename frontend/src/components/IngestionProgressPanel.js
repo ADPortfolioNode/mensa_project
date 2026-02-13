@@ -15,7 +15,7 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
     const apiBase = getApiBase();
 
     useEffect(() => {
-        if (!isActive || !game || !apiBase) {
+        if (!isActive || !game || apiBase === null || apiBase === undefined) {
             setProgress(null);
             setStartTime(null);
             return;

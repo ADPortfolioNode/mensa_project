@@ -25,7 +25,7 @@ export default function ExpandableCard({
     }
   };
 
-  const cardClasses = `card p-3 mb-3 h-100 shadow-lg ${neonBorder ? 'border-neon' : ''} ${className}`;
+  const cardClasses = `card p-3 mb-3 h-100 shadow-lg ${neonBorder ? 'border-neon' : ''} ${expanded ? 'card-selected' : ''} ${className}`;
   const headerClasses = expanded ? 'bg-primary text-white' : '';
 
   return (
