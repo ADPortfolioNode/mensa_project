@@ -290,8 +290,14 @@ export default function Dashboard() {
   }, [selectedGame, API_BASE]);
 
   const startTrain = useCallback(async () => {
-    if (ingestStatus !== 'completed' || !selectedTrainGame) {
-      alert('Please complete data ingestion first and select a game.');
+    if (!selectedTrainGame) {
+      alert('Please select a game for training.');
+      return;
+    }
+
+    const selectedGameDrawCount = Number(gameContents[selectedTrainGame] || 0);
+    if (selectedGameDrawCount <= 0) {
+      alert(`No ingested data found for ${selectedTrainGame.toUpperCase()}. Please run ingestion for this game first.`);
       return;
     }
     setTrainStatus('in progress');
@@ -299,7 +305,7 @@ export default function Dashboard() {
     setTrainStartTime(Date.now());
     setExpandedCard('train');
     
-    const interval = setInterval(() => setTrainProgress(p => Math.min(p + 5, 95)), 2000);
+    const interval = setInterval(() => setTrainProgress((p) => Math.min(p + 1, 97)), 400);
     try {
       const response = await axios.post(`${API_BASE}/api/train`, { 
         game: selectedTrainGame,
@@ -325,9 +331,11 @@ export default function Dashboard() {
       setTrainProgress(0);
       alert(`Training failed due to an error: ${e.response?.data?.detail || e.message}`);
     }
-  }, [ingestStatus, selectedTrainGame, trainParams, API_BASE]);
+  }, [selectedTrainGame, trainParams, API_BASE, gameContents]);
 
   const isTrained = experiments.length > 0;
+  const selectedTrainGameDraws = selectedTrainGame ? Number(gameContents[selectedTrainGame] || 0) : 0;
+  const canTrainSelectedGame = Boolean(selectedTrainGame) && selectedTrainGameDraws > 0;
 
   const getGameColorScheme = (gameName) => {
     const idx = games.findIndex((name) => name === gameName);
@@ -631,7 +639,7 @@ export default function Dashboard() {
             <button 
               className="btn btn-success" 
               onClick={startTrain} 
-              disabled={trainStatus === 'in progress' || ingestStatus !== 'completed' || !selectedTrainGame}
+              disabled={trainStatus === 'in progress' || !canTrainSelectedGame}
             >
               {trainStatus === 'in progress' ? 'Training...' : 'Start Training'}
             </button>

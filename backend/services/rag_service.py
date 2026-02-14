@@ -54,9 +54,20 @@ class RAGService:
         
         # Step 3: Build augmented prompt
         augmented_prompt = self._build_augmented_prompt(user_query, context_text)
+
+        if not self.gemini_client.is_available():
+            return {
+                "response": self._build_local_fallback_response(user_query, retrieved_docs),
+                "sources": retrieved_docs,
+                "context_count": len(retrieved_docs),
+                "game": game,
+            }
         
         # Step 4: Generate response with Gemini
         response_text = await self.gemini_client.generate_text(augmented_prompt)
+
+        if isinstance(response_text, str) and "trouble connecting to the Gemini API" in response_text:
+            response_text = self._build_local_fallback_response(user_query, retrieved_docs)
         
         return {
             "response": response_text,
@@ -64,6 +75,45 @@ class RAGService:
             "context_count": len(retrieved_docs),
             "game": game,
         }
+
+    def _build_local_fallback_response(self, user_query: str, documents: list) -> str:
+        if not documents:
+            return (
+                "Gemini is currently unavailable, but the app is running. "
+                "I could not find relevant context records for your query in ChromaDB yet. "
+                "Try a more specific request (for example: 'show latest take5 winning numbers')."
+            )
+
+        unique_games = sorted({doc.get("game", "unknown") for doc in documents if doc.get("game")})
+        sample_lines = []
+        for doc in documents[:3]:
+            game = str(doc.get("game", "unknown")).upper()
+            metadata = doc.get("metadata") or {}
+            winning = metadata.get("winning_numbers")
+            draw_date = metadata.get("draw_date")
+            content = str(doc.get("content", "")).strip()
+
+            if winning:
+                line = f"- {game}: winning numbers {winning}"
+                if draw_date:
+                    line += f" (draw date: {draw_date})"
+            elif content:
+                line = f"- {game}: {content[:180]}"
+            else:
+                line = f"- {game}: context record available"
+
+            sample_lines.append(line)
+
+        context_preview = "\n".join(sample_lines)
+        games_text = ", ".join(game.upper() for game in unique_games) if unique_games else "the available games"
+
+        return (
+            "Gemini is currently unavailable, so this answer is generated from local ChromaDB context only.\n\n"
+            f"Query: {user_query}\n"
+            f"Relevant games: {games_text}\n"
+            f"Top context records:\n{context_preview}\n\n"
+            "You can continue using ingestion, training, prediction, and diagnostics while Gemini reconnects."
+        )
 
     def _retrieve_context(
         self, 
@@ -117,7 +167,7 @@ class RAGService:
             return documents
         except Exception as e:
             print(f"Error searching {game} collection: {e}")
-            return []
+            return self._fallback_get_recent_collection_docs(game, top_k)
 
     def _search_all_collections(self, query: str, top_k: int) -> list:
         """Search across all game collections"""
@@ -145,6 +195,7 @@ class RAGService:
                             })
                 except Exception as e:
                     print(f"Error searching {game_name} collection: {e}")
+                    all_documents.extend(self._fallback_get_recent_collection_docs(game_name, max(1, top_k // max(len(collections), 1))))
                     continue
             
             # Sort by distance and return top_k
@@ -153,6 +204,28 @@ class RAGService:
             
         except Exception as e:
             print(f"Error listing collections: {e}")
+            return []
+
+    def _fallback_get_recent_collection_docs(self, game: str, limit: int) -> list:
+        try:
+            collection = self.chroma_client.get_or_create_collection(game)
+            data = collection.get(limit=limit, include=["documents", "metadatas"])
+            docs = data.get("documents") or []
+            metas = data.get("metadatas") or []
+
+            documents = []
+            for i, content in enumerate(docs[:limit]):
+                metadata = metas[i] if i < len(metas) and isinstance(metas[i], dict) else {}
+                documents.append({
+                    "game": game,
+                    "content": content,
+                    "distance": 1.0,
+                    "metadata": metadata,
+                })
+
+            return documents
+        except Exception as e:
+            print(f"Fallback get() failed for {game}: {e}")
             return []
 
     def _format_context(self, documents: list) -> str:

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import getApiBase from '../utils/apiBase';
 import ProgressiveProgressBar from './ProgressiveProgressBar';
@@ -22,14 +22,27 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
         }
 
         // Set start time when ingestion begins
-        if (!startTime) {
-            setStartTime(Date.now());
-        }
+        setStartTime(Date.now());
+        let cancelled = false;
 
         const pollProgress = async () => {
             try {
                 const response = await axios.get(`${apiBase}/api/ingest_progress?game=${game}`);
-                setProgress(response.data);
+                if (cancelled || !response?.data) return;
+
+                setProgress((prev) => {
+                    if (
+                        prev &&
+                        prev.status === response.data.status &&
+                        prev.rows_fetched === response.data.rows_fetched &&
+                        prev.total_rows === response.data.total_rows &&
+                        prev.progress === response.data.progress &&
+                        prev.error === response.data.error
+                    ) {
+                        return prev;
+                    }
+                    return response.data;
+                });
                 setError(null);
 
                 // Call onComplete if ingestion finished
@@ -46,18 +59,27 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
         pollProgress();
         const interval = setInterval(pollProgress, 500);
 
-        return () => clearInterval(interval);
-    }, [isActive, game, apiBase, onComplete, startTime]);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [isActive, game, apiBase, onComplete]);
 
     if (!isActive || !progress) {
         return null;
     }
 
-    const rowsFetched = progress.rows_fetched || 0;
-    const totalRows = progress.total_rows || 1;
-    const status = progress.status === 'completed' ? 'completed' 
-                 : progress.status === 'error' ? 'error' 
-                 : 'active';
+    const { rowsFetched, totalRows, status } = useMemo(() => {
+        const fetched = Number(progress.rows_fetched || 0);
+        const total = Number(progress.total_rows || 1);
+        const computedStatus = progress.status === 'completed'
+            ? 'completed'
+            : progress.status === 'error'
+                ? 'error'
+                : 'active';
+
+        return { rowsFetched: fetched, totalRows: total, status: computedStatus };
+    }, [progress]);
 
     return (
         <div style={{

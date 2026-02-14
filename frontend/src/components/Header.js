@@ -44,13 +44,14 @@ const Header = () => {
       {/* Startup Progress Bar */}
       {showProgress && startupStatus && (
         <div style={{
-          backgroundColor: '#f8f9fa',
-          borderBottom: '2px solid #dee2e6',
-          padding: '12px 0',
-          marginBottom: '12px'
+          background: 'linear-gradient(180deg, rgba(18, 27, 58, 0.95), rgba(12, 20, 44, 0.95))',
+          borderBottom: '1px solid rgba(110, 168, 254, 0.45)',
+          padding: '10px 0',
+          marginBottom: '10px',
+          boxShadow: '0 4px 14px rgba(6, 12, 28, 0.45)'
         }}>
           <div className="container">
-            <div style={{ fontSize: '12px', marginBottom: '6px', color: '#666' }}>
+            <div style={{ fontSize: '12px', marginBottom: '6px', color: 'var(--text-secondary)', letterSpacing: '0.2px' }}>
               <strong>🎰 Lottery Data Initialization</strong>
               {startupStatus.current_game && (
                 <span style={{ marginLeft: '8px' }}>
@@ -60,11 +61,12 @@ const Header = () => {
                   )}
                 </span>
               )}
-              {isCompleted && <span style={{ marginLeft: '8px', color: '#28a745' }}>✓ Complete</span>}
+              {isCompleted && <span style={{ marginLeft: '8px', color: '#8affd2' }}>✓ Complete</span>}
             </div>
             <div style={{
               width: '100%',
-              backgroundColor: '#e9ecef',
+              backgroundColor: 'rgba(26, 40, 80, 0.95)',
+              border: '1px solid rgba(110, 168, 254, 0.35)',
               borderRadius: '4px',
               height: '6px',
               overflow: 'hidden',
@@ -72,7 +74,9 @@ const Header = () => {
             }}>
               <div style={{
                 width: `${progressPercentage}%`,
-                backgroundColor: isCompleted ? '#28a745' : '#007bff',
+                background: isCompleted
+                  ? 'linear-gradient(90deg, rgba(111, 255, 188, 0.95), rgba(84, 220, 170, 0.95))'
+                  : 'linear-gradient(90deg, var(--accent-green-dark), var(--accent-green), var(--accent-green-light))',
                 height: '100%',
                 transition: 'width 0.3s ease',
                 borderRadius: '4px'
@@ -85,10 +89,10 @@ const Header = () => {
       {/* Main Header */}
       <div className="container py-4">
         <div className="alert alert-info">
-          <h4>Welcome to Mensa Predictive Dashboard</h4>
-          <p>Use this app to predict lottery numbers. Follow the workflow: 1. Ingest data, 2. Train the model, 3. Make predictions.</p>
+          <h4 style={{ marginBottom: '0.4rem', letterSpacing: '0.3px' }}>Welcome to Mensa Predictive Dashboard</h4>
+          <p style={{ marginBottom: 0 }}>Use this app to predict lottery numbers. Follow the workflow: 1. Ingest data, 2. Train the model, 3. Make predictions.</p>
         </div>
-        <h2>Mensa Predictive Dashboard</h2>
+        <h2 style={{ marginTop: '0.2rem', marginBottom: 0, letterSpacing: '0.25px' }}>Mensa Predictive Dashboard</h2>
       </div>
     </div>
   );

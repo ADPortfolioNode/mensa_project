@@ -16,11 +16,19 @@ echo -e "${CYAN}Mensa Project - Startup Monitor${RESET}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
 
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1 && docker-compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+else
+    echo "ERROR: Neither 'docker compose' nor 'docker-compose' is available."
+    exit 1
+fi
+
 # Phase 1: Stop and clean
 echo -e "${YELLOW}[Phase 1]${RESET} Stopping and removing existing containers..."
 start_time=$(date +%s)
-docker-compose down --remove-orphans 2>/dev/null || true
-docker rm -f mensa_frontend mensa_backend mensa_chroma 2>/dev/null || true
+${COMPOSE_CMD} down --remove-orphans 2>/dev/null || true
 docker system prune -f 2>/dev/null || true
 phase1_duration=$(($(date +%s) - start_time))
 echo -e "${GREEN}✓${RESET} Cleaned in ${phase1_duration}s"
@@ -29,7 +37,7 @@ echo ""
 # Phase 2: Build
 echo -e "${YELLOW}[Phase 2]${RESET} Building and starting services..."
 start_time=$(date +%s)
-docker-compose up -d --build
+${COMPOSE_CMD} up -d --build
 phase2_duration=$(($(date +%s) - start_time))
 echo -e "${GREEN}✓${RESET} Build and start completed in ${phase2_duration}s"
 echo ""
@@ -44,9 +52,11 @@ check_service_health() {
     local service=$1
     local max_retries=30
     local retry=0
+    local container_id
     
     while [ $retry -lt $max_retries ]; do
-        if docker-compose ps | grep -q "$service.*healthy"; then
+        container_id=$(${COMPOSE_CMD} ps -q "$service" 2>/dev/null || true)
+        if [ -n "$container_id" ] && docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null | grep -Eq 'healthy|running'; then
             echo -e "${GREEN}✓${RESET} $service is healthy"
             return 0
         fi
@@ -59,9 +69,9 @@ check_service_health() {
     return 1
 }
 
-check_service_health "mensa_chroma" || true
-check_service_health "mensa_backend" || true
-check_service_health "mensa_frontend" || true
+check_service_health "chroma" || true
+check_service_health "backend" || true
+check_service_health "frontend" || true
 
 phase3_duration=$(($(date +%s) - start_time))
 echo -e "${GREEN}✓${RESET} Services ready in ${phase3_duration}s"
@@ -101,7 +111,7 @@ echo ""
 
 # Phase 5: Final status
 echo -e "${YELLOW}[Phase 5]${RESET} Container status:"
-docker-compose ps
+${COMPOSE_CMD} ps
 echo ""
 
 total_duration=$(($(date +%s) - start_time))
@@ -121,8 +131,8 @@ echo -e "  Backend:  ${CYAN}http://localhost:5000/api${RESET}"
 echo -e "  Chroma:   ${CYAN}http://localhost:8000/api/v1/heartbeat${RESET}"
 echo ""
 echo -e "View logs:"
-echo -e "  Backend:  ${CYAN}docker-compose logs -f backend${RESET}"
-echo -e "  Frontend: ${CYAN}docker-compose logs -f frontend${RESET}"
-echo -e "  All:      ${CYAN}docker-compose logs -f${RESET}"
+echo -e "  Backend:  ${CYAN}${COMPOSE_CMD} logs -f backend${RESET}"
+echo -e "  Frontend: ${CYAN}${COMPOSE_CMD} logs -f frontend${RESET}"
+echo -e "  All:      ${CYAN}${COMPOSE_CMD} logs -f${RESET}"
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"

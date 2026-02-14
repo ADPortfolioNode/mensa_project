@@ -1,64 +1,128 @@
+:root {
+  --trek-bg-1: #070d1f;
+  --trek-bg-2: #121b3a;
+  --trek-panel: #18254a;
+  --trek-border: rgba(104, 168, 255, 0.38);
+  --trek-accent: #6ea8fe;
+  --trek-accent-2: #8bb9fe;
+  --trek-text: #dbe9ff;
+
+  --bs-body-bg: var(--trek-bg-1);
+  --bs-body-color: var(--trek-text);
+  --bs-border-color: var(--trek-border);
+  --bs-primary: var(--trek-accent);
+  --bs-primary-rgb: 110, 168, 254;
+  --bs-link-color: var(--trek-accent);
+  --bs-link-hover-color: var(--trek-accent-2);
+}
+
 body {
   font-family: 'Segoe UI', 'Inter', 'Roboto', sans-serif;
-  background: #000;
-  color: #e7ffe7;
+  background: radial-gradient(circle at top, #18254a 0%, var(--trek-bg-1) 50%, #040812 100%);
+  color: var(--trek-text);
 }
 
 .text-neon {
-  color: #39ff14 !important;
-  text-shadow: 0 0 6px rgba(57, 255, 20, 0.65), 0 0 14px rgba(57, 255, 20, 0.4);
+  color: var(--trek-accent) !important;
+  text-shadow: 0 0 8px rgba(110, 168, 254, 0.55), 0 0 18px rgba(110, 168, 254, 0.35);
 }
 
 .border-neon {
-  border-color: #39ff14 !important;
+  border-color: var(--trek-accent) !important;
 }
 
 .card {
-  background: #ffffff;
-  color: #141414;
-  border: 1px solid rgba(57, 255, 20, 0.45);
+  background: linear-gradient(180deg, rgba(24, 37, 74, 0.95), rgba(10, 18, 40, 0.95));
+  color: var(--trek-text);
+  border: 1px solid var(--trek-border);
   border-radius: 12px;
-  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45), 0 0 24px rgba(57, 255, 20, 0.2);
+  box-shadow: 0 0 12px rgba(110, 168, 254, 0.22), 0 0 28px rgba(26, 44, 95, 0.45);
   transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 16px rgba(110, 168, 254, 0.28), 0 0 34px rgba(26, 44, 95, 0.52);
+}
+
+.card .card-body {
+  padding: 1.15rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.72rem;
+}
+
+.card .card-body > h4,
+.card .card-body > h5 {
+  margin-bottom: 0.15rem;
+  letter-spacing: 0.35px;
+}
+
 .card.card-selected {
-  box-shadow: 0 0 10px rgba(170, 170, 170, 0.55), 0 0 24px rgba(120, 120, 120, 0.35);
-  border-color: rgba(150, 150, 150, 0.9);
+  box-shadow: 0 0 14px rgba(139, 185, 254, 0.35), 0 0 30px rgba(110, 168, 254, 0.2);
+  border-color: rgba(139, 185, 254, 0.75);
 }
 
 .card .card-header {
-  background: #ffffff;
-  border-bottom: 1px solid rgba(57, 255, 20, 0.2);
+  background: rgba(16, 26, 54, 0.9);
+  border-bottom: 1px solid rgba(110, 168, 254, 0.25);
 }
 
 .form-control,
 .form-select {
-  background: #ffffff;
-  color: #141414;
-  border: 1px solid rgba(57, 255, 20, 0.55);
+  background: rgba(16, 26, 54, 0.9);
+  color: var(--trek-text);
+  border: 1px solid rgba(110, 168, 254, 0.45);
 }
 
 .form-control:focus,
 .form-select:focus {
-  border-color: #39ff14;
-  box-shadow: 0 0 0 0.2rem rgba(57, 255, 20, 0.2);
+  border-color: var(--trek-accent);
+  box-shadow: 0 0 0 0.2rem rgba(110, 168, 254, 0.2);
+  background: rgba(22, 35, 73, 0.95);
 }
 
 .btn-primary,
 .btn-success {
-  box-shadow: 0 0 8px rgba(57, 255, 20, 0.35);
+  background: linear-gradient(135deg, #3f67c6, var(--trek-accent));
+  border-color: rgba(139, 185, 254, 0.8);
+  color: #081229;
+  box-shadow: 0 0 10px rgba(110, 168, 254, 0.35);
 }
 
 .btn-outline-secondary {
-  border-color: #8a8a8a;
-  color: #3a3a3a;
+  border-color: rgba(139, 185, 254, 0.55);
+  color: var(--trek-accent-2);
+  background: rgba(16, 26, 54, 0.5);
 }
 
 .alert-info {
-  background: #f3fff0;
-  color: #114111;
-  border-color: rgba(57, 255, 20, 0.5);
+  background: rgba(110, 168, 254, 0.12);
+  color: var(--trek-text);
+  border-color: rgba(110, 168, 254, 0.5);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.container.py-4 {
+  padding-top: 1.35rem !important;
+  padding-bottom: 1.4rem !important;
+}
+
+.row.g-4 {
+  --bs-gutter-y: 1.15rem;
+  --bs-gutter-x: 1.15rem;
+}
+
+.form-label.text-neon {
+  margin-bottom: 0.45rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.btn {
+  border-radius: 999px;
 }
 
 .overflow-auto::-webkit-scrollbar {
@@ -66,10 +130,10 @@ body {
 }
 
 .overflow-auto::-webkit-scrollbar-track {
-  background: #111;
+  background: #0a132b;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: #39ff14;
+  background: var(--trek-accent);
   border-radius: 4px;
 }

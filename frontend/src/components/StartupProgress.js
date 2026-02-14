@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { getApiBase } from '../utils/apiBase';
 import { analyzeError, ErrorCategory } from '../utils/errorUtils';
 import ErrorMessage from './ErrorMessage';
+import ProgressiveProgressBar from './ProgressiveProgressBar';
 
 const StartupProgress = ({ onComplete }) => {
+    const apiBase = getApiBase();
     const [status, setStatus] = useState(null);
     const [errorReport, setErrorReport] = useState(null);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -14,7 +16,7 @@ const StartupProgress = ({ onComplete }) => {
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await axios.get(`${getApiBase()}/api/startup_status`);
+                const response = await axios.get(`${apiBase}/api/startup_status`);
                 transientErrorCountRef.current = 0;
                 setErrorReport(null);
                 setStatus(response.data);
@@ -49,7 +51,7 @@ const StartupProgress = ({ onComplete }) => {
         fetchStatus();
 
         return () => clearInterval(interval);
-    }, [onComplete]);
+    }, [onComplete, apiBase]);
 
     if (errorReport) {
         return (
@@ -63,27 +65,44 @@ const StartupProgress = ({ onComplete }) => {
         return <div style={{ padding: '20px' }}>Initializing...</div>;
     }
 
-    const availableGames = Array.isArray(status.available_games) ? status.available_games : [];
-    const games = status.games || {};
-    const normalizedGames = availableGames.length > 0
-        ? availableGames.reduce((acc, game) => {
-            acc[game] = {
-                status: games?.[game]?.status || 'pending',
-                error: games?.[game]?.error || null,
-            };
-            return acc;
-        }, {})
-        : games;
-    const gameEntries = Object.entries(normalizedGames);
-    const progressVal = Number(status.progress ?? 0);
-    // Fall back to the number of games if backend omits total
-    const totalVal = Number(status.total ?? gameEntries.length ?? 0);
-    const rowsFetched = Number(status.current_game_rows_fetched ?? 0);
-    const overallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : 0;
-    const isIngesting = status.status === 'ingesting';
-    const isCompleted = status.status === 'completed';
-    const isReady = status.status === 'ready';
-    const hasGamesConfigured = gameEntries.length > 0;
+    const {
+        gameEntries,
+        progressVal,
+        totalVal,
+        rowsFetched,
+        isIngesting,
+        isCompleted,
+        isReady,
+        hasGamesConfigured,
+    } = useMemo(() => {
+        const availableGames = Array.isArray(status.available_games) ? status.available_games : [];
+        const games = status.games || {};
+        const normalizedGames = availableGames.length > 0
+            ? availableGames.reduce((acc, game) => {
+                acc[game] = {
+                    status: games?.[game]?.status || 'pending',
+                    error: games?.[game]?.error || null,
+                };
+                return acc;
+            }, {})
+            : games;
+
+        const entries = Object.entries(normalizedGames);
+        const progress = Number(status.progress ?? 0);
+        const total = Number(status.total ?? entries.length ?? 0);
+        const fetched = Number(status.current_game_rows_fetched ?? 0);
+
+        return {
+            gameEntries: entries,
+            progressVal: progress,
+            totalVal: total,
+            rowsFetched: fetched,
+            isIngesting: status.status === 'ingesting',
+            isCompleted: status.status === 'completed',
+            isReady: status.status === 'ready',
+            hasGamesConfigured: entries.length > 0,
+        };
+    }, [status]);
     
     const formatTime = (seconds) => {
         if (seconds < 60) return `${seconds.toFixed(1)}s`;
@@ -111,7 +130,7 @@ const StartupProgress = ({ onComplete }) => {
     const handleStartInitialization = async () => {
         setIsStarting(true);
         try {
-            await axios.post(`${getApiBase()}/api/startup_init`);
+            await axios.post(`${apiBase}/api/startup_init`);
         } catch (error) {
             console.error("Error starting initialization:", error);
         } finally {
@@ -181,30 +200,43 @@ const StartupProgress = ({ onComplete }) => {
                         No games reported by backend yet. This usually means ingestion has not started.
                     </p>
                 )}
-                <div style={{
-                    width: '100%',
-                    backgroundColor: '#e9ecef',
-                    borderRadius: '5px',
-                    overflow: 'hidden',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center'
-                }}>
-                    <div style={{
-                        width: `${overallProgress}%`,
-                        backgroundColor: overallProgress === 100 ? '#28a745' : '#007bff',
-                        height: '100%',
-                        transition: 'width 0.3s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        fontSize: '14px'
-                    }}>
-                        {Math.round(overallProgress)}%
+                <ProgressiveProgressBar
+                    current={progressVal}
+                    total={totalVal || 1}
+                    status={isCompleted ? 'completed' : isIngesting ? 'active' : 'idle'}
+                    label="Overall Initialization"
+                    showMetadata={true}
+                    colorScheme="primary"
+                />
+
+                {hasGamesConfigured && (
+                    <div style={{ marginTop: '10px' }}>
+                        {gameEntries.map(([game, gameData]) => {
+                            const gameStatus = gameData.status === 'failed'
+                                ? 'error'
+                                : gameData.status === 'ingesting'
+                                    ? 'active'
+                                    : gameData.status === 'completed'
+                                        ? 'completed'
+                                        : 'idle';
+
+                            const gameCurrent = gameStatus === 'completed' || gameStatus === 'error' ? 1 : 0;
+
+                            return (
+                                <ProgressiveProgressBar
+                                    key={`${game}-progress`}
+                                    current={gameCurrent}
+                                    total={1}
+                                    status={gameStatus}
+                                    label={formatGameLabel(game)}
+                                    showMetadata={false}
+                                    colorScheme="primary"
+                                    indeterminate={gameStatus === 'active'}
+                                />
+                            );
+                        })}
                     </div>
-                </div>
+                )}
                 {hasGamesConfigured && (
                     <div style={{
                         display: 'flex',

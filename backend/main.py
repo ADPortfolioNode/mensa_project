@@ -327,6 +327,18 @@ def _render_tool_response(tool_name: str, tool_result: Dict[str, Any]) -> str:
         f"```json\n{pretty}\n```"
     )
 
+
+def _build_non_rag_fallback(user_text: str) -> str:
+    return (
+        "Gemini is currently unavailable, but core workflows are online.\n\n"
+        "Available actions right now:\n"
+        "- Run ingestion for one game or all games\n"
+        "- Train models and generate predictions\n"
+        "- Inspect Chroma collections and experiments\n\n"
+        f"Your message was: '{user_text}'. "
+        "If you want, I can help with a concrete operation (for example: 'train take5')."
+    )
+
 # --- API Endpoints ---
 @app.get("/api")
 async def root():
@@ -363,7 +375,7 @@ async def chat_endpoint(request: ChatRequest):
         if request.use_rag:
             # Use RAG service for context-aware responses
             result = await rag_service.query_with_rag(
-                user_query=f"{concierge_prefix}\n\nUser request: {request.text}",
+                user_query=request.text,
                 game=request.game,
                 use_all_games=request.game is None
             )
@@ -378,6 +390,8 @@ async def chat_endpoint(request: ChatRequest):
             response_text = await gemini_client.generate_text(
                 f"{concierge_prefix}\n\nUser request: {request.text}"
             )
+            if isinstance(response_text, str) and "trouble connecting to the Gemini API" in response_text:
+                response_text = _build_non_rag_fallback(request.text)
             return ChatResponse(response=response_text)
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
@@ -546,12 +560,12 @@ async def train_model(request: TrainRequest):
         })
 
         return {
+            **result,
             "status": "COMPLETED",
             "game": request.game,
             "message": f"Successfully trained model for {request.game}",
             "experiment_id": f"train-{request.game}-{int(timestamp)}",
             "score": result.get("accuracy", 0),
-            **result
         }
     except Exception as e:
         print(f"❌ Training failed for {request.game}: {str(e)}")

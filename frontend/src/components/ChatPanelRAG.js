@@ -4,6 +4,7 @@ import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanelRAG.css';
 import getApiBase from '../utils/apiBase';
+import { hasBonusSignal, highlightBonusTermsAsSafeHtml } from '../utils/chatBonusUtils';
 
 const API_BASE = getApiBase();
 
@@ -26,12 +27,7 @@ const ChatPanel = ({ game = null }) => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [useRag, setUseRag] = useState(true);
-    const [toolPath, setToolPath] = useState('.');
-    const [toolReadPath, setToolReadPath] = useState('README.md');
-    const [toolWritePath, setToolWritePath] = useState('message_from_agent.txt');
-    const [toolWriteContent, setToolWriteContent] = useState('Hello from Mensa Concierge.');
-    const [toolSearchQuery, setToolSearchQuery] = useState('latest ChromaDB retrieval best practices');
-    const messagesEndRef = useRef(null);
+    const chatWindowRef = useRef(null);
 
     const quickActions = [
         {
@@ -56,13 +52,17 @@ const ChatPanel = ({ game = null }) => {
         Prism.highlightAll();
     }, [messages]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollToTop = () => {
+        if (chatWindowRef.current) {
+            chatWindowRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     };
 
     useEffect(() => {
-        scrollToBottom();
+        scrollToTop();
     }, [messages]);
+
+    const orderedMessages = [...messages].reverse();
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
@@ -191,121 +191,23 @@ const ChatPanel = ({ game = null }) => {
                 </div>
             </div>
 
-            <div className="px-3 pt-2 pb-1 border-bottom" style={{ background: '#f6f6f6' }}>
-                <div className="small fw-semibold mb-2">Quick Actions</div>
-                <div className="d-flex flex-wrap gap-2 mb-2">
-                    {quickActions.map((action) => (
-                        <button
-                            key={action.label}
-                            type="button"
-                            className="btn btn-sm btn-outline-secondary"
-                            disabled={isLoading}
-                            onClick={action.run}
-                        >
-                            {action.label}
-                        </button>
-                    ))}
-                </div>
-                <div className="small text-muted">
-                    I can help with coding, debugging, architecture, file operations, web research, and runtime diagnostics.
-                </div>
-            </div>
-
-            <div className="chat-window-rag">
-                {messages.map((msg, index) => (
-                    <div key={index} className={`chat-message-rag ${msg.sender}`}>
-                        <div className="message-container">
-                            <div className="message-bubble">
-                                {msg.sender === 'user' ? (
-                                    msg.text
-                                ) : (
-                                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
-                                )}
-                            </div>
-                            
-                            {/* Show sources badge if RAG was used */}
-                            {msg.sender === 'bot' && msg.contextUsed && msg.sources && msg.sources.length > 0 && (
-                                <div className="sources-badge">
-                                    📚 {msg.sources.length} source{msg.sources.length > 1 ? 's' : ''}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Expandable sources display */}
-                        {msg.sources && msg.sources.length > 0 && (
-                            <div className="message-sources">
-                                {msg.sources.map((source, i) => (
-                                    <div key={i} className="source-item">
-                                        <span className="source-game">{source.game}</span>
-                                        <span className="source-content">{source.content}</span>
-                                        <span className="source-distance">Score: {(1 - source.distance).toFixed(3)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {msg.toolResult && (
-                            <div className="message-sources">
-                                <div className="source-item">
-                                    <span className="source-game">Tool: {msg.toolName || 'tool'}</span>
-                                    <span className="source-content">{JSON.stringify(msg.toolResult, null, 2)}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-
-                {isLoading && (
-                    <div className="chat-message-rag bot">
-                        <div className="message-bubble loading">
-                            <span className="spinner-dot"></span>
-                            <span className="spinner-dot"></span>
-                            <span className="spinner-dot"></span>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-            </div>
-
-            <div className="chat-input-form-rag" style={{ borderTop: '1px solid #d9d9d9', background: '#fafafa' }}>
-                <div className="row g-2">
-                    <div className="col-md-6">
-                        <label className="form-label small">Browse Path</label>
-                        <input className="form-control form-control-sm" value={toolPath} onChange={(e) => setToolPath(e.target.value)} disabled={isLoading} />
-                    </div>
-                    <div className="col-md-6 d-flex align-items-end gap-2">
-                        <button className="btn btn-sm btn-outline-primary" type="button" disabled={isLoading} onClick={() => callTool('list_files', { path: toolPath })}>List Files</button>
-                        <button className="btn btn-sm btn-outline-dark" type="button" disabled={isLoading} onClick={() => callTool('self_diagnostics', {})}>Self Diagnostics</button>
-                    </div>
-                    <div className="col-md-6">
-                        <label className="form-label small">Read File</label>
-                        <input className="form-control form-control-sm" value={toolReadPath} onChange={(e) => setToolReadPath(e.target.value)} disabled={isLoading} />
-                    </div>
-                    <div className="col-md-6 d-flex align-items-end">
-                        <button className="btn btn-sm btn-outline-success" type="button" disabled={isLoading} onClick={() => callTool('read_file', { path: toolReadPath, start_line: 1, end_line: 200 })}>Read File</button>
-                    </div>
-                    <div className="col-md-6">
-                        <label className="form-label small">Write File Path</label>
-                        <input className="form-control form-control-sm" value={toolWritePath} onChange={(e) => setToolWritePath(e.target.value)} disabled={isLoading} />
-                    </div>
-                    <div className="col-md-6">
-                        <label className="form-label small">Internet Search</label>
-                        <div className="d-flex gap-2">
-                            <input className="form-control form-control-sm" value={toolSearchQuery} onChange={(e) => setToolSearchQuery(e.target.value)} disabled={isLoading} />
-                            <button className="btn btn-sm btn-outline-info" type="button" disabled={isLoading} onClick={() => callTool('internet_search', { query: toolSearchQuery })}>Search</button>
-                        </div>
-                    </div>
-                    <div className="col-12">
-                        <label className="form-label small">Write Content</label>
-                        <textarea className="form-control form-control-sm" rows={2} value={toolWriteContent} onChange={(e) => setToolWriteContent(e.target.value)} disabled={isLoading} />
-                    </div>
-                    <div className="col-12 d-flex justify-content-end">
-                        <button className="btn btn-sm btn-outline-warning" type="button" disabled={isLoading} onClick={() => callTool('write_file', { path: toolWritePath, content: toolWriteContent, mode: 'overwrite' })}>Write File</button>
-                    </div>
-                </div>
-            </div>
-
             <form onSubmit={handleSendMessage} className="chat-input-form-rag">
+                <div className="quick-actions-rag">
+                    <div className="quick-actions-title">Quick Actions</div>
+                    <div className="quick-actions-buttons">
+                        {quickActions.map((action) => (
+                            <button
+                                key={action.label}
+                                type="button"
+                                className="quick-action-btn"
+                                disabled={isLoading}
+                                onClick={action.run}
+                            >
+                                {action.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
                 <div className="input-wrapper">
                     <input
                         type="text"
@@ -330,6 +232,67 @@ const ChatPanel = ({ game = null }) => {
                     </div>
                 )}
             </form>
+
+            <div className="chat-window-rag" ref={chatWindowRef}>
+                {isLoading && (
+                    <div className="chat-message-rag bot">
+                        <div className="message-bubble loading">
+                            <span className="spinner-dot"></span>
+                            <span className="spinner-dot"></span>
+                            <span className="spinner-dot"></span>
+                        </div>
+                    </div>
+                )}
+
+                {orderedMessages.map((msg, index) => (
+                    <div key={index} className={`chat-message-rag ${msg.sender}`}>
+                        <div className="message-container">
+                            <div className="message-bubble">
+                                {msg.sender === 'user' ? (
+                                    msg.text
+                                ) : (
+                                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
+                                )}
+                            </div>
+                            
+                            {/* Show sources badge if RAG was used */}
+                            {msg.sender === 'bot' && msg.contextUsed && msg.sources && msg.sources.length > 0 && (
+                                <div className="sources-badge">
+                                    📚 {msg.sources.length} source{msg.sources.length > 1 ? 's' : ''}
+                                </div>
+                            )}
+
+                            {hasBonusSignal(msg) && (
+                                <div className="bonus-badge" role="status" aria-label="Bonus number indicated in this response">
+                                    🎯 Bonus number included
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Expandable sources display */}
+                        {msg.sources && msg.sources.length > 0 && (
+                            <div className="message-sources">
+                                {msg.sources.map((source, i) => (
+                                    <div key={i} className="source-item">
+                                        <span className="source-game">{source.game}</span>
+                                        <span className="source-content" dangerouslySetInnerHTML={{ __html: highlightBonusTermsAsSafeHtml(source.content) }} />
+                                        <span className="source-distance">Score: {(1 - source.distance).toFixed(3)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {msg.toolResult && (
+                            <div className="message-sources">
+                                <div className="source-item">
+                                    <span className="source-game">Tool: {msg.toolName || 'tool'}</span>
+                                    <span className="source-content">{JSON.stringify(msg.toolResult, null, 2)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };

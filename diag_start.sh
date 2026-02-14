@@ -68,7 +68,6 @@ echo "--- Stopping and removing old containers ---" >> "${LOG_FILE}"
 if ! run_compose_with_timeout 180 sh -lc "${COMPOSE_CMD} down --remove-orphans" >> "${LOG_FILE}" 2>&1; then
     echo "ERROR: timed out or failed while stopping old containers" >> "${LOG_FILE}"
 fi
-docker rm -f mensa_frontend mensa_backend mensa_chroma >> "${LOG_FILE}" 2>&1 || true
 
 # Attempt to build and start (detached mode with loop detection)
 echo "--- Building and starting new containers ---" >> "${LOG_FILE}"
@@ -89,44 +88,63 @@ echo "Monitoring containers for restart loops (30 second check)..." | tee -a "${
 
 sleep 5  # Give containers time to start
 
-# Track restart counts
+# Track restart counts by compose service
 declare -A initial_restart_counts
-declare -A final_restart_counts
+declare -A service_container_ids
+services=(backend frontend chroma)
 
 # Get initial restart counts
-for container in mensa_backend mensa_frontend mensa_chroma; do
-    restart_count=$(docker inspect --format='{{.RestartCount}}' "${container}" 2>/dev/null || echo "0")
-    initial_restart_counts["${container}"]="${restart_count}"
+for service in "${services[@]}"; do
+    container_id=$(eval "${COMPOSE_CMD} ps -q ${service}" 2>/dev/null || true)
+    service_container_ids["${service}"]="${container_id}"
+
+    if [ -n "${container_id}" ]; then
+        restart_count=$(docker inspect --format='{{.RestartCount}}' "${container_id}" 2>/dev/null || echo "0")
+    else
+        restart_count="0"
+    fi
+
+    initial_restart_counts["${service}"]="${restart_count}"
 done
 
 # Wait and check again
 sleep 25
 
 LOOP_DETECTED=0
-for container in mensa_backend mensa_frontend mensa_chroma; do
-    if ! docker ps --filter "name=${container}" --format "{{.Names}}" | grep -q "${container}"; then
-        echo "✗ ERROR: Container ${container} is not running!" | tee -a "${LOG_FILE}"
-        echo "--- LOGS FOR ${container} ---" >> "${LOG_FILE}"
-        docker logs "${container}" --tail 50 >> "${LOG_FILE}" 2>&1 || true
+for service in "${services[@]}"; do
+    container_id=$(eval "${COMPOSE_CMD} ps -q ${service}" 2>/dev/null || true)
+
+    if [ -z "${container_id}" ]; then
+        echo "✗ ERROR: Service ${service} container was not created!" | tee -a "${LOG_FILE}"
+        echo "--- LOGS FOR ${service} ---" >> "${LOG_FILE}"
+        eval "${COMPOSE_CMD} logs --tail 50 ${service}" >> "${LOG_FILE}" 2>&1 || true
         echo "--------------------------------" >> "${LOG_FILE}"
         LOOP_DETECTED=1
         continue
     fi
-    
-    restart_count=$(docker inspect --format='{{.RestartCount}}' "${container}" 2>/dev/null || echo "0")
-    final_restart_counts["${container}"]="${restart_count}"
-    initial=${initial_restart_counts["${container}"]}
-    
+
+    is_running=$(docker inspect --format='{{.State.Running}}' "${container_id}" 2>/dev/null || echo "false")
+    if [ "${is_running}" != "true" ]; then
+        echo "✗ ERROR: Service ${service} container is not running!" | tee -a "${LOG_FILE}"
+        echo "--- LOGS FOR ${service} ---" >> "${LOG_FILE}"
+        eval "${COMPOSE_CMD} logs --tail 50 ${service}" >> "${LOG_FILE}" 2>&1 || true
+        echo "--------------------------------" >> "${LOG_FILE}"
+        LOOP_DETECTED=1
+        continue
+    fi
+
+    restart_count=$(docker inspect --format='{{.RestartCount}}' "${container_id}" 2>/dev/null || echo "0")
+    initial=${initial_restart_counts["${service}"]}
     restarts=$((restart_count - initial))
-    
+
     if [ "${restarts}" -gt 2 ]; then
-        echo "✗ ERROR: Container ${container} has restarted ${restarts} times in 30 seconds - RESTART LOOP DETECTED!" | tee -a "${LOG_FILE}"
-        echo "--- LOGS FOR ${container} ---" >> "${LOG_FILE}"
-        docker logs "${container}" --tail 100 >> "${LOG_FILE}" 2>&1 || true
+        echo "✗ ERROR: Service ${service} has restarted ${restarts} times in 30 seconds - RESTART LOOP DETECTED!" | tee -a "${LOG_FILE}"
+        echo "--- LOGS FOR ${service} ---" >> "${LOG_FILE}"
+        eval "${COMPOSE_CMD} logs --tail 100 ${service}" >> "${LOG_FILE}" 2>&1 || true
         echo "--------------------------------" >> "${LOG_FILE}"
         LOOP_DETECTED=1
     elif [ "${restarts}" -gt 0 ]; then
-        echo "⚠ Warning: Container ${container} has restarted ${restarts} time(s)" | tee -a "${LOG_FILE}"
+        echo "⚠ Warning: Service ${service} has restarted ${restarts} time(s)" | tee -a "${LOG_FILE}"
     fi
 done
 

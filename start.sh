@@ -55,8 +55,10 @@ configure_backend_cache_buster() {
 verify_backend_source_sync() {
     local files=("main.py" "services/trainer.py" "services/predictor.py")
     local mismatch=0
+    local backend_container_id
 
-    if ! docker ps --filter "name=mensa_backend" --format "{{.Names}}" | grep -q "^mensa_backend$"; then
+    backend_container_id=$(eval "${COMPOSE_CMD} ps -q backend" 2>/dev/null || true)
+    if [ -z "${backend_container_id}" ]; then
         echo "WARNING: backend container is not running; cannot verify source sync."
         return 1
     fi
@@ -71,7 +73,7 @@ verify_backend_source_sync() {
 
         local host_hash container_hash
         host_hash=$(sha256sum "${host_file}" | awk '{print $1}')
-        container_hash=$(docker exec mensa_backend sh -lc "sha256sum /app/${rel_path} 2>/dev/null | awk '{print \\\$1}'" 2>/dev/null || true)
+        container_hash=$(docker exec "${backend_container_id}" sh -lc "sha256sum /app/${rel_path} 2>/dev/null | awk '{print \\\$1}'" 2>/dev/null || true)
 
         if [ -z "${container_hash}" ] || [ "${host_hash}" != "${container_hash}" ]; then
             echo "WARNING: backend source mismatch detected for ${rel_path}"

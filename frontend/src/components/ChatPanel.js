@@ -4,6 +4,7 @@ import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanel.css';
 import getApiBase from '../utils/apiBase';
+import { hasBonusSignal, highlightBonusTermsInHtml } from '../utils/chatBonusUtils';
 
 const API_BASE = getApiBase();
 
@@ -12,7 +13,7 @@ function renderMarkdown(text) {
         return '';
     }
     const rawMarkup = marked(text);
-    return rawMarkup;
+    return highlightBonusTermsInHtml(rawMarkup);
 }
 
 const ChatPanel = () => {
@@ -80,7 +81,14 @@ const ChatPanel = () => {
                         {msg.sender === 'user' ? (
                             <div className="message-bubble">{msg.text}</div>
                         ) : (
-                            <div className="message-bubble" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
+                            <>
+                                <div className="message-bubble" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
+                                {hasBonusSignal(msg) && (
+                                    <div className="bonus-badge" role="status" aria-label="Bonus number indicated in this response">
+                                        🎯 Bonus number included
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 ))}
@@ -92,14 +100,16 @@ const ChatPanel = () => {
                 <div ref={messagesEndRef} />
             </div>
             <form onSubmit={handleSendMessage} className="chat-input-form">
-                <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask the agent anything..."
-                    disabled={isLoading}
-                />
-                <button type="submit" disabled={isLoading}>Send</button>
+                <div className="chat-input-shell">
+                    <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Ask the agent anything..."
+                        disabled={isLoading}
+                    />
+                    <button type="submit" disabled={isLoading}>Send</button>
+                </div>
             </form>
         </div>
     );

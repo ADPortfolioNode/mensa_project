@@ -2,6 +2,7 @@ import os
 import re
 import numpy as np
 import joblib
+from config import GAME_CONFIGS
 
 class PredictorService:
     def __init__(self):
@@ -9,6 +10,78 @@ class PredictorService:
 
     def _parse_numbers(self, raw_value):
         return [int(token) for token in re.findall(r"\d+", str(raw_value or ""))]
+
+    def _get_rules(self, game: str):
+        base = {
+            "primary_count": 5,
+            "primary_min": 1,
+            "primary_max": 99,
+            "primary_unique": True,
+            "bonus_count": 0,
+            "bonus_min": 1,
+            "bonus_max": 99,
+        }
+        configured = GAME_CONFIGS.get(game, {}) or {}
+        return {**base, **configured}
+
+    def _normalize_primary_predictions(self, values, rules):
+        primary_count = int(rules["primary_count"])
+        primary_min = int(rules["primary_min"])
+        primary_max = int(rules["primary_max"])
+        unique_required = bool(rules.get("primary_unique", True))
+
+        normalized = []
+        for value in values[:primary_count]:
+            n = int(np.round(value))
+            n = max(primary_min, min(primary_max, n))
+            if unique_required and n in normalized:
+                candidate = n
+                while candidate in normalized and candidate <= primary_max:
+                    candidate += 1
+                while candidate in normalized and candidate >= primary_min:
+                    candidate -= 1
+                n = max(primary_min, min(primary_max, candidate))
+            normalized.append(n)
+
+        if unique_required:
+            seen = set()
+            deduped = []
+            for n in normalized:
+                if n not in seen:
+                    seen.add(n)
+                    deduped.append(n)
+            normalized = deduped
+
+            candidate = primary_min
+            while len(normalized) < primary_count and candidate <= primary_max:
+                if candidate not in seen:
+                    seen.add(candidate)
+                    normalized.append(candidate)
+                candidate += 1
+
+        while len(normalized) < primary_count:
+            normalized.append(primary_min)
+
+        return normalized[:primary_count]
+
+    def _normalize_bonus_predictions(self, values, rules, include_bonus):
+        if not include_bonus:
+            return []
+
+        bonus_count = int(rules.get("bonus_count", 0) or 0)
+        bonus_min = int(rules.get("bonus_min", 1))
+        bonus_max = int(rules.get("bonus_max", 99))
+
+        normalized = []
+        for value in values[:bonus_count]:
+            n = int(np.round(value))
+            n = max(bonus_min, min(bonus_max, n))
+            normalized.append(n)
+
+        while len(normalized) < bonus_count:
+            normalized.append(bonus_min)
+
+        return normalized[:bonus_count]
 
     def _extract_sequence(self, metadata):
         if not isinstance(metadata, dict):
@@ -47,6 +120,7 @@ class PredictorService:
         model = artifact.get("model")
         feature_len = int(artifact.get("feature_len", 10))
         output_len = int(artifact.get("output_len", 6))
+        rules = artifact.get("rules") or self._get_rules(game)
         if model is None:
             return {"status": "error", "message": f"Model artifact for game '{game}' is invalid."}
 
@@ -71,14 +145,24 @@ class PredictorService:
         
         prediction = model.predict(X)
         prediction = np.array(prediction).reshape(-1)[:output_len]
-        
-        # Round to nearest integers
-        predicted_numbers = [max(0, int(np.round(value))) for value in prediction]
+
+        primary_count = int(rules.get("primary_count", 5))
+        bonus_count = int(rules.get("bonus_count", 0) or 0)
+        include_bonus = bonus_count > 0 and output_len >= (primary_count + bonus_count)
+
+        primary_raw = prediction[:primary_count]
+        bonus_raw = prediction[primary_count:primary_count + bonus_count] if include_bonus else []
+
+        primary_numbers = self._normalize_primary_predictions(primary_raw, rules)
+        bonus_numbers = self._normalize_bonus_predictions(bonus_raw, rules, include_bonus)
+        predicted_numbers = primary_numbers + bonus_numbers
         
         return {
             "status": "success",
             "game": game,
             "predicted_numbers": predicted_numbers,
+            "predicted_main_numbers": primary_numbers,
+            "predicted_bonus_numbers": bonus_numbers,
         }
 
     def predict_all_games(self, games, recent_k: int = 10):
