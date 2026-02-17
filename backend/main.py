@@ -360,6 +360,7 @@ def _render_tool_response(tool_name: str, tool_result: Dict[str, Any]) -> str:
     )
 
 
+<<<<<<< HEAD
 def _parse_datetime(value: Any) -> Optional[datetime]:
     text = str(value or "").strip()
     if not text:
@@ -519,6 +520,19 @@ def _resolve_lm_chain(lm_provider: Optional[str]) -> list[tuple[str, Any]]:
         ("chatgpt", chatgpt_client),
     ]
 
+=======
+def _build_non_rag_fallback(user_text: str) -> str:
+    return (
+        "Gemini is currently unavailable, but core workflows are online.\n\n"
+        "Available actions right now:\n"
+        "- Run ingestion for one game or all games\n"
+        "- Train models and generate predictions\n"
+        "- Inspect Chroma collections and experiments\n\n"
+        f"Your message was: '{user_text}'. "
+        "If you want, I can help with a concrete operation (for example: 'train take5')."
+    )
+
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
 # --- API Endpoints ---
 @app.get("/api")
 async def root():
@@ -555,6 +569,7 @@ async def chat_endpoint(request: ChatRequest):
         lm_chain = _resolve_lm_chain(request.lm_provider)
 
         if request.use_rag:
+<<<<<<< HEAD
             first_unavailable = None
             for provider_name, provider_client in lm_chain:
                 result = await rag_service.query_with_rag(
@@ -580,6 +595,13 @@ async def chat_endpoint(request: ChatRequest):
                 request.text,
                 first_unavailable or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
                 request.game,
+=======
+            # Use RAG service for context-aware responses
+            result = await rag_service.query_with_rag(
+                user_query=request.text,
+                game=request.game,
+                use_all_games=request.game is None
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
             )
             return ChatResponse(
                 response=fallback_text,
@@ -594,6 +616,7 @@ async def chat_endpoint(request: ChatRequest):
             response_text = await provider_client.generate_text(
                 f"{concierge_prefix}\n\nUser request: {request.text}"
             )
+<<<<<<< HEAD
             if isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX):
                 first_unavailable = first_unavailable or response_text
                 continue
@@ -606,6 +629,11 @@ async def chat_endpoint(request: ChatRequest):
             request.game,
         )
         return ChatResponse(response=fallback_text, lm_provider="fallback")
+=======
+            if isinstance(response_text, str) and "trouble connecting to the Gemini API" in response_text:
+                response_text = _build_non_rag_fallback(request.text)
+            return ChatResponse(response=response_text)
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
         return ChatResponse(response=f"Error: {str(e)}", tool_result={"error": str(e)})

@@ -5,6 +5,7 @@ import joblib
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
+from config import GAME_CONFIGS
 
 
 class TrainerService:
@@ -16,27 +17,121 @@ class TrainerService:
         tokens = re.findall(r"\d+", str(raw_value or ""))
         return [int(token) for token in tokens]
 
-    def _extract_winning_sequences(self, metadatas):
+    def _get_rules(self, game: str):
+        base = {
+            "primary_count": 5,
+            "primary_min": 1,
+            "primary_max": 99,
+            "primary_unique": True,
+            "bonus_count": 0,
+            "bonus_min": 1,
+            "bonus_max": 99,
+            "bonus_keys": [],
+            "embedded_bonus_in_winning_numbers": False,
+        }
+        configured = GAME_CONFIGS.get(game, {}) or {}
+        merged = {**base, **configured}
+        merged["bonus_keys"] = [str(k).lower() for k in (merged.get("bonus_keys") or [])]
+        return merged
+
+    def _clamp_primary(self, numbers, rules):
+        valid = [
+            int(n)
+            for n in numbers
+            if rules["primary_min"] <= int(n) <= rules["primary_max"]
+        ]
+
+        if not valid:
+            return []
+
+        if rules.get("primary_unique", True):
+            seen = set()
+            uniq = []
+            for value in valid:
+                if value not in seen:
+                    seen.add(value)
+                    uniq.append(value)
+            valid = uniq
+
+        if len(valid) < rules["primary_count"]:
+            return []
+        return valid[:rules["primary_count"]]
+
+    def _extract_bonus_values(self, metadata, rules):
+        bonus_count = int(rules.get("bonus_count", 0) or 0)
+        if bonus_count <= 0:
+            return []
+
+        values = []
+        bonus_min = int(rules.get("bonus_min", 1))
+        bonus_max = int(rules.get("bonus_max", 99))
+
+        for key, value in (metadata or {}).items():
+            key_lower = str(key).lower()
+            if key_lower in rules["bonus_keys"] or ("bonus" in key_lower and "winning" not in key_lower):
+                parsed = self._parse_numbers(value)
+                for item in parsed:
+                    if bonus_min <= item <= bonus_max:
+                        values.append(item)
+                        if len(values) >= bonus_count:
+                            return values[:bonus_count]
+        return values[:bonus_count]
+
+    def _extract_primary_candidate(self, metadata):
+        winning_value = None
+
+        for key, value in (metadata or {}).items():
+            key_lower = str(key).lower()
+            if "winning" in key_lower and "number" in key_lower:
+                winning_value = value
+                break
+
+        if winning_value is None:
+            for key, value in (metadata or {}).items():
+                key_lower = str(key).lower()
+                if "numbers" in key_lower or "result" in key_lower:
+                    if "draw_number" in key_lower:
+                        continue
+                    winning_value = value
+                    break
+
+        return self._parse_numbers(winning_value)
+
+    def _extract_record_sequence(self, metadata, game: str):
+        rules = self._get_rules(game)
+        winning_numbers = self._extract_primary_candidate(metadata)
+        if not winning_numbers:
+            return []
+
+        primary_count = int(rules["primary_count"])
+        bonus_count = int(rules.get("bonus_count", 0) or 0)
+
+        embedded_bonus = []
+        if rules.get("embedded_bonus_in_winning_numbers") and bonus_count > 0 and len(winning_numbers) >= primary_count + bonus_count:
+            embedded_bonus = winning_numbers[primary_count:primary_count + bonus_count]
+            winning_numbers = winning_numbers[:primary_count]
+
+        primary_numbers = self._clamp_primary(winning_numbers, rules)
+        if len(primary_numbers) != primary_count:
+            return []
+
+        bonus_numbers = self._extract_bonus_values(metadata, rules)
+        if not bonus_numbers and embedded_bonus:
+            bonus_min = int(rules.get("bonus_min", 1))
+            bonus_max = int(rules.get("bonus_max", 99))
+            bonus_numbers = [int(n) for n in embedded_bonus if bonus_min <= int(n) <= bonus_max][:bonus_count]
+
+        if bonus_count > 0 and bonus_numbers:
+            return primary_numbers + bonus_numbers[:bonus_count]
+        return primary_numbers
+
+    def _extract_winning_sequences(self, metadatas, game: str):
         sequences = []
         for meta in metadatas or []:
             if not isinstance(meta, dict):
                 continue
 
-            winning_value = None
-            for key, value in meta.items():
-                key_lower = str(key).lower()
-                if "winning" in key_lower and "number" in key_lower:
-                    winning_value = value
-                    break
-
-            if winning_value is None:
-                for key, value in meta.items():
-                    key_lower = str(key).lower()
-                    if "numbers" in key_lower or "result" in key_lower:
-                        winning_value = value
-                        break
-
-            numbers = self._parse_numbers(winning_value)
+            numbers = self._extract_record_sequence(meta, game)
             if numbers:
                 sequences.append(numbers)
 
@@ -74,7 +169,7 @@ class TrainerService:
         if not metadatas:
             return {"status": "error", "message": "No data found to train on."}
 
-        sequences = self._extract_winning_sequences(metadatas)
+        sequences = self._extract_winning_sequences(metadatas, game)
         X, y, feature_len, output_len = self._build_supervised_dataset(sequences)
         if X is None or len(X) < 10:
             return {"status": "error", "message": "Not enough parsed winning-number sequences to train."}
@@ -102,6 +197,7 @@ class TrainerService:
             "feature_len": feature_len,
             "output_len": output_len,
             "game": game,
+            "rules": self._get_rules(game),
             "version": 1,
         }
 

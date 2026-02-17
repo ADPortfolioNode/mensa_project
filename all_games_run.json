@@ -1,0 +1,58 @@
+[
+    {
+        "game":  "take5",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "7,13,18,23,28",
+        "bonus":  "1"
+    },
+    {
+        "game":  "pick3",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "4,6,7",
+        "bonus":  ""
+    },
+    {
+        "game":  "powerball",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "9,20,30,42,53",
+        "bonus":  "12"
+    },
+    {
+        "game":  "megamillions",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "13,29,38,46,57",
+        "bonus":  "16"
+    },
+    {
+        "game":  "pick10",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "4,8,11,15,19,23,26,30,34,38,42,46,50,54,58,62,66,69,73,77",
+        "bonus":  ""
+    },
+    {
+        "game":  "cash4life",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "11,25,35,45,55",
+        "bonus":  "2"
+    },
+    {
+        "game":  "quickdraw",
+        "train":  "error",
+        "predict":  "error",
+        "main":  "",
+        "bonus":  ""
+    },
+    {
+        "game":  "nylotto",
+        "train":  "COMPLETED",
+        "predict":  "success",
+        "main":  "9,19,30,37,46,52",
+        "bonus":  "17"
+    }
+]

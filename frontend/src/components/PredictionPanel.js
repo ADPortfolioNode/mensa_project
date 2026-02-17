@@ -81,12 +81,21 @@ export default function PredictionPanel({ games = [], disabled = false }) {
   };
 
   return (
+<<<<<<< HEAD
     <>
       {disabled ? (
         <div className="alert alert-warning mb-0">
           <strong>Prediction unavailable:</strong> Train a model first for the selected game.
+=======
+    <div className="card p-3 mb-3">
+      <h5>Predictions</h5>
+      {disabled && (
+        <div className="alert alert-warning mb-3">
+          <strong>Heads up:</strong> No completed training experiment is currently recorded. You can still select a game and try prediction.
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
         </div>
-      ) : games.length > 0 ? (
+      )}
+      {games.length > 0 ? (
         <>
           <select className="form-select mb-3" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
             <option value={ALL_GAMES_VALUE}>All Games (Concurrent)</option>

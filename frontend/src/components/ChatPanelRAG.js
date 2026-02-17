@@ -4,6 +4,7 @@ import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanelRAG.css';
 import getApiBase from '../utils/apiBase';
+import { hasBonusSignal, highlightBonusTermsAsSafeHtml } from '../utils/chatBonusUtils';
 
 const API_BASE = getApiBase();
 
@@ -82,6 +83,7 @@ const ChatPanel = ({ game = null }) => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [useRag, setUseRag] = useState(true);
+<<<<<<< HEAD
     const [toolPath, setToolPath] = useState('.');
     const [toolReadPath, setToolReadPath] = useState('README.md');
     const [toolWritePath, setToolWritePath] = useState('message_from_agent.txt');
@@ -95,6 +97,9 @@ const ChatPanel = ({ game = null }) => {
     const [apiDescription, setApiDescription] = useState(API_ENDPOINTS[0].description);
     const [latestApiIO, setLatestApiIO] = useState(null);
     const messagesEndRef = useRef(null);
+=======
+    const chatWindowRef = useRef(null);
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
 
     const quickActions = [
         {
@@ -119,6 +124,7 @@ const ChatPanel = ({ game = null }) => {
         Prism.highlightAll();
     }, [messages]);
 
+<<<<<<< HEAD
     useEffect(() => {
         const endpoint = API_ENDPOINTS.find((item) => item.label === selectedApiEndpoint);
         if (!endpoint) return;
@@ -136,11 +142,19 @@ const ChatPanel = ({ game = null }) => {
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+=======
+    const scrollToTop = () => {
+        if (chatWindowRef.current) {
+            chatWindowRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
     };
 
     useEffect(() => {
-        scrollToBottom();
+        scrollToTop();
     }, [messages]);
+
+    const orderedMessages = [...messages].reverse();
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
@@ -345,6 +359,7 @@ const ChatPanel = ({ game = null }) => {
                 </div>
             </div>
 
+<<<<<<< HEAD
             <div className="chat-workspace">
                 <div className="chat-left-column">
                     <div className="px-3 pt-2 pb-2 border-bottom chat-utility-strip">
@@ -552,6 +567,109 @@ const ChatPanel = ({ game = null }) => {
                         )}
                     </form>
                 </div>
+=======
+            <form onSubmit={handleSendMessage} className="chat-input-form-rag">
+                <div className="quick-actions-rag">
+                    <div className="quick-actions-title">Quick Actions</div>
+                    <div className="quick-actions-buttons">
+                        {quickActions.map((action) => (
+                            <button
+                                key={action.label}
+                                type="button"
+                                className="quick-action-btn"
+                                disabled={isLoading}
+                                onClick={action.run}
+                            >
+                                {action.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="input-wrapper">
+                    <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder={useRag ? "Ask me about lottery data, workflow errors, or code fixes..." : "Ask anything — I’ll help step by step..."}
+                        disabled={isLoading}
+                        className="chat-input-rag"
+                    />
+                    <button 
+                        type="submit" 
+                        disabled={isLoading || !input.trim()}
+                        className="chat-send-btn"
+                    >
+                        {isLoading ? '...' : '→'}
+                    </button>
+                </div>
+                {useRag && (
+                    <div className="rag-info">
+                        <span className="info-icon">ℹ️</span>
+                        <span>RAG enabled: I ground answers using ChromaDB context before responding.</span>
+                    </div>
+                )}
+            </form>
+
+            <div className="chat-window-rag" ref={chatWindowRef}>
+                {isLoading && (
+                    <div className="chat-message-rag bot">
+                        <div className="message-bubble loading">
+                            <span className="spinner-dot"></span>
+                            <span className="spinner-dot"></span>
+                            <span className="spinner-dot"></span>
+                        </div>
+                    </div>
+                )}
+
+                {orderedMessages.map((msg, index) => (
+                    <div key={index} className={`chat-message-rag ${msg.sender}`}>
+                        <div className="message-container">
+                            <div className="message-bubble">
+                                {msg.sender === 'user' ? (
+                                    msg.text
+                                ) : (
+                                    <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} />
+                                )}
+                            </div>
+                            
+                            {/* Show sources badge if RAG was used */}
+                            {msg.sender === 'bot' && msg.contextUsed && msg.sources && msg.sources.length > 0 && (
+                                <div className="sources-badge">
+                                    📚 {msg.sources.length} source{msg.sources.length > 1 ? 's' : ''}
+                                </div>
+                            )}
+
+                            {hasBonusSignal(msg) && (
+                                <div className="bonus-badge" role="status" aria-label="Bonus number indicated in this response">
+                                    🎯 Bonus number included
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Expandable sources display */}
+                        {msg.sources && msg.sources.length > 0 && (
+                            <div className="message-sources">
+                                {msg.sources.map((source, i) => (
+                                    <div key={i} className="source-item">
+                                        <span className="source-game">{source.game}</span>
+                                        <span className="source-content" dangerouslySetInnerHTML={{ __html: highlightBonusTermsAsSafeHtml(source.content) }} />
+                                        <span className="source-distance">Score: {(1 - source.distance).toFixed(3)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {msg.toolResult && (
+                            <div className="message-sources">
+                                <div className="source-item">
+                                    <span className="source-game">Tool: {msg.toolName || 'tool'}</span>
+                                    <span className="source-content">{JSON.stringify(msg.toolResult, null, 2)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
             </div>
         </div>
     );

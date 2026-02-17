@@ -5,7 +5,6 @@ services:
       dockerfile: Dockerfile
       args:
         CACHE_BUSTER: ${BACKEND_CACHE_BUSTER:-stable}
-    container_name: mensa_backend
     volumes:
       - backend_data:/data
     ports:
@@ -15,8 +14,14 @@ services:
       - MAX_CONCURRENT_CLONES=3
       - CHROMA_SDK_ENABLED=1
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+<<<<<<< HEAD
       - CHAT_GPT_API_KEY=${CHAT_GPT_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+=======
+      - GROK_API_KEY=${GROK_API_KEY}
+      - GROK_API_BASE=${GROK_API_BASE:-https://api.x.ai/v1}
+      - GROK_MODEL=${GROK_MODEL:-grok-3-mini-beta}
+>>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
       - CHROMA_HOST=mensa_chroma
       - CHROMA_PORT=8000
       - INGEST_BATCH_SIZE=4000

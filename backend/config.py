@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     CHAT_GPT_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GROK_API_KEY: str | None = None
+    GROK_API_BASE: str = "https://api.x.ai/v1"
+    GROK_MODEL: str = "grok-3-mini-beta"
     
     # ChromaDB
     CHROMA_HOST: str = "mensa_chroma"
@@ -22,14 +26,78 @@ settings = Settings()
 
 # Game configurations (imported by main.py)
 GAME_CONFIGS = {
-    "take5": {},
-    "pick3": {},
-    "powerball": {},
-    "megamillions": {},
-    "pick10": {},
-    "cash4life": {},
-    "quickdraw": {},
-    "nylotto": {}
+    "take5": {
+        "primary_count": 5,
+        "primary_min": 1,
+        "primary_max": 39,
+        "primary_unique": True,
+        "bonus_count": 1,
+        "bonus_min": 1,
+        "bonus_max": 39,
+        "bonus_keys": ["midday_bonus", "evening_bonus", "bonus"],
+    },
+    "pick3": {
+        "primary_count": 3,
+        "primary_min": 0,
+        "primary_max": 9,
+        "primary_unique": False,
+        "bonus_count": 0,
+    },
+    "powerball": {
+        "primary_count": 5,
+        "primary_min": 1,
+        "primary_max": 69,
+        "primary_unique": True,
+        "bonus_count": 1,
+        "bonus_min": 1,
+        "bonus_max": 26,
+        "embedded_bonus_in_winning_numbers": True,
+        "bonus_keys": ["powerball", "power_ball"],
+    },
+    "megamillions": {
+        "primary_count": 5,
+        "primary_min": 1,
+        "primary_max": 70,
+        "primary_unique": True,
+        "bonus_count": 1,
+        "bonus_min": 1,
+        "bonus_max": 25,
+        "bonus_keys": ["mega_ball", "megaball"],
+    },
+    "pick10": {
+        "primary_count": 20,
+        "primary_min": 1,
+        "primary_max": 80,
+        "primary_unique": True,
+        "bonus_count": 0,
+    },
+    "cash4life": {
+        "primary_count": 5,
+        "primary_min": 1,
+        "primary_max": 60,
+        "primary_unique": True,
+        "bonus_count": 1,
+        "bonus_min": 1,
+        "bonus_max": 4,
+        "bonus_keys": ["cash_ball", "cashball"],
+    },
+    "quickdraw": {
+        "primary_count": 20,
+        "primary_min": 1,
+        "primary_max": 80,
+        "primary_unique": True,
+        "bonus_count": 0,
+    },
+    "nylotto": {
+        "primary_count": 6,
+        "primary_min": 1,
+        "primary_max": 59,
+        "primary_unique": True,
+        "bonus_count": 1,
+        "bonus_min": 1,
+        "bonus_max": 59,
+        "bonus_keys": ["bonus"],
+    }
 }
 
 GAME_TITLES = {
