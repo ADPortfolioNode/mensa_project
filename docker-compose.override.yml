@@ -3,4 +3,11 @@ services:
     environment:
       - HOME=/app
   backend:
+    environment:
+      - INGEST_BATCH_SIZE=4000
+      - INGEST_REQUEST_TIMEOUT=20
+      - INGEST_MAX_RETRIES=2
+      - INGEST_RETRY_DELAY=1
+      - INGEST_ENABLE_CATALOG_FALLBACK=0
+      - INGEST_MAX_CATALOG_CANDIDATES=3
     volumes: []

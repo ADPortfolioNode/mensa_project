@@ -82,7 +82,7 @@ export default function GameSummaryPanel({ games, refreshKey = 0, initialSummari
       <h5>Game Contents</h5>
       {loading && (
         <div className="progress mb-2">
-          <div className="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style={{ width: '100%' }}></div>
+          <div className="progress-bar progress-bar-striped progress-bar-animated w-100" role="progressbar"></div>
         </div>
       )}
       {error && !loading && (

@@ -48,8 +48,8 @@ export default function StatusPanel({ status: initial = {} }) {
                   <small className="text-monospace">{id}</small>
                   <small>{pct}%</small>
                 </div>
-                <div className="progress" style={{height: '8px'}}>
-                  <div className="progress-bar" role="progressbar" style={{width: `${pct}%`}} aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"></div>
+                <div className="status-panel-progress-wrap">
+                  <progress className="status-panel-progress" value={pct} max="100" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100" />
                 </div>
                 <div className="small text-muted mt-1">
                   {(info.steps || []).slice(-3).map((s, idx) => (

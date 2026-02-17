@@ -25,26 +25,28 @@ export default function ExpandableCard({
     }
   };
 
-  const cardClasses = `card p-3 mb-3 h-100 shadow-lg ${neonBorder ? 'border-neon' : ''} ${expanded ? 'card-selected' : ''} ${className}`;
+  const handleHeaderKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleToggle();
+    }
+  };
+
+  const cardClasses = `card p-3 mb-3 h-100 shadow-lg expandable-card ${neonBorder ? 'border-neon' : ''} ${expanded ? 'card-selected' : ''} ${className}`;
   const headerClasses = expanded ? 'bg-primary text-white' : '';
 
   return (
-    <div className={cardClasses} style={{ 
-      transition: 'all 0.3s ease',
-      position: 'relative'
-    }}>
-      <div className={`card-header ${headerClasses}`} style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        cursor: 'pointer',
-        padding: '12px 16px',
-        borderRadius: expanded ? '8px 8px 0 0' : '0'
-      }} onClick={handleToggle}>
-        <h5 className={`${neonBorder ? 'text-neon' : ''}`} style={{ margin: 0 }}>
+    <div className={cardClasses}>
+      <div className={`card-header expandable-card-header ${headerClasses} ${expanded ? 'is-expanded' : ''}`}
+      onClick={handleToggle}
+      onKeyDown={handleHeaderKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}>
+        <h5 className={`${neonBorder ? 'text-neon' : ''} mb-0`}>
           {title}
         </h5>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="expandable-card-actions">
           {statusBadge && <span>{statusBadge}</span>}
           {isActive && (
             <span className="badge bg-warning text-dark">
@@ -54,33 +56,21 @@ export default function ExpandableCard({
           <button 
             className="btn btn-sm btn-outline-secondary"
             onClick={(e) => { e.stopPropagation(); handleToggle(); }}
-            style={{ padding: '2px 8px', fontSize: '12px' }}
           >
             {expanded ? '▼' : '▶'}
           </button>
         </div>
       </div>
 
-      <div className="card-body" style={{ padding: '16px' }}>
+      <div className="card-body expandable-card-body">
         {expanded && Object.keys(metadata).length > 0 && (
-          <div style={{
-            background: '#f8f9fa',
-            padding: '12px',
-            borderRadius: '6px',
-            marginBottom: '12px',
-            border: '1px solid #dee2e6'
-          }}>
-            <h6 style={{ marginBottom: '8px', color: '#495057' }}>Metadata</h6>
-            <div style={{ fontSize: '13px' }}>
+          <div className="expandable-metadata mb-3">
+            <h6 className="mb-2">Metadata</h6>
+            <div className="expandable-metadata-grid">
               {Object.entries(metadata).map(([key, value]) => (
-                <div key={key} style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  padding: '4px 0',
-                  borderBottom: '1px solid #e9ecef'
-                }}>
-                  <span style={{ fontWeight: '500', color: '#6c757d' }}>{key}:</span>
-                  <span style={{ color: '#212529' }}>{value}</span>
+                <div key={key} className="expandable-metadata-row">
+                  <span className="expandable-metadata-key">{key}:</span>
+                  <span className="expandable-metadata-value">{value}</span>
                 </div>
               ))}
             </div>

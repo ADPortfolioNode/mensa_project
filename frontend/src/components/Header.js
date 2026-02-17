@@ -1,16 +1,31 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getApiBase } from '../utils/apiBase';
 
 const Header = () => {
   const [startupStatus, setStartupStatus] = useState(null);
   const [showProgress, setShowProgress] = useState(true);
 
+  const fetchStartupStatus = async () => {
+    const apiBase = getApiBase();
+    const primaryUrl = `${apiBase}/api/startup_status`;
+    const fallbackUrl = apiBase
+      ? null
+      : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_status`;
+
+    try {
+      return await axios.get(primaryUrl, { timeout: 10000 });
+    } catch (primaryError) {
+      if (!fallbackUrl) throw primaryError;
+      return axios.get(fallbackUrl, { timeout: 10000 });
+    }
+  };
+
   useEffect(() => {
     const pollStartupStatus = async () => {
       try {
-        const { getApiBase } = await import('../utils/apiBase');
-        const response = await axios.get(`${getApiBase()}/api/startup_status`);
+        const response = await fetchStartupStatus();
         setStartupStatus(response.data);
         
         // Hide progress bar after completion
@@ -43,40 +58,26 @@ const Header = () => {
     <div>
       {/* Startup Progress Bar */}
       {showProgress && startupStatus && (
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          borderBottom: '2px solid #dee2e6',
-          padding: '12px 0',
-          marginBottom: '12px'
-        }}>
+        <div className="header-startup-strip py-2 mb-3">
           <div className="container">
-            <div style={{ fontSize: '12px', marginBottom: '6px', color: '#666' }}>
+            <div className="header-startup-meta small mb-2">
               <strong>🎰 Lottery Data Initialization</strong>
               {startupStatus.current_game && (
-                <span style={{ marginLeft: '8px' }}>
+                <span className="ms-2">
                   • {startupStatus.current_game.toUpperCase()}
                   {startupStatus.progress && (
                     <span> ({startupStatus.progress.toFixed(1)}/{startupStatus.total})</span>
                   )}
                 </span>
               )}
-              {isCompleted && <span style={{ marginLeft: '8px', color: '#28a745' }}>✓ Complete</span>}
+              {isCompleted && <span className="ms-2 text-success">✓ Complete</span>}
             </div>
-            <div style={{
-              width: '100%',
-              backgroundColor: '#e9ecef',
-              borderRadius: '4px',
-              height: '6px',
-              overflow: 'hidden',
-              position: 'relative'
-            }}>
-              <div style={{
-                width: `${progressPercentage}%`,
-                backgroundColor: isCompleted ? '#28a745' : '#007bff',
-                height: '100%',
-                transition: 'width 0.3s ease',
-                borderRadius: '4px'
-              }} />
+            <div className="progress header-startup-progress" role="progressbar" aria-valuenow={progressPercentage} aria-valuemin="0" aria-valuemax="100">
+              <progress
+                className={`header-startup-progress-native ${isCompleted ? 'is-complete' : isIngesting ? 'is-active' : 'is-idle'}`}
+                value={Math.max(0, Math.min(progressPercentage, 100))}
+                max="100"
+              />
             </div>
           </div>
         </div>

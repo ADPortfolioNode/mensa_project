@@ -11,14 +11,16 @@ export default function App() {
     setStartupComplete(true);
   };
 
-  if (!startupComplete) {
-    return <StartupProgress onComplete={handleStartupComplete} />;
-  }
-
   return (
-    <div className="container py-4">
-      <Header />
-      <Dashboard />
+    <div className="star-trek-app min-vh-100 py-3 py-md-4">
+      {!startupComplete ? (
+        <StartupProgress onComplete={handleStartupComplete} />
+      ) : (
+        <div className="container py-2 py-md-3">
+          <Header />
+          <Dashboard />
+        </div>
+      )}
     </div>
   );
 }

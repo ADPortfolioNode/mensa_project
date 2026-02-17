@@ -13,8 +13,8 @@ export default function PredictionDisplayWindow({ ingestStatus, trainStatus, ing
           <span className={`badge ${ingestStatus === 'completed' ? 'bg-success' : ingestStatus === 'in progress' ? 'bg-warning' : ingestStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>{ingestStatus}</span>
         </div>
         {ingestStatus === 'in progress' && (
-          <div className="progress mt-2" style={{height: '10px'}}>
-            <div className="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style={{width: `${ingestProgress}%`}}></div>
+          <div className="prediction-progress-wrap mt-2">
+            <progress className="prediction-progress" value={ingestProgress} max="100" />
           </div>
         )}
         {ingestStatus === 'completed' && <p className="text-success">Data ingestion completed successfully.</p>}
@@ -29,8 +29,8 @@ export default function PredictionDisplayWindow({ ingestStatus, trainStatus, ing
           <span className={`badge ${trainStatus === 'completed' ? 'bg-success' : trainStatus === 'in progress' ? 'bg-warning' : trainStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>{trainStatus}</span>
         </div>
         {trainStatus === 'in progress' && (
-          <div className="progress mt-2" style={{height: '10px'}}>
-            <div className="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style={{width: `${trainProgress}%`}}></div>
+          <div className="prediction-progress-wrap mt-2">
+            <progress className="prediction-progress" value={trainProgress} max="100" />
           </div>
         )}
         {trainStatus === 'completed' && (

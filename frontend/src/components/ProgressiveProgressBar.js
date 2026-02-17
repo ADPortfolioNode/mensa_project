@@ -21,6 +21,7 @@ export default function ProgressiveProgressBar({
   colorScheme = 'primary' // primary, success, warning, danger
 }) {
   const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+  const clampedPercentage = Math.max(0, Math.min(percentage, 100));
   
   // Calculate rate if not provided
   let calculatedRate = rate;
@@ -69,61 +70,32 @@ export default function ProgressiveProgressBar({
   };
 
   return (
-    <div style={{ marginBottom: '16px' }}>
+    <div className="progressive-progress mb-3">
       {/* Header with label and status */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '6px'
-      }}>
-        <span style={{ fontWeight: '600', fontSize: '14px', color: labelColor || undefined }}>
+      <div className="progressive-progress-header">
+        <span className={`progressive-progress-label ${labelColor ? `progressive-progress-label-${colorScheme}` : ''}`}>
           {getStatusIcon()} {label}
         </span>
-        <span style={{ fontSize: '13px', color: '#6c757d' }}>
-          {percentage}%
+        <span className="progressive-progress-percent">
+          {clampedPercentage}%
         </span>
       </div>
 
       {/* Progress Bar */}
-      <div style={{
-        width: '100%',
-        backgroundColor: '#e9ecef',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        height: '24px',
-        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
-      }}>
-        <div 
-          className={`${getBarColor()} ${status === 'active' ? 'progress-bar-striped progress-bar-animated' : ''}`}
-          style={{
-            width: `${percentage}%`,
-            height: '100%',
-            transition: 'width 0.3s ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: '11px',
-            textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-          }}
-        >
-          {percentage > 15 && `${percentage}%`}
-        </div>
+      <div className="progressive-progress-track">
+        <progress
+          className={`progressive-progress-native ${getBarColor()} ${status === 'active' ? 'is-active' : ''}`}
+          value={clampedPercentage}
+          max="100"
+        />
+        {clampedPercentage > 15 && (
+          <span className="progressive-progress-overlay">{clampedPercentage}%</span>
+        )}
       </div>
 
       {/* Metadata */}
       {showMetadata && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginTop: '6px',
-          fontSize: '12px',
-          color: '#6c757d',
-          flexWrap: 'wrap',
-          gap: '8px'
-        }}>
+        <div className="progressive-progress-meta">
           <div>
             <strong>Items:</strong> {current.toLocaleString()} / {total.toLocaleString()}
           </div>

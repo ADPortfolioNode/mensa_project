@@ -38,11 +38,42 @@ configure_backend_cache_buster() {
 run_compose_with_timeout() {
     local seconds="$1"
     shift
-    if command -v timeout >/dev/null 2>&1; then
+    local cmd_preview="$*"
+    if command -v timeout >/dev/null 2>&1 && timeout --version 2>/dev/null | grep -qi "coreutils"; then
         timeout "${seconds}"s "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "${seconds}"s "$@"
     else
-        "$@"
+        "$@" &
+        local cmd_pid=$!
+        local elapsed=0
+
+        while kill -0 "${cmd_pid}" 2>/dev/null; do
+            if [ "${elapsed}" -gt 0 ] && [ $((elapsed % 10)) -eq 0 ]; then
+                echo "... still waiting (${elapsed}s/${seconds}s): ${cmd_preview}" | tee -a "${LOG_FILE}"
+            fi
+            if [ "${elapsed}" -ge "${seconds}" ]; then
+                kill -TERM "${cmd_pid}" 2>/dev/null || true
+                sleep 2
+                kill -KILL "${cmd_pid}" 2>/dev/null || true
+                wait "${cmd_pid}" 2>/dev/null || true
+                return 124
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+
+        wait "${cmd_pid}"
     fi
+}
+
+force_remove_container() {
+    local container="$1"
+    if run_compose_with_timeout 20 sh -lc "docker rm -f ${container}" >> "${LOG_FILE}" 2>&1; then
+        return 0
+    fi
+    echo "WARNING: force remove timed out/failed for ${container}" >> "${LOG_FILE}"
+    return 1
 }
 
 echo "Running a diagnostic startup..."
@@ -68,7 +99,9 @@ echo "--- Stopping and removing old containers ---" >> "${LOG_FILE}"
 if ! run_compose_with_timeout 180 sh -lc "${COMPOSE_CMD} down --remove-orphans" >> "${LOG_FILE}" 2>&1; then
     echo "ERROR: timed out or failed while stopping old containers" >> "${LOG_FILE}"
 fi
-docker rm -f mensa_frontend mensa_backend mensa_chroma >> "${LOG_FILE}" 2>&1 || true
+force_remove_container mensa_frontend || true
+force_remove_container mensa_backend || true
+force_remove_container mensa_chroma || true
 
 # Attempt to build and start (detached mode with loop detection)
 echo "--- Building and starting new containers ---" >> "${LOG_FILE}"

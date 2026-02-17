@@ -1,0 +1,555 @@
+:root {
+  --st-bg: #060b1a;
+  --st-panel: #0f1831;
+  --st-panel-2: #172245;
+  --st-border: #ff9f40;
+  --st-accent: #8ad7ff;
+  --st-accent-2: #8f7bff;
+  --st-accent-3: #59d8bf;
+  --st-text: #e9f2ff;
+  --st-muted: #c6d2ef;
+  --st-success: #6fe2a0;
+}
+
+body {
+  background: radial-gradient(circle at 15% 10%, #1a2548 0%, var(--st-bg) 45%, #03060f 100%);
+  color: var(--st-text);
+}
+
+.star-trek-app {
+  color: var(--st-text);
+}
+
+.star-trek-app .container,
+.star-trek-app .container-fluid {
+  max-width: 1400px;
+}
+
+.star-trek-app .alert {
+  background: linear-gradient(120deg, rgba(138, 215, 255, 0.15), rgba(255, 159, 64, 0.14));
+  border: 1px solid rgba(255, 159, 64, 0.55);
+  color: var(--st-text);
+  border-radius: 16px;
+}
+
+.star-trek-app .alert-info {
+  background: linear-gradient(120deg, rgba(138, 215, 255, 0.18), rgba(70, 106, 189, 0.18));
+  border-color: rgba(138, 215, 255, 0.45);
+}
+
+.star-trek-app .card {
+  background: linear-gradient(160deg, var(--st-panel) 0%, var(--st-panel-2) 100%);
+  border: 1px solid rgba(255, 159, 64, 0.5);
+  color: var(--st-text);
+  border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.star-trek-app .card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--st-border) 0%, var(--st-accent) 55%, var(--st-accent-2) 100%);
+  opacity: 0.9;
+}
+
+.star-trek-app .card::after {
+  content: "";
+  position: absolute;
+  right: -38px;
+  top: -38px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle at center, rgba(89, 216, 191, 0.22) 0%, rgba(89, 216, 191, 0) 72%);
+  pointer-events: none;
+}
+
+.star-trek-app .card:hover {
+  border-color: rgba(138, 215, 255, 0.55);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(143, 123, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.star-trek-app .card p,
+.star-trek-app .card li,
+.star-trek-app .card label,
+.star-trek-app .card .form-label,
+.star-trek-app .card .card-text {
+  color: var(--st-text);
+}
+
+.star-trek-app .card .small,
+.star-trek-app .card small,
+.star-trek-app .card .text-muted {
+  color: var(--st-muted) !important;
+}
+
+.star-trek-app .card .card-header,
+.star-trek-app .card .card-footer {
+  background: rgba(5, 12, 30, 0.55);
+  border-color: rgba(255, 159, 64, 0.35);
+  color: var(--st-text);
+}
+
+.star-trek-app .card .card-header {
+  border-bottom: 1px solid rgba(138, 215, 255, 0.24);
+  box-shadow: inset 0 -1px 0 rgba(143, 123, 255, 0.1);
+}
+
+.star-trek-app .card .card-body {
+  background: linear-gradient(180deg, rgba(14, 23, 48, 0.88) 0%, rgba(12, 21, 44, 0.92) 100%);
+}
+
+.star-trek-app .card.card-selected {
+  border-color: rgba(143, 123, 255, 0.8);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(143, 123, 255, 0.28);
+}
+
+.star-trek-app .form-control,
+.star-trek-app .form-select,
+.star-trek-app .input-group-text,
+.star-trek-app textarea {
+  background-color: rgba(6, 11, 26, 0.75);
+  color: var(--st-text);
+  border-color: rgba(138, 215, 255, 0.4);
+}
+
+.star-trek-app .form-control::placeholder,
+.star-trek-app textarea::placeholder {
+  color: var(--st-muted);
+}
+
+.star-trek-app .form-control:focus,
+.star-trek-app .form-select:focus,
+.star-trek-app textarea:focus {
+  border-color: rgba(138, 215, 255, 0.8);
+  box-shadow: 0 0 0 0.2rem rgba(138, 215, 255, 0.2);
+  background-color: rgba(6, 11, 26, 0.85);
+  color: var(--st-text);
+}
+
+.star-trek-app .btn-primary {
+  background: linear-gradient(120deg, #f28b2e, #ffb35f);
+  border-color: #f28b2e;
+  color: #201100;
+}
+
+.star-trek-app .btn-primary:hover,
+.star-trek-app .btn-primary:focus {
+  background: linear-gradient(120deg, #ffaa56, #ffc885);
+  border-color: #ffaa56;
+  color: #201100;
+}
+
+.star-trek-app .btn-success {
+  background: linear-gradient(120deg, #3fbf8a, var(--st-success));
+  border-color: #3fbf8a;
+  color: #04190f;
+}
+
+.star-trek-app .btn-outline-secondary {
+  border-color: rgba(138, 215, 255, 0.55);
+  color: var(--st-accent);
+}
+
+.star-trek-app .btn-outline-secondary:hover {
+  background-color: rgba(138, 215, 255, 0.16);
+  color: #dff6ff;
+}
+
+.star-trek-app .table {
+  color: var(--st-text);
+}
+
+.star-trek-app .table thead th {
+  border-color: rgba(255, 159, 64, 0.45);
+  color: #ffd7a8;
+}
+
+.star-trek-app .table td,
+.star-trek-app .table th {
+  border-color: rgba(138, 215, 255, 0.2);
+}
+
+.star-trek-app .table-hover > tbody > tr:hover > * {
+  color: var(--st-text);
+  background-color: rgba(138, 215, 255, 0.1);
+}
+
+.star-trek-app .list-group-item {
+  background: rgba(8, 15, 36, 0.92);
+  color: var(--st-text);
+  border-color: rgba(138, 215, 255, 0.24);
+}
+
+.star-trek-app .progress {
+  background-color: rgba(6, 11, 26, 0.72);
+  border: 1px solid rgba(138, 215, 255, 0.4);
+}
+
+.star-trek-app .progress-bar {
+  background: linear-gradient(90deg, #ff9f40 0%, #ffd08f 100%);
+  color: #2a1700;
+}
+
+.star-trek-app h1,
+.star-trek-app h2,
+.star-trek-app h3,
+.star-trek-app h4,
+.star-trek-app h5,
+.star-trek-app h6 {
+  color: #ffd7a8;
+}
+
+.star-trek-app .text-muted,
+.star-trek-app .small,
+.star-trek-app small {
+  color: var(--st-muted) !important;
+}
+
+.star-trek-app .badge {
+  border-radius: 999px;
+}
+
+.star-trek-app .badge.bg-primary {
+  background: linear-gradient(120deg, #6fa5ff, #8ad7ff) !important;
+  color: #071528;
+  border: 1px solid rgba(138, 215, 255, 0.8);
+}
+
+.star-trek-app .badge.bg-success {
+  background: linear-gradient(120deg, #4cbf8b, #7ce3ab) !important;
+  color: #032214;
+  border: 1px solid rgba(111, 226, 160, 0.9);
+}
+
+.star-trek-app .badge.bg-warning {
+  background: linear-gradient(120deg, #f6bd53, #ffd88e) !important;
+  color: #2d1a00;
+  border: 1px solid rgba(255, 216, 142, 0.95);
+}
+
+.star-trek-app .badge.bg-danger {
+  background: linear-gradient(120deg, #f26b78, #ff9aa4) !important;
+  color: #2a070a;
+  border: 1px solid rgba(255, 154, 164, 0.9);
+}
+
+.star-trek-app .badge.bg-info {
+  background: linear-gradient(120deg, #59c8e6, #8ae6ff) !important;
+  color: #06202b;
+  border: 1px solid rgba(138, 230, 255, 0.95);
+}
+
+.star-trek-app .badge.bg-secondary {
+  background: linear-gradient(120deg, #7d89a7, #a4b0cf) !important;
+  color: #0c1222;
+  border: 1px solid rgba(164, 176, 207, 0.85);
+}
+
+.star-trek-app .badge.bg-dark {
+  background: linear-gradient(120deg, #2b3557, #485b93) !important;
+  color: #e7efff;
+  border: 1px solid rgba(138, 215, 255, 0.45);
+}
+
+.star-trek-app .expandable-card {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.star-trek-app .expandable-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 0;
+}
+
+.star-trek-app .expandable-card-header.is-expanded {
+  border-radius: 8px 8px 0 0;
+}
+
+.star-trek-app .expandable-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.star-trek-app .expandable-card-body {
+  padding: 16px;
+}
+
+.star-trek-app .expandable-metadata,
+.star-trek-app .training-params-panel {
+  background: rgba(8, 15, 36, 0.9);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(138, 215, 255, 0.28);
+}
+
+.star-trek-app .expandable-metadata-grid {
+  font-size: 13px;
+}
+
+.star-trek-app .expandable-metadata-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(138, 215, 255, 0.18);
+}
+
+.star-trek-app .expandable-metadata-key {
+  font-weight: 600;
+  color: var(--st-muted);
+}
+
+.star-trek-app .expandable-metadata-value {
+  color: var(--st-text);
+  text-align: right;
+}
+
+.star-trek-app hr {
+  border-color: rgba(138, 215, 255, 0.3);
+}
+
+.star-trek-app .header-startup-strip {
+  background: rgba(7, 14, 34, 0.82);
+  border-bottom: 1px solid rgba(138, 215, 255, 0.3);
+}
+
+.star-trek-app .header-startup-meta {
+  color: var(--st-muted);
+}
+
+.star-trek-app .header-startup-progress {
+  height: 0.45rem;
+  border: 1px solid rgba(138, 215, 255, 0.35);
+  background-color: rgba(6, 11, 26, 0.8);
+}
+
+.star-trek-app .startup-shell {
+  color: var(--st-text);
+}
+
+.star-trek-app .startup-status-card {
+  border-width: 2px;
+}
+
+.star-trek-app .startup-status-card.is-active {
+  border-color: rgba(255, 193, 7, 0.7);
+}
+
+.star-trek-app .startup-status-card.is-complete {
+  border-color: rgba(40, 167, 69, 0.8);
+}
+
+.star-trek-app .startup-progress-bar {
+  height: 1.9rem;
+  border-radius: 0.5rem;
+  position: relative;
+}
+
+.star-trek-app .startup-progress-native,
+.star-trek-app .header-startup-progress-native,
+.star-trek-app .progressive-progress-native,
+.star-trek-app .status-panel-progress,
+.star-trek-app .prediction-progress,
+.star-trek-app .dashboard-modern-progress,
+.star-trek-app .dashboard-expandable-progress,
+.star-trek-app .training-progress {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  background: transparent;
+}
+
+.star-trek-app .startup-progress-native,
+.star-trek-app .header-startup-progress-native {
+  height: 100%;
+}
+
+.star-trek-app .progressive-progress-native,
+.star-trek-app .status-panel-progress,
+.star-trek-app .prediction-progress,
+.star-trek-app .dashboard-modern-progress,
+.star-trek-app .dashboard-expandable-progress,
+.star-trek-app .training-progress {
+  height: 0.75rem;
+}
+
+.star-trek-app .startup-progress-native::-webkit-progress-bar,
+.star-trek-app .header-startup-progress-native::-webkit-progress-bar,
+.star-trek-app .progressive-progress-native::-webkit-progress-bar,
+.star-trek-app .status-panel-progress::-webkit-progress-bar,
+.star-trek-app .prediction-progress::-webkit-progress-bar,
+.star-trek-app .dashboard-modern-progress::-webkit-progress-bar,
+.star-trek-app .dashboard-expandable-progress::-webkit-progress-bar,
+.star-trek-app .training-progress::-webkit-progress-bar {
+  background: rgba(7, 14, 34, 0.72);
+  border-radius: 999px;
+}
+
+.star-trek-app .startup-progress-native::-webkit-progress-value,
+.star-trek-app .header-startup-progress-native::-webkit-progress-value,
+.star-trek-app .progressive-progress-native::-webkit-progress-value,
+.star-trek-app .status-panel-progress::-webkit-progress-value,
+.star-trek-app .prediction-progress::-webkit-progress-value,
+.star-trek-app .dashboard-modern-progress::-webkit-progress-value,
+.star-trek-app .dashboard-expandable-progress::-webkit-progress-value,
+.star-trek-app .training-progress::-webkit-progress-value {
+  background: linear-gradient(90deg, #ff9f40 0%, #ffd08f 100%);
+  border-radius: 999px;
+}
+
+.star-trek-app .startup-progress-native::-moz-progress-bar,
+.star-trek-app .header-startup-progress-native::-moz-progress-bar,
+.star-trek-app .progressive-progress-native::-moz-progress-bar,
+.star-trek-app .status-panel-progress::-moz-progress-bar,
+.star-trek-app .prediction-progress::-moz-progress-bar,
+.star-trek-app .dashboard-modern-progress::-moz-progress-bar,
+.star-trek-app .dashboard-expandable-progress::-moz-progress-bar,
+.star-trek-app .training-progress::-moz-progress-bar {
+  background: linear-gradient(90deg, #ff9f40 0%, #ffd08f 100%);
+  border-radius: 999px;
+}
+
+.star-trek-app .header-startup-progress-native.is-complete::-webkit-progress-value,
+.star-trek-app .startup-progress-native.is-complete::-webkit-progress-value,
+.star-trek-app .header-startup-progress-native.is-complete::-moz-progress-bar,
+.star-trek-app .startup-progress-native.is-complete::-moz-progress-bar {
+  background: linear-gradient(90deg, #2faa6a 0%, #7ad9a7 100%);
+}
+
+.star-trek-app .header-startup-progress-native.is-active::-webkit-progress-value,
+.star-trek-app .header-startup-progress-native.is-active::-moz-progress-bar {
+  background: linear-gradient(90deg, #f7c354 0%, #ffd88e 100%);
+}
+
+.star-trek-app .startup-progress-overlay,
+.star-trek-app .progressive-progress-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #201100;
+  pointer-events: none;
+}
+
+.star-trek-app .startup-game-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 215, 255, 0.4);
+  background: rgba(8, 16, 38, 0.8);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.star-trek-app .startup-game-pill.status-completed { border-color: rgba(40, 167, 69, 0.75); }
+.star-trek-app .startup-game-pill.status-ingesting { border-color: rgba(255, 193, 7, 0.75); }
+.star-trek-app .startup-game-pill.status-failed { border-color: rgba(220, 53, 69, 0.75); }
+.star-trek-app .startup-game-pill.status-pending { border-color: rgba(138, 215, 255, 0.45); }
+
+.star-trek-app .startup-status-col { width: 80px; }
+
+.star-trek-app .ingestion-progress-panel {
+  padding: 16px;
+  border: 2px solid rgba(138, 215, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(8, 15, 36, 0.85);
+}
+
+.star-trek-app .ingestion-progress-panel.is-active { border-color: rgba(255, 193, 7, 0.7); }
+.star-trek-app .ingestion-progress-panel.is-complete { border-color: rgba(40, 167, 69, 0.75); }
+.star-trek-app .ingestion-progress-panel.is-error { border-color: rgba(220, 53, 69, 0.75); }
+
+.star-trek-app .ingestion-progress-title {
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.star-trek-app .ingestion-progress-alert { margin-bottom: 12px; padding: 8px; }
+
+.star-trek-app .progressive-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.star-trek-app .progressive-progress-label { font-weight: 600; font-size: 14px; }
+.star-trek-app .progressive-progress-label-primary { color: #9dc7ff; }
+.star-trek-app .progressive-progress-label-success { color: #85e3b0; }
+.star-trek-app .progressive-progress-label-warning { color: #ffd88e; }
+.star-trek-app .progressive-progress-label-info { color: #8ad7ff; }
+.star-trek-app .progressive-progress-label-danger { color: #ff9f9f; }
+.star-trek-app .progressive-progress-label-secondary { color: var(--st-muted); }
+.star-trek-app .progressive-progress-label-dark { color: #ffd7a8; }
+
+.star-trek-app .progressive-progress-percent {
+  font-size: 13px;
+  color: var(--st-muted);
+}
+
+.star-trek-app .progressive-progress-track {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.star-trek-app .progressive-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--st-muted);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.star-trek-app .status-panel-progress-wrap,
+.star-trek-app .prediction-progress-wrap,
+.star-trek-app .dashboard-modern-progress-wrap,
+.star-trek-app .dashboard-expandable-progress-wrap,
+.star-trek-app .training-progress-wrap {
+  width: 100%;
+}
+
+.star-trek-app .app-error-message {
+  border: 1px solid rgba(220, 53, 69, 0.7);
+}
+
+.star-trek-app .startup-game-pill.is-current {
+  background: rgba(138, 215, 255, 0.16);
+}
+
+.star-trek-app .startup-status-table thead tr {
+  background: rgba(138, 215, 255, 0.12);
+}
+
+.star-trek-app .startup-status-table td,
+.star-trek-app .startup-status-table th {
+  color: var(--st-text);
+}
+
+.star-trek-app .startup-status-table .startup-current-row {
+  background: rgba(138, 215, 255, 0.08);
+}
+
+.star-trek-app .startup-complete-banner {
+  border: 1px solid rgba(40, 167, 69, 0.55);
+}

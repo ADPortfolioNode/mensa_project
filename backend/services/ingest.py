@@ -5,7 +5,7 @@ import signal
 import os
 import re
 from functools import wraps
-from config import DATASET_ENDPOINTS
+from config import DATASET_ENDPOINTS, GAME_TITLES, GAME_ALIASES, resolve_game_key
 from chromadb.utils import embedding_functions
 
 class TimeoutError(Exception):
@@ -37,22 +37,19 @@ def with_timeout(seconds):
 
 class IngestService:
     def __init__(self):
-        self.request_timeout = 30  # 30 second timeout per request
-        self.max_retries = 3
-        self.retry_delay = 2  # seconds
-        self.batch_size = int(os.getenv("INGEST_BATCH_SIZE", "500"))
+        self.request_timeout = int(os.getenv("INGEST_REQUEST_TIMEOUT", "20"))
+        self.max_retries = int(os.getenv("INGEST_MAX_RETRIES", "2"))
+        self.retry_delay = int(os.getenv("INGEST_RETRY_DELAY", "1"))
+        self.batch_size = int(os.getenv("INGEST_BATCH_SIZE", "4000"))
         self.use_upsert = os.getenv("INGEST_USE_UPSERT", "1") != "0"
+        self.enable_catalog_fallback = os.getenv("INGEST_ENABLE_CATALOG_FALLBACK", "1") == "1"
+        self.fallback_on_empty = os.getenv("INGEST_FALLBACK_ON_EMPTY", "1") == "1"
+        self.max_catalog_candidates = int(os.getenv("INGEST_MAX_CATALOG_CANDIDATES", "3"))
         self.socrata_catalog_url = os.getenv("SOCRATA_CATALOG_URL", "https://api.us.socrata.com/api/catalog/v1")
         self.socrata_domain = os.getenv("SOCRATA_DOMAIN", "data.ny.gov")
         self.game_search_hints = {
-            "take5": "take 5 lottery",
-            "pick3": "pick 3 lottery",
-            "powerball": "powerball lottery",
-            "megamillions": "mega millions lottery",
-            "pick10": "pick 10 lottery",
-            "cash4life": "cash4life lottery",
-            "quickdraw": "quick draw lottery",
-            "nylotto": "new york lotto lottery",
+            key: f"new york {GAME_TITLES.get(key, key)} lottery"
+            for key in DATASET_ENDPOINTS.keys()
         }
 
     def _normalize_text(self, value: str) -> str:
@@ -90,8 +87,11 @@ class IngestService:
 
     def _fetch_catalog_endpoints(self, game: str):
         """Discover fallback dataset endpoints from Socrata catalog for a game."""
-        hint = self.game_search_hints.get(game, game)
-        query = f"new york lottery {hint}"
+        if not self.enable_catalog_fallback:
+            return []
+
+        hint = self.game_search_hints.get(game, GAME_TITLES.get(game, game))
+        query = hint
 
         try:
             response = requests.get(
@@ -111,7 +111,13 @@ class IngestService:
             print(f"⚠ Catalog lookup failed for {game}: {exc}")
             return []
 
-        game_token = self._normalize_text(game).replace(" ", "")
+        game_tokens = set(self._normalize_text(GAME_TITLES.get(game, game)).split())
+        alias_tokens = {
+            token
+            for alias in GAME_ALIASES.get(game, [])
+            for token in self._normalize_text(alias).split()
+        }
+        all_expected_tokens = {token for token in (game_tokens | alias_tokens) if token and token != "lottery"}
         ranked = []
 
         for item in results:
@@ -127,7 +133,11 @@ class IngestService:
             score = 0
             if "lottery" in combined:
                 score += 3
-            if game_token and game_token in combined.replace(" ", ""):
+            token_hits = sum(1 for token in all_expected_tokens if token in combined)
+            if token_hits > 0:
+                score += min(token_hits, 4)
+            compact_expected = self._normalize_text(GAME_TITLES.get(game, game)).replace(" ", "")
+            if compact_expected and compact_expected in combined.replace(" ", ""):
                 score += 5
             if "new york" in combined:
                 score += 2
@@ -150,11 +160,23 @@ class IngestService:
             deduped_endpoints.append(endpoint)
             print(f"  ↳ Catalog candidate for {game}: {title} -> {endpoint}")
 
+            if len(deduped_endpoints) >= self.max_catalog_candidates:
+                break
+
         return deduped_endpoints
 
     def _resolve_game_endpoints(self, game: str):
         configured = DATASET_ENDPOINTS.get(game, [])
+
+        # Fast path: use known configured datasets by default.
+        # Catalog fallback is opt-in and primarily for recovery when configured endpoints are missing.
+        if configured and not self.enable_catalog_fallback:
+            return configured
+
         catalog_candidates = self._fetch_catalog_endpoints(game)
+
+        if configured and not catalog_candidates:
+            return configured
 
         ordered = []
         seen = set()
@@ -165,62 +187,31 @@ class IngestService:
             ordered.append(endpoint)
 
         return ordered
-    
-    def fetch_and_sync(self, game: str, progress_callback=None):
-        """
-        Fetch game data and sync to ChromaDB in batches.
-        
-        Args:
-            game: Game name
-            progress_callback: Optional callback function(rows_fetched, total_rows) for progress tracking
-        """
-        endpoints = self._resolve_game_endpoints(game)
-        if not endpoints:
-            raise ValueError(
-                f"Game '{game}' endpoint not found in configured datasets or Socrata catalog. "
-                f"Available configured games: {list(DATASET_ENDPOINTS.keys())}"
-            )
-        total_rows_processed = 0
-        column_names = []
+
+    def _process_endpoints(self, game: str, endpoints: list[str], collection, column_names: list[str],
+                           total_rows_processed: int, progress_callback=None):
+        """Process a list of endpoints and return (rows_added, updated_column_names)."""
         batch_size = self.batch_size
-
-        collection_name = game
-        # Use default embedding function to avoid dimension mismatch
-        default_ef = embedding_functions.DefaultEmbeddingFunction()
-        
-        # Lazy import to avoid ChromaDB connection during module import
-        from .chroma_client import chroma_client
-        
-        try:
-            collection = chroma_client.client.get_or_create_collection(
-                name=collection_name,
-                embedding_function=default_ef
-            )
-            print(f"✓ Connected to collection '{collection_name}'")
-        except Exception as conn_error:
-            raise Exception(f"Failed to connect to ChromaDB collection '{collection_name}': {str(conn_error)}")
-
-        # Estimate total rows for progress reporting, assuming 1000 per endpoint as a rough guess
-        estimated_total_rows = len(endpoints) * 1000 
+        rows_before = total_rows_processed
+        discovered_total_rows = 0
 
         for endpoint_idx, endpoint in enumerate(endpoints):
             success = False
             last_error = None
-            
+
             print(f"[{game.upper()}] Endpoint {endpoint_idx + 1}/{len(endpoints)}: {endpoint}")
-            
+
             for attempt in range(self.max_retries):
                 try:
                     print(f"  Fetching from {endpoint} (attempt {attempt + 1}/{self.max_retries})...")
                     response = requests.get(endpoint, timeout=self.request_timeout)
                     response.raise_for_status()
-                    
-                    # Validate response content
+
                     if not response.content:
                         last_error = "Empty response received"
                         print(f"  ⚠ {last_error}")
                         break
-                    
+
                     try:
                         data = response.json()
                     except ValueError as json_error:
@@ -228,7 +219,7 @@ class IngestService:
                         print(f"  ⚠ {last_error}")
                         print(f"  Response preview: {response.text[:200]}")
                         break
-                    
+
                     fetched_rows, extracted_columns = self._extract_rows_and_columns(data)
 
                     if not column_names and extracted_columns:
@@ -242,11 +233,12 @@ class IngestService:
                         success = True
                         break
 
+                    discovered_total_rows += len(fetched_rows)
                     print(f"  ✓ Fetched {len(fetched_rows)} rows. Processing in batches of {batch_size}...")
 
                     for j in range(0, len(fetched_rows), batch_size):
                         batch = fetched_rows[j:j + batch_size]
-                        
+
                         try:
                             metadatas = []
                             ids = []
@@ -267,7 +259,7 @@ class IngestService:
                                     continue
                                 metadatas.append(metadata_item)
                                 ids.append(hashlib.md5(str(row).encode()).hexdigest())
-                            
+
                             documents = [str(item) for item in metadatas]
 
                             if ids:
@@ -283,26 +275,25 @@ class IngestService:
                                         metadatas=metadatas,
                                         ids=ids
                                     )
-                            
+
                             total_rows_processed += len(batch)
                             if progress_callback:
-                                # Report progress based on estimated total
-                                progress_callback(total_rows_processed, estimated_total_rows)
+                                total_for_progress = max(discovered_total_rows, total_rows_processed - rows_before, 1)
+                                progress_callback(total_rows_processed, rows_before + total_for_progress)
                         except Exception as batch_error:
                             print(f"  ⚠ Error processing batch {j}-{j+len(batch)}: {str(batch_error)}")
-                            # Continue with next batch instead of failing completely
                             continue
 
                     print(f"  ✓ Processed and stored {len(fetched_rows)} rows from endpoint.")
                     success = True
                     break
-                    
+
                 except requests.Timeout:
                     last_error = f"Request timeout after {self.request_timeout}s"
                     print(f"  ⚠ {last_error}")
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay * (2 ** attempt))
-                        
+
                 except requests.RequestException as req_error:
                     last_error = f"Request error: {str(req_error)}"
                     print(f"  ⚠ {last_error}")
@@ -316,16 +307,114 @@ class IngestService:
                     import traceback
                     traceback.print_exc()
                     break
-            
+
             if not success and last_error:
                 print(f"  ✗ Failed to fetch from endpoint: {last_error}")
-                # Don't raise, just continue with next endpoint
                 continue
 
-        if total_rows_processed == 0:
-            raise Exception(f"No data was successfully ingested for game '{game}'. Check backend logs for details.")
+        return total_rows_processed - rows_before, column_names
+    
+    def fetch_and_sync(self, game: str, progress_callback=None, force: bool = False):
+        """
+        Fetch game data and sync to ChromaDB in batches.
         
-        print(f"✓ [{game.upper()}] Ingestion complete: {total_rows_processed} total rows processed")
-        return {"status": "success", "added": total_rows_processed, "total": total_rows_processed}
+        Args:
+            game: Game name
+            progress_callback: Optional callback function(rows_fetched, total_rows) for progress tracking
+        """
+        game_key = resolve_game_key(game)
+        if not game_key:
+            raise ValueError(
+                f"Unknown game '{game}'. Available configured games: {list(DATASET_ENDPOINTS.keys())}"
+            )
+
+        endpoints = self._resolve_game_endpoints(game_key)
+        if not endpoints:
+            raise ValueError(
+                f"Game '{game_key}' endpoint not found in configured datasets or Socrata catalog. "
+                f"Available configured games: {list(DATASET_ENDPOINTS.keys())}"
+            )
+        total_rows_processed = 0
+        column_names = []
+
+        collection_name = game_key
+        # Use default embedding function to avoid dimension mismatch
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+        
+        # Lazy import to avoid ChromaDB connection during module import
+        from .chroma_client import chroma_client
+        
+        try:
+            collection = chroma_client.client.get_or_create_collection(
+                name=collection_name,
+                embedding_function=default_ef
+            )
+            print(f"✓ Connected to collection '{collection_name}'")
+        except Exception as conn_error:
+            raise Exception(f"Failed to connect to ChromaDB collection '{collection_name}': {str(conn_error)}")
+
+        existing_count = collection.count()
+        if existing_count > 0 and not force:
+            print(
+                f"↷ [{game_key.upper()}] Skipping ingest: {existing_count} records already exist "
+                f"(use force=True to reload)."
+            )
+            if progress_callback:
+                progress_callback(existing_count, existing_count)
+            return {
+                "status": "success",
+                "added": 0,
+                "total": existing_count,
+                "processed": 0,
+                "skipped_existing": True,
+            }
+
+        rows_added, column_names = self._process_endpoints(
+            game=game_key,
+            endpoints=endpoints,
+            collection=collection,
+            column_names=column_names,
+            total_rows_processed=total_rows_processed,
+            progress_callback=progress_callback,
+        )
+        total_rows_processed += rows_added
+
+        if rows_added == 0 and self.fallback_on_empty:
+            print(f"⚠ [{game_key.upper()}] No rows from configured endpoints; trying catalog fallback candidates...")
+            fallback_endpoints = self._fetch_catalog_endpoints(game_key)
+            configured_set = set(endpoints)
+            fallback_endpoints = [ep for ep in fallback_endpoints if ep not in configured_set]
+
+            if fallback_endpoints:
+                fallback_added, column_names = self._process_endpoints(
+                    game=game_key,
+                    endpoints=fallback_endpoints,
+                    collection=collection,
+                    column_names=column_names,
+                    total_rows_processed=total_rows_processed,
+                    progress_callback=progress_callback,
+                )
+                total_rows_processed += fallback_added
+
+        if total_rows_processed == 0:
+            raise Exception(f"No data was successfully ingested for game '{game_key}'. Check backend logs for details.")
+
+        if progress_callback:
+            progress_callback(total_rows_processed, total_rows_processed)
+        
+        final_total = collection.count()
+        net_added = max(final_total - existing_count, 0)
+
+        print(
+            f"✓ [{game_key.upper()}] Ingestion complete: processed={total_rows_processed}, "
+            f"net_added={net_added}, total={final_total}"
+        )
+        return {
+            "status": "success",
+            "added": net_added,
+            "total": final_total,
+            "processed": total_rows_processed,
+            "skipped_existing": False,
+        }
 
 ingest_service = IngestService()

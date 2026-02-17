@@ -2,6 +2,7 @@ import os
 import re
 import numpy as np
 import joblib
+from config import GAME_PREDICTION_FORMATS
 
 class PredictorService:
     def __init__(self):
@@ -29,6 +30,64 @@ class PredictorService:
                     break
 
         return self._parse_numbers(winning_value)
+
+    def _clamp_number(self, value, minimum, maximum):
+        parsed = int(np.round(value))
+        return max(minimum, min(maximum, parsed))
+
+    def _ensure_unique(self, values, minimum, maximum):
+        used = set()
+        unique_values = []
+        span = (maximum - minimum) + 1
+
+        for value in values:
+            candidate = value
+            for _ in range(span):
+                if candidate not in used:
+                    break
+                candidate = minimum + ((candidate - minimum + 1) % span)
+            used.add(candidate)
+            unique_values.append(candidate)
+
+        return unique_values
+
+    def _format_prediction(self, game: str, raw_numbers):
+        format_spec = GAME_PREDICTION_FORMATS.get(game, {})
+        main_count = int(format_spec.get("main_count", len(raw_numbers) or 0))
+        bonus_count = int(format_spec.get("bonus_count", 0))
+        total_count = main_count + bonus_count
+
+        normalized = list(raw_numbers or [])
+        if len(normalized) < total_count:
+            normalized.extend([0] * (total_count - len(normalized)))
+        if total_count > 0:
+            normalized = normalized[:total_count]
+
+        main_min = int(format_spec.get("main_min", 0))
+        main_max = int(format_spec.get("main_max", 99))
+        bonus_min = int(format_spec.get("bonus_min", main_min))
+        bonus_max = int(format_spec.get("bonus_max", main_max))
+
+        main_values = [self._clamp_number(value, main_min, main_max) for value in normalized[:main_count]]
+        if format_spec.get("unique_main", False):
+            main_values = self._ensure_unique(main_values, main_min, main_max)
+        if format_spec.get("sort_main", False):
+            main_values = sorted(main_values)
+
+        bonus_values = [
+            self._clamp_number(value, bonus_min, bonus_max)
+            for value in normalized[main_count:main_count + bonus_count]
+        ]
+
+        formatted = {
+            "main_numbers": main_values,
+            "bonus_numbers": bonus_values,
+            "main_label": format_spec.get("main_label", "Numbers"),
+            "bonus_label": format_spec.get("bonus_label", "Bonus"),
+            "has_bonus": bonus_count > 0,
+        }
+
+        return formatted, main_values + bonus_values
 
     def predict_next_draw(self, game: str, recent_k: int = 10):
         # Lazy import to avoid ChromaDB connection during module import
@@ -74,11 +133,13 @@ class PredictorService:
         
         # Round to nearest integers
         predicted_numbers = [max(0, int(np.round(value))) for value in prediction]
+        formatted_prediction, normalized_flat = self._format_prediction(game, predicted_numbers)
         
         return {
             "status": "success",
             "game": game,
-            "predicted_numbers": predicted_numbers,
+            "predicted_numbers": normalized_flat,
+            "formatted_prediction": formatted_prediction,
         }
 
     def predict_all_games(self, games, recent_k: int = 10):

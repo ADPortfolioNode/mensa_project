@@ -15,8 +15,16 @@ services:
       - MAX_CONCURRENT_CLONES=3
       - CHROMA_SDK_ENABLED=1
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CHAT_GPT_API_KEY=${CHAT_GPT_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - CHROMA_HOST=mensa_chroma
       - CHROMA_PORT=8000
+      - INGEST_BATCH_SIZE=4000
+      - INGEST_REQUEST_TIMEOUT=20
+      - INGEST_MAX_RETRIES=2
+      - INGEST_RETRY_DELAY=1
+      - INGEST_ENABLE_CATALOG_FALLBACK=0
+      - INGEST_MAX_CATALOG_CANDIDATES=3
     depends_on:
       chroma:
         condition: service_started

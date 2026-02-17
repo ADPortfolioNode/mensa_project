@@ -49,7 +49,7 @@ export default function GamePrediction({ game }) {
       </div>
       {loading && (
         <div className="progress">
-          <div className="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style={{ width: '100%' }}></div>
+          <div className="progress-bar progress-bar-striped progress-bar-animated w-100" role="progressbar"></div>
         </div>
       )}
       {error && !loading && (

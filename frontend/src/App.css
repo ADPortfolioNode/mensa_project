@@ -1,64 +1,18 @@
-body {
-  font-family: 'Segoe UI', 'Inter', 'Roboto', sans-serif;
-  background: #000;
-  color: #e7ffe7;
-}
-
 .text-neon {
-  color: #39ff14 !important;
-  text-shadow: 0 0 6px rgba(57, 255, 20, 0.65), 0 0 14px rgba(57, 255, 20, 0.4);
+  color: #ffd7a8 !important;
+  text-shadow: 0 0 8px rgba(255, 159, 64, 0.4), 0 0 18px rgba(138, 215, 255, 0.25);
 }
 
 .border-neon {
-  border-color: #39ff14 !important;
+  border-color: rgba(255, 159, 64, 0.7) !important;
 }
 
 .card {
-  background: #ffffff;
-  color: #141414;
-  border: 1px solid rgba(57, 255, 20, 0.45);
-  border-radius: 12px;
-  box-shadow: 0 0 10px rgba(57, 255, 20, 0.45), 0 0 24px rgba(57, 255, 20, 0.2);
   transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
 .card.card-selected {
-  box-shadow: 0 0 10px rgba(170, 170, 170, 0.55), 0 0 24px rgba(120, 120, 120, 0.35);
-  border-color: rgba(150, 150, 150, 0.9);
-}
-
-.card .card-header {
-  background: #ffffff;
-  border-bottom: 1px solid rgba(57, 255, 20, 0.2);
-}
-
-.form-control,
-.form-select {
-  background: #ffffff;
-  color: #141414;
-  border: 1px solid rgba(57, 255, 20, 0.55);
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: #39ff14;
-  box-shadow: 0 0 0 0.2rem rgba(57, 255, 20, 0.2);
-}
-
-.btn-primary,
-.btn-success {
-  box-shadow: 0 0 8px rgba(57, 255, 20, 0.35);
-}
-
-.btn-outline-secondary {
-  border-color: #8a8a8a;
-  color: #3a3a3a;
-}
-
-.alert-info {
-  background: #f3fff0;
-  color: #114111;
-  border-color: rgba(57, 255, 20, 0.5);
+  box-shadow: 0 0 0 2px rgba(138, 215, 255, 0.4), 0 10px 26px rgba(0, 0, 0, 0.38);
 }
 
 .overflow-auto::-webkit-scrollbar {
@@ -66,10 +20,10 @@ body {
 }
 
 .overflow-auto::-webkit-scrollbar-track {
-  background: #111;
+  background: rgba(5, 11, 26, 0.7);
 }
 
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: #39ff14;
+  background: linear-gradient(180deg, #ff9f40, #8ad7ff);
   border-radius: 4px;
 }

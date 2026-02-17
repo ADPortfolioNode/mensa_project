@@ -89,23 +89,15 @@ export default function ChromaStatusPanel() {
 
     return (
         <div className="card p-3 mb-3 h-100">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h5 style={{ margin: 0 }}>ChromaDB Collections Status</h5>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="mb-0">ChromaDB Collections Status</h5>
                 {refreshing && !loading && !error && (
-                    <span style={{ fontSize: '12px', color: '#6c757d' }}>Refreshing...</span>
+                    <span className="small text-muted">Refreshing...</span>
                 )}
                 {error && (
                     <button 
                         onClick={() => fetchChromaStatus(apiBase, { silent: false })}
-                        style={{
-                            padding: '4px 8px',
-                            fontSize: '12px',
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer'
-                        }}
+                        className="btn btn-primary btn-sm"
                     >
                         Retry
                     </button>
@@ -120,20 +112,20 @@ export default function ChromaStatusPanel() {
                 </div>
             )}
             {error && collections.length === 0 && (
-                <div className="alert alert-danger" style={{ marginBottom: 0 }}>
+                <div className="alert alert-danger mb-0">
                     <strong>Error:</strong> {error}
                 </div>
             )}
             {error && collections.length > 0 && (
-                <div className="alert alert-warning" style={{ marginBottom: '12px' }}>
+                <div className="alert alert-warning mb-3">
                     <strong>Warning:</strong> {error} Showing last known collections.
                 </div>
             )}
             {!loading && !error && collections.length === 0 && (
-                <p style={{ color: '#6c757d' }}>No ChromaDB collections found. Run ingestion to populate.</p>
+                <p className="text-muted">No ChromaDB collections found. Run ingestion to populate.</p>
             )}
             {meta && (
-                <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '8px' }}>
+                <div className="small text-muted mb-2">
                     Record index: {meta.record_index_basis || 'configured order'}
                 </div>
             )}
@@ -141,11 +133,11 @@ export default function ChromaStatusPanel() {
                 <ul className="list-group list-group-flush">
                     {collections.map((collection, index) => (
                         <li key={`${collection.name}-${index}`} className="list-group-item d-flex justify-content-between align-items-center">
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontWeight: 'bold' }}>{collection.name.toUpperCase()}</span>
-                                <small style={{ color: '#6c757d' }}>Index #{collection.record_index || (index + 1)}</small>
+                            <div className="d-flex flex-column">
+                                <span className="fw-bold">{collection.name.toUpperCase()}</span>
+                                <small className="text-muted">Index #{collection.record_index || (index + 1)}</small>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div className="d-flex align-items-center gap-2">
                                 {(collection.state === 'timeout' || collection.state === 'error') && (
                                     <span className="badge bg-warning text-dark rounded-pill">{collection.state}</span>
                                 )}

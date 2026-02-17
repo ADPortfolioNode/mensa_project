@@ -6,15 +6,8 @@ const ErrorMessage = ({ errorReport }) => {
     }
 
     return (
-        <div style={{
-            backgroundColor: '#ffdddd',
-            border: '1px solid #f44336',
-            color: '#f44336',
-            padding: '15px',
-            margin: '20px 0',
-            borderRadius: '5px'
-        }}>
-            <h4 style={{ marginTop: 0 }}>{errorReport.title}</h4>
+        <div className="alert alert-danger my-3 app-error-message">
+            <h4 className="mt-0">{errorReport.title}</h4>
             <p><strong>Details:</strong> {errorReport.originalError}</p>
             <p><strong>Suggestions:</strong></p>
             <ul>

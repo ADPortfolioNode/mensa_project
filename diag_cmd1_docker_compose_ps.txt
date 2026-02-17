@@ -1,0 +1,12 @@
+﻿docker : request returned 500 Internal Server Error for API route and version h
+ttp://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.51/containers/json?filters=%
+7B%22label%22%3A%7B%22com.docker.compose.config-hash%22%3Atrue%2C%22com.docker.
+compose.oneoff%3DFalse%22%3Atrue%2C%22com.docker.compose.project%3Dmensa_projec
+t%22%3Atrue%7D%7D, check if the server supports the requested API version
+At line:1 char:1
++ docker compose ps *>&1 | Out-File -FilePath diag_cmd1_docker_compose_ ...
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (request returne...ted API version 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

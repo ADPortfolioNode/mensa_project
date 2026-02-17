@@ -15,8 +15,8 @@ export default function TrainingCard({ trainStatus, trainProgress, iterations, a
         <div className="training-status">
           <span className={`status-badge ${trainStatus}`}>{trainStatus}</span>
           {trainStatus === 'in progress' && (
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${trainProgress}%` }}></div>
+            <div className="training-progress-wrap">
+              <progress className="training-progress" value={trainProgress} max="100" />
             </div>
           )}
         </div>

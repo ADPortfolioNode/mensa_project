@@ -247,8 +247,8 @@ export default function Dashboard() {
 
             {trainStatus === 'in progress' && (
               <div className="form-group">
-                <div className="progress">
-                  <div className="progress-bar" style={{ width: `${trainProgress}%` }}></div>
+                <div className="dashboard-modern-progress-wrap">
+                  <progress className="dashboard-modern-progress" value={trainProgress} max="100" />
                 </div>
                 <small>{trainProgress}%</small>
               </div>

@@ -24,7 +24,8 @@ class RAGService:
         self, 
         user_query: str, 
         game: str = None,
-        use_all_games: bool = False
+        use_all_games: bool = False,
+        lm_client=None,
     ) -> dict:
         """
         Query using RAG pattern:
@@ -55,8 +56,9 @@ class RAGService:
         # Step 3: Build augmented prompt
         augmented_prompt = self._build_augmented_prompt(user_query, context_text)
         
-        # Step 4: Generate response with Gemini
-        response_text = await self.gemini_client.generate_text(augmented_prompt)
+        # Step 4: Generate response with configured LM client
+        active_lm_client = lm_client or self.gemini_client
+        response_text = await active_lm_client.generate_text(augmented_prompt)
         
         return {
             "response": response_text,

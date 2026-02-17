@@ -6,8 +6,13 @@
 node_modules
 .DS_Store
 
-# Ignore build artifacts when building in-container; keep `build/` available if present
-# To use the prebuilt copy approach, ensure `build/` is present and not excluded.
+# Ignore generated build artifacts/logs to keep Docker context small and stable
+build
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Ignore IDE and OS files
 .vscode

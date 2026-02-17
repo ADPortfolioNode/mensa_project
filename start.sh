@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+# cspell:ignore BUILDKIT BuildKit gtimeout healthcheck
 # === Mensa Project Robust Start Script ===
 # Performs a safe reset and robust startup for development.
-# Usage: ./start.sh [--prune] [--yes] [--no-ingest-wait] [--build] [--diag]
-#   --prune          : run `docker system prune -a -f` and `docker volume prune -f` before starting
+# Usage: ./start.sh [--prune|--purge] [--yes] [--no-ingest-wait] [--build] [--diag]
+#   --prune|--purge  : run `docker system prune -a -f` and `docker volume prune -f` before starting
 #   --yes            : auto-confirm prune (implies --prune)
 #   --no-ingest-wait : start containers but do not wait for data ingestion to complete.
 #   --build          : force a rebuild of the docker images
-#             : run a diagnostic-only startup, logging all output to 'diag_output.log'
+#   --diag           : run a diagnostic-only startup, logging all output to 'diag_output.log'
 
 # --- Helper Functions ---
 
@@ -192,10 +193,32 @@ run_compose_up_with_retries() {
 run_compose_with_timeout() {
     local seconds="$1"
     shift
-    if command -v timeout >/dev/null 2>&1; then
+    local cmd_preview="$*"
+    if command -v timeout >/dev/null 2>&1 && timeout --version 2>/dev/null | grep -qi "coreutils"; then
         timeout "${seconds}"s "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "${seconds}"s "$@"
     else
-        "$@"
+        "$@" &
+        local cmd_pid=$!
+        local elapsed=0
+
+        while kill -0 "${cmd_pid}" 2>/dev/null; do
+            if [ "${elapsed}" -gt 0 ] && [ $((elapsed % 10)) -eq 0 ]; then
+                echo "... still waiting (${elapsed}s/${seconds}s): ${cmd_preview}"
+            fi
+            if [ "${elapsed}" -ge "${seconds}" ]; then
+                kill -TERM "${cmd_pid}" 2>/dev/null || true
+                sleep 2
+                kill -KILL "${cmd_pid}" 2>/dev/null || true
+                wait "${cmd_pid}" 2>/dev/null || true
+                return 124
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+
+        wait "${cmd_pid}"
     fi
 }
 
@@ -234,13 +257,13 @@ DIAG_RUN=false
 
 while [[ ${#} -gt 0 ]]; do
     case "$1" in
-        --prune) PRUNE=true; shift ;;
+        --prune|--purge) PRUNE=true; shift ;;
         --yes) PRUNE=true; AUTOMATIC_YES=true; shift ;;
         --no-ingest-wait) WAIT_FOR_INGEST=false; shift ;;
         --build) BUILD=true; shift ;;
         --diag) DIAG_RUN=true; shift ;;
-        -h|--help) echo "Usage: $0 [--prune] [--yes] [--no-ingest-wait] [--build] [--diag]"; exit 0 ;;
-        *) echo "Unknown arg: $1"; echo "Usage: $0 [--prune] [--yes] [--no-ingest-wait] [--build] [--diag]"; exit 2 ;;
+        -h|--help) echo "Usage: $0 [--prune|--purge] [--yes] [--no-ingest-wait] [--build] [--diag]"; exit 0 ;;
+        *) echo "Unknown arg: $1"; echo "Usage: $0 [--prune|--purge] [--yes] [--no-ingest-wait] [--build] [--diag]"; exit 2 ;;
     esac
 done
 

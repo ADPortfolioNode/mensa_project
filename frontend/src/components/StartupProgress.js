@@ -11,15 +11,45 @@ const StartupProgress = ({ onComplete }) => {
     const [isStarting, setIsStarting] = useState(false);
     const transientErrorCountRef = useRef(0);
 
+    const getStartupStatus = async () => {
+        const apiBase = getApiBase();
+        const primaryUrl = `${apiBase}/api/startup_status`;
+        const fallbackUrl = apiBase
+            ? null
+            : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_status`;
+
+        try {
+            return await axios.get(primaryUrl, { timeout: 10000 });
+        } catch (primaryError) {
+            if (!fallbackUrl) throw primaryError;
+            return axios.get(fallbackUrl, { timeout: 10000 });
+        }
+    };
+
+    const postStartupInit = async () => {
+        const apiBase = getApiBase();
+        const primaryUrl = `${apiBase}/api/startup_init`;
+        const fallbackUrl = apiBase
+            ? null
+            : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_init`;
+
+        try {
+            return await axios.post(primaryUrl, null, { timeout: 10000 });
+        } catch (primaryError) {
+            if (!fallbackUrl) throw primaryError;
+            return axios.post(fallbackUrl, null, { timeout: 10000 });
+        }
+    };
+
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await axios.get(`${getApiBase()}/api/startup_status`);
+                const response = await getStartupStatus();
                 transientErrorCountRef.current = 0;
                 setErrorReport(null);
                 setStatus(response.data);
                 setElapsedSeconds(response.data.elapsed_s || 0);
-                // Complete on either 'completed' (auto-ingestion) or 'ready' (manual mode)
+                // Complete when backend is either fully initialized or in ready/manual mode.
                 if (response.data.status === 'completed' || response.data.status === 'ready') {
                     onComplete();
                 }
@@ -53,14 +83,14 @@ const StartupProgress = ({ onComplete }) => {
 
     if (errorReport) {
         return (
-            <div style={{ padding: '20px' }}>
+            <div className="container py-4">
                 <ErrorMessage errorReport={errorReport} />
             </div>
         );
     }
 
     if (!status || status.status === 'pending') {
-        return <div style={{ padding: '20px' }}>Initializing...</div>;
+        return <div className="container py-4">Initializing...</div>;
     }
 
     const availableGames = Array.isArray(status.available_games) ? status.available_games : [];
@@ -82,7 +112,6 @@ const StartupProgress = ({ onComplete }) => {
     const overallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : 0;
     const isIngesting = status.status === 'ingesting';
     const isCompleted = status.status === 'completed';
-    const isReady = status.status === 'ready';
     const hasGamesConfigured = gameEntries.length > 0;
     
     const formatTime = (seconds) => {
@@ -97,11 +126,18 @@ const StartupProgress = ({ onComplete }) => {
         return '◯';
     };
 
-    const getStatusColor = (gameStatus) => {
-        if (gameStatus === 'completed') return '#28a745';
-        if (gameStatus === 'ingesting') return '#ffc107';
-        if (gameStatus === 'failed') return '#dc3545';
-        return '#6c757d';
+    const getStatusTextClass = (gameStatus) => {
+        if (gameStatus === 'completed') return 'text-success';
+        if (gameStatus === 'ingesting') return 'text-warning';
+        if (gameStatus === 'failed') return 'text-danger';
+        return 'text-secondary';
+    };
+
+    const getGameStatusClass = (gameStatus) => {
+        if (gameStatus === 'completed') return 'status-completed';
+        if (gameStatus === 'ingesting') return 'status-ingesting';
+        if (gameStatus === 'failed') return 'status-failed';
+        return 'status-pending';
     };
 
     const formatGameLabel = (game) => game
@@ -111,7 +147,7 @@ const StartupProgress = ({ onComplete }) => {
     const handleStartInitialization = async () => {
         setIsStarting(true);
         try {
-            await axios.post(`${getApiBase()}/api/startup_init`);
+            await postStartupInit();
         } catch (error) {
             console.error("Error starting initialization:", error);
         } finally {
@@ -120,21 +156,14 @@ const StartupProgress = ({ onComplete }) => {
     };
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-            <h2>🎰 Lottery Data Initialization</h2>
-            {(isReady || status.status === 'pending') && (
-                <div style={{ marginBottom: '12px' }}>
+        <div className="container py-4 startup-shell">
+            <h2 className="mb-3">🎰 Lottery Data Initialization</h2>
+            {status.status === 'pending' && (
+                <div className="mb-3">
                     <button
                         onClick={handleStartInitialization}
                         disabled={isStarting}
-                        style={{
-                            backgroundColor: '#007bff',
-                            color: 'white',
-                            border: 'none',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            cursor: isStarting ? 'not-allowed' : 'pointer'
-                        }}
+                        className="btn btn-primary"
                     >
                         {isStarting ? 'Starting...' : 'Start Initialization'}
                     </button>
@@ -142,93 +171,57 @@ const StartupProgress = ({ onComplete }) => {
             )}
             
             {/* Status Header */}
-            <div style={{
-                padding: '15px',
-                backgroundColor: isCompleted ? '#d4edda' : '#fff3cd',
-                border: `2px solid ${isCompleted ? '#28a745' : '#ffc107'}`,
-                borderRadius: '5px',
-                marginBottom: '20px'
-            }}>
-                <p style={{ margin: '5px 0' }}>
+            <div className={`card startup-status-card mb-4 ${isCompleted ? 'is-complete' : isIngesting ? 'is-active' : ''}`}>
+                <div className="card-body">
+                <p className="mb-2">
                     <strong>Status:</strong> 
-                    {isCompleted && <span style={{ color: '#28a745' }}>✓ Complete</span>}
-                    {isIngesting && <span style={{ color: '#ffc107' }}>⟳ Downloading Game Data...</span>}
-                    {!isCompleted && !isIngesting && <span>Pending</span>}
+                    {isCompleted && <span className="text-success ms-2">✓ Complete</span>}
+                    {isIngesting && <span className="text-warning ms-2">⟳ Downloading Game Data...</span>}
+                    {!isCompleted && !isIngesting && <span className="ms-2">Ready</span>}
                 </p>
                 {status.current_game && (
-                    <p style={{ margin: '5px 0' }}>
+                    <p className="mb-2">
                         <strong>Currently Processing:</strong> {status.current_game.toUpperCase()}
                         {status.current_task && <span> ({status.current_task})</span>}
                     </p>
                 )}
-                <p style={{ margin: '5px 0' }}>
+                <p className="mb-0">
                     <strong>Elapsed Time:</strong> {formatTime(elapsedSeconds)}
                 </p>
+                </div>
             </div>
 
             {/* Progress Bar */}
-            <div style={{ marginBottom: '20px' }}>
-                <h4 style={{ marginBottom: '8px' }}>
+            <div className="mb-4">
+                <h4 className="mb-2">
                     Download Progress: {progressVal.toFixed(1)} of {totalVal} games
                     {rowsFetched > 0 && (
-                        <span style={{ fontSize: '0.9em', color: '#666' }}>
+                        <span className="small text-muted">
                             {' '}({rowsFetched.toLocaleString()} rows in {status.current_game})
                         </span>
                     )}
                 </h4>
                 {!hasGamesConfigured && (
-                    <p style={{ marginTop: '-4px', color: '#6c757d' }}>
+                    <p className="text-muted mb-2">
                         No games reported by backend yet. This usually means ingestion has not started.
                     </p>
                 )}
-                <div style={{
-                    width: '100%',
-                    backgroundColor: '#e9ecef',
-                    borderRadius: '5px',
-                    overflow: 'hidden',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center'
-                }}>
-                    <div style={{
-                        width: `${overallProgress}%`,
-                        backgroundColor: overallProgress === 100 ? '#28a745' : '#007bff',
-                        height: '100%',
-                        transition: 'width 0.3s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontWeight: 'bold',
-                        fontSize: '14px'
-                    }}>
-                        {Math.round(overallProgress)}%
-                    </div>
+                <div className="progress startup-progress-bar">
+                    <progress
+                        className={`startup-progress-native ${overallProgress === 100 ? 'is-complete' : 'is-active'}`}
+                        value={Math.max(0, Math.min(overallProgress, 100))}
+                        max="100"
+                    />
+                    <span className="startup-progress-overlay">{Math.round(overallProgress)}%</span>
                 </div>
                 {hasGamesConfigured && (
-                    <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '8px',
-                        marginTop: '10px'
-                    }}>
+                    <div className="d-flex flex-wrap gap-2 mt-2">
                         {gameEntries.map(([game, gameData]) => (
                             <div
                                 key={game}
-                                style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '4px 10px',
-                                    borderRadius: '999px',
-                                    border: `1px solid ${getStatusColor(gameData.status)}`,
-                                    backgroundColor: game === status.current_game ? '#f0f8ff' : '#ffffff',
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    color: '#212529'
-                                }}
+                                className={`startup-game-pill ${getGameStatusClass(gameData.status)} ${game === status.current_game ? 'is-current' : ''}`}
                             >
-                                <span style={{ color: getStatusColor(gameData.status) }}>{getStatusIcon(gameData.status)}</span>
+                                <span className={getStatusTextClass(gameData.status)}>{getStatusIcon(gameData.status)}</span>
                                 <span>{formatGameLabel(game)}</span>
                             </div>
                         ))}
@@ -238,22 +231,19 @@ const StartupProgress = ({ onComplete }) => {
 
             {/* Game Status Table */}
             <h4>Game Download Status</h4>
-            <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginBottom: '20px'
-            }}>
+            <div className="table-responsive mb-4">
+            <table className="table table-hover align-middle startup-status-table">
                 <thead>
-                    <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
-                        <th style={{ textAlign: 'left', padding: '12px' }}>Game</th>
-                        <th style={{ textAlign: 'center', padding: '12px', width: '80px' }}>Status</th>
-                        <th style={{ textAlign: 'left', padding: '12px' }}>Details</th>
+                    <tr>
+                        <th>Game</th>
+                        <th className="text-center startup-status-col">Status</th>
+                        <th>Details</th>
                     </tr>
                 </thead>
                 <tbody>
                     {gameEntries.length === 0 && (
                         <tr>
-                            <td colSpan="3" style={{ padding: '12px', textAlign: 'center', color: '#6c757d' }}>
+                            <td colSpan="3" className="text-center text-muted py-3">
                                 Waiting for backend to report game ingestion status...
                             </td>
                         </tr>
@@ -261,36 +251,26 @@ const StartupProgress = ({ onComplete }) => {
                     {gameEntries.map(([game, gameData]) => (
                         <tr
                             key={game}
-                            style={{
-                                borderBottom: '1px solid #dee2e6',
-                                backgroundColor: game === status.current_game ? '#f0f8ff' : 'white',
-                                transition: 'background-color 0.3s ease'
-                            }}
+                            className={game === status.current_game ? 'startup-current-row' : ''}
                         >
-                            <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                            <td className="fw-semibold">
                                 {formatGameLabel(game)}
                             </td>
-                            <td style={{
-                                padding: '12px',
-                                textAlign: 'center',
-                                color: getStatusColor(gameData.status),
-                                fontSize: '18px',
-                                fontWeight: 'bold'
-                            }}>
+                            <td className={`text-center fs-5 fw-bold ${getStatusTextClass(gameData.status)}`}>
                                 {getStatusIcon(gameData.status)}
                             </td>
-                            <td style={{ padding: '12px' }}>
+                            <td>
                                 {gameData.status === 'completed' && (
-                                    <span style={{ color: '#28a745' }}>Downloaded ✓</span>
+                                    <span className="text-success">Downloaded ✓</span>
                                 )}
                                 {gameData.status === 'ingesting' && (
-                                    <span style={{ color: '#ffc107' }}>Downloading...</span>
+                                    <span className="text-warning">Downloading...</span>
                                 )}
                                 {gameData.status === 'pending' && (
-                                    <span style={{ color: '#6c757d' }}>Waiting...</span>
+                                    <span className="text-secondary">Waiting...</span>
                                 )}
                                 {gameData.status === 'failed' && (
-                                    <span style={{ color: '#dc3545' }}>
+                                    <span className="text-danger">
                                         Failed {gameData.error && `(${gameData.error})`}
                                     </span>
                                 )}
@@ -299,18 +279,12 @@ const StartupProgress = ({ onComplete }) => {
                     ))}
                 </tbody>
             </table>
+            </div>
 
             {isCompleted && (
-                <div style={{
-                    padding: '15px',
-                    backgroundColor: '#d4edda',
-                    border: '2px solid #28a745',
-                    borderRadius: '5px',
-                    color: '#155724',
-                    textAlign: 'center'
-                }}>
-                    <h3 style={{ margin: '10px 0' }}>✓ All games downloaded successfully!</h3>
-                    <p style={{ margin: '5px 0' }}>Launching dashboard...</p>
+                <div className="alert alert-success text-center startup-complete-banner">
+                    <h3 className="my-2">✓ All games downloaded successfully!</h3>
+                    <p className="mb-0">Launching dashboard...</p>
                 </div>
             )}
         </div>

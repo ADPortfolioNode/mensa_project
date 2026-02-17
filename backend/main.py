@@ -5,14 +5,16 @@ import threading
 import time
 import os
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
 
 # Import services
-from config import GAME_CONFIGS
-from services.gemini_client import gemini_client
+from config import GAME_CONFIGS, GAME_TITLES, resolve_game_key
+from services.gemini_client import gemini_client, LM_UNAVAILABLE_PREFIX
+from services.chatgpt_client import chatgpt_client
 from services.chroma_client import chroma_client
 from experiments.store import ExperimentStore
 from services.ingest import ingest_service
@@ -37,9 +39,23 @@ manual_ingest_state = {}
 
 _ingestion_started = False
 
+
+def _reset_startup_state_for_new_run():
+    startup_state["status"] = "ready"
+    startup_state["progress"] = 0.0
+    startup_state["total"] = len(GAME_CONFIGS)
+    startup_state["current_game"] = None
+    startup_state["current_task"] = None
+    startup_state["current_game_rows_fetched"] = 0
+    startup_state["current_game_rows_total"] = 0
+    startup_state["games"] = {game: {"status": "pending", "error": None} for game in GAME_CONFIGS.keys()}
+    startup_state["started_at"] = None
+    startup_state["completed_at"] = None
+
 def start_background_ingestion():
     """Start non-blocking background ingestion in a daemon thread."""
     def ingest_all():
+        global _ingestion_started
         startup_state["started_at"] = time.time()
         startup_state["status"] = "ingesting"
 
@@ -57,7 +73,9 @@ def start_background_ingestion():
                     startup_state["current_game_rows_fetched"] = rows_fetched
                     startup_state["current_game_rows_total"] = total_rows
                     if total_rows and total_rows > 0:
-                        startup_state["progress"] = float(i - 1) + (rows_fetched / total_rows)
+                        fraction = rows_fetched / max(total_rows, 1)
+                        fraction = max(0.0, min(1.0, fraction))
+                        startup_state["progress"] = float(i - 1) + fraction
                     else:
                         startup_state["progress"] = float(i - 1)
 
@@ -78,6 +96,7 @@ def start_background_ingestion():
         startup_state["current_game"] = None
         startup_state["current_task"] = None
         startup_state["completed_at"] = time.time()
+        _ingestion_started = False
 
     thread = threading.Thread(target=ingest_all, daemon=True, name="BackgroundIngestion")
     thread.start()
@@ -98,6 +117,7 @@ class ChatRequest(BaseModel):
     text: str
     game: str = None
     use_rag: bool = True
+    lm_provider: str = "auto"
     tool: Optional[Dict[str, Any]] = None
 
 class ChatResponse(BaseModel):
@@ -105,11 +125,13 @@ class ChatResponse(BaseModel):
     sources: list = []
     context_used: bool = False
     sources_count: int = 0
+    lm_provider: str = None
     tool_name: str = None
     tool_result: dict = None
 
 class IngestRequest(BaseModel):
     game: str
+    force: bool = False
 
 class TrainRequest(BaseModel):
     game: str
@@ -121,6 +143,16 @@ class PredictRequest(BaseModel):
 class GameSummaryResponse(BaseModel):
     game: str
     draw_count: int
+
+
+def _require_game_key(raw_game: str) -> str:
+    game_key = resolve_game_key(raw_game)
+    if not game_key:
+        available = sorted([GAME_TITLES.get(g, g) for g in GAME_CONFIGS.keys()])
+        raise ValueError(
+            f"Unknown game '{raw_game}'. Supported games: {', '.join(available)}"
+        )
+    return game_key
 
 
 def _workspace_roots() -> list[Path]:
@@ -327,6 +359,166 @@ def _render_tool_response(tool_name: str, tool_result: Dict[str, Any]) -> str:
         f"```json\n{pretty}\n```"
     )
 
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+
+    for converter in (
+        lambda v: datetime.fromisoformat(v.replace("Z", "+00:00")),
+        lambda v: datetime.strptime(v, "%Y-%m-%d"),
+        lambda v: datetime.strptime(v, "%m/%d/%Y"),
+        lambda v: datetime.strptime(v, "%Y/%m/%d"),
+        lambda v: datetime.strptime(v, "%m-%d-%Y"),
+    ):
+        try:
+            return converter(text)
+        except Exception:
+            continue
+
+    return None
+
+
+def _extract_metadata_value(metadata: dict, preferred_tokens: list[str]) -> Optional[str]:
+    if not isinstance(metadata, dict):
+        return None
+
+    for key, value in metadata.items():
+        key_lower = str(key).lower()
+        if all(token in key_lower for token in preferred_tokens):
+            return str(value)
+
+    return None
+
+
+def _latest_game_snapshot(game: str, sample_size: int = 200) -> Optional[dict]:
+    try:
+        collection = chroma_client.client.get_collection(game)
+        count = int(collection.count() or 0)
+        if count <= 0:
+            return {
+                "game": game,
+                "draw_count": 0,
+                "latest_draw_date": None,
+                "latest_numbers": None,
+            }
+
+        payload = collection.get(limit=min(sample_size, count), include=["metadatas"])
+        metadatas = payload.get("metadatas") if isinstance(payload, dict) else []
+
+        candidates = []
+        for metadata in metadatas or []:
+            draw_date = _extract_metadata_value(metadata, ["date"])
+            winning_numbers = _extract_metadata_value(metadata, ["winning", "number"])
+            if not winning_numbers:
+                winning_numbers = _extract_metadata_value(metadata, ["numbers"])
+            candidates.append({
+                "draw_date": draw_date,
+                "winning_numbers": winning_numbers,
+                "parsed_date": _parse_datetime(draw_date),
+            })
+
+        candidates_with_date = [item for item in candidates if item.get("parsed_date") is not None]
+        if candidates_with_date:
+            latest = max(candidates_with_date, key=lambda item: item["parsed_date"])
+        elif candidates:
+            latest = candidates[0]
+        else:
+            latest = {"draw_date": None, "winning_numbers": None}
+
+        return {
+            "game": game,
+            "draw_count": count,
+            "latest_draw_date": latest.get("draw_date"),
+            "latest_numbers": latest.get("winning_numbers"),
+        }
+    except Exception:
+        return {
+            "game": game,
+            "draw_count": 0,
+            "latest_draw_date": None,
+            "latest_numbers": None,
+        }
+
+
+def _draw_schedule_fallback_context(raw_game: Optional[str]) -> list[dict]:
+    if raw_game:
+        resolved = resolve_game_key(raw_game)
+        target_games = [resolved] if resolved else []
+    else:
+        target_games = list(GAME_CONFIGS.keys())
+
+    snapshots = []
+    for game in target_games:
+        if not game:
+            continue
+        snapshot = _latest_game_snapshot(game)
+        if snapshot is not None:
+            snapshots.append(snapshot)
+
+    return snapshots
+
+
+def _chat_fallback_for_lm_unavailable(user_text: str, lm_response: str, raw_game: Optional[str] = None) -> str:
+    raw_text = str(user_text or "")
+    normalized = raw_text.lower()
+
+    reason = "api_error"
+    if isinstance(lm_response, str) and lm_response.startswith(LM_UNAVAILABLE_PREFIX):
+        parts = lm_response.split(":", 2)
+        if len(parts) >= 2:
+            reason = parts[1]
+
+    reason_message = {
+        "missing_key": "LM key is not configured on the backend.",
+        "rate_limited": "LM quota is currently exhausted/rate-limited.",
+        "api_error": "LM provider returned an API error.",
+    }.get(reason, "LM provider is temporarily unavailable.")
+
+    if "next" in normalized and ("drawing" in normalized or "draw" in normalized):
+        snapshots = _draw_schedule_fallback_context(raw_game)
+        if snapshots:
+            lines = []
+            for item in snapshots:
+                game = str(item.get("game", "")).upper()
+                draw_count = int(item.get("draw_count") or 0)
+                latest_date = item.get("latest_draw_date") or "unknown"
+                latest_numbers = item.get("latest_numbers") or "unknown"
+                lines.append(
+                    f"- {game}: latest known draw date={latest_date}, latest known numbers={latest_numbers}, stored draws={draw_count}"
+                )
+
+            return (
+                f"I can’t compute official next drawing schedule via LM right now because {reason_message} "
+                "Here is the latest available draw data in your database:\n"
+                + "\n".join(lines)
+                + "\nFor official next drawing times, verify on the NY Lottery site."
+            )
+
+        return (
+            f"I can’t answer draw-schedule questions from the LM right now because {reason_message} "
+            "For official next drawing times, check the NY Lottery site for your game. "
+            "You can still use this app for ingestion, training, and predictions while LM access is down."
+        )
+
+    return (
+        f"I can’t use the LM right now because {reason_message} "
+        "Please retry shortly, or update backend LM quota/key configuration."
+    )
+
+
+def _resolve_lm_chain(lm_provider: Optional[str]) -> list[tuple[str, Any]]:
+    provider = (lm_provider or "auto").strip().lower()
+    if provider in {"gemini"}:
+        return [("gemini", gemini_client)]
+    if provider in {"chatgpt", "openai", "chat_gpt"}:
+        return [("chatgpt", chatgpt_client)]
+    return [
+        ("gemini", gemini_client),
+        ("chatgpt", chatgpt_client),
+    ]
+
 # --- API Endpoints ---
 @app.get("/api")
 async def root():
@@ -360,25 +552,60 @@ async def chat_endpoint(request: ChatRequest):
             "Be concise, practical, and provide actionable steps."
         )
 
+        lm_chain = _resolve_lm_chain(request.lm_provider)
+
         if request.use_rag:
-            # Use RAG service for context-aware responses
-            result = await rag_service.query_with_rag(
-                user_query=f"{concierge_prefix}\n\nUser request: {request.text}",
-                game=request.game,
-                use_all_games=request.game is None
+            first_unavailable = None
+            for provider_name, provider_client in lm_chain:
+                result = await rag_service.query_with_rag(
+                    user_query=f"{concierge_prefix}\n\nUser request: {request.text}",
+                    game=request.game,
+                    use_all_games=request.game is None,
+                    lm_client=provider_client,
+                )
+                response_text = result.get("response", "")
+                if isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX):
+                    first_unavailable = first_unavailable or response_text
+                    continue
+
+                return ChatResponse(
+                    response=response_text,
+                    sources=result.get("sources", []),
+                    context_used=True,
+                    sources_count=result.get("context_count", 0),
+                    lm_provider=provider_name,
+                )
+
+            fallback_text = _chat_fallback_for_lm_unavailable(
+                request.text,
+                first_unavailable or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
+                request.game,
             )
             return ChatResponse(
-                response=result.get("response", ""),
-                sources=result.get("sources", []),
+                response=fallback_text,
+                sources=[],
                 context_used=True,
-                sources_count=result.get("context_count", 0)
+                sources_count=0,
+                lm_provider="fallback",
             )
-        else:
-            # Standard response without RAG
-            response_text = await gemini_client.generate_text(
+
+        first_unavailable = None
+        for provider_name, provider_client in lm_chain:
+            response_text = await provider_client.generate_text(
                 f"{concierge_prefix}\n\nUser request: {request.text}"
             )
-            return ChatResponse(response=response_text)
+            if isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX):
+                first_unavailable = first_unavailable or response_text
+                continue
+
+            return ChatResponse(response=response_text, lm_provider=provider_name)
+
+        fallback_text = _chat_fallback_for_lm_unavailable(
+            request.text,
+            first_unavailable or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
+            request.game,
+        )
+        return ChatResponse(response=fallback_text, lm_provider="fallback")
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
         return ChatResponse(response=f"Error: {str(e)}", tool_result={"error": str(e)})
@@ -442,9 +669,18 @@ async def ingest_data(request: IngestRequest):
     Manual ingestion endpoint triggered from dashboard.
     Ingests data for a single game asynchronously with progress tracking.
     """
+    try:
+        game_key = _require_game_key(request.game)
+    except ValueError as e:
+        return {
+            "status": "error",
+            "game": request.game,
+            "message": str(e)
+        }
+
     def progress_callback(rows_fetched, total_rows):
         """Callback to track ingestion progress."""
-        manual_ingest_state[request.game] = {
+        manual_ingest_state[game_key] = {
             "status": "ingesting",
             "rows_fetched": rows_fetched,
             "total_rows": total_rows,
@@ -452,40 +688,52 @@ async def ingest_data(request: IngestRequest):
         }
     
     try:
-        print(f"📥 Manual ingestion started for {request.game}")
-        manual_ingest_state[request.game] = {
+        print(f"📥 Manual ingestion started for {game_key}")
+        manual_ingest_state[game_key] = {
             "status": "ingesting",
             "rows_fetched": 0,
             "total_rows": 0,
             "progress": 0
         }
         
-        result = ingest_service.fetch_and_sync(request.game, progress_callback=progress_callback)
+        result = ingest_service.fetch_and_sync(
+            game_key,
+            progress_callback=progress_callback,
+            force=request.force,
+        )
         
-        manual_ingest_state[request.game] = {
+        manual_ingest_state[game_key] = {
             "status": "completed",
             "rows_fetched": result.get("total", 0),
             "total_rows": result.get("total", 0),
             "progress": 100,
             "added": result.get("added", 0)
         }
-        print(f"✅ Manual ingestion completed for {request.game}")
+        print(f"✅ Manual ingestion completed for {game_key}")
+        skipped_existing = bool(result.get("skipped_existing", False))
+        response_message = (
+            f"Skipped ingest for {game_key}: records already exist"
+            if skipped_existing
+            else f"Successfully ingested {game_key}"
+        )
         return {
             "status": "completed",
-            "game": request.game,
+            "game": game_key,
             "added": result.get("added", 0),
             "total": result.get("total", 0),
-            "message": f"Successfully ingested {request.game}"
+            "processed": result.get("processed", 0),
+            "skipped_existing": skipped_existing,
+            "message": response_message,
         }
     except Exception as e:
-        manual_ingest_state[request.game] = {
+        manual_ingest_state[game_key] = {
             "status": "error",
             "error": str(e)
         }
-        print(f"❌ Manual ingestion failed for {request.game}: {str(e)}")
+        print(f"❌ Manual ingestion failed for {game_key}: {str(e)}")
         return {
             "status": "error",
-            "game": request.game,
+            "game": game_key,
             "message": str(e)
         }
 
@@ -497,7 +745,8 @@ async def get_ingest_progress(game: str = None):
     Otherwise, return all ongoing ingestions.
     """
     if game:
-        return manual_ingest_state.get(game, {"status": "idle"})
+        game_key = resolve_game_key(game) or game
+        return manual_ingest_state.get(game_key, {"status": "idle"})
     return manual_ingest_state
 
 @app.post("/api/train")
@@ -507,6 +756,7 @@ async def train_model(request: TrainRequest):
     Trains model for a single game.
     """
     try:
+        game_key = _require_game_key(request.game)
         # Lazy import to avoid TensorFlow overhead during app startup
         from services.trainer import trainer_service
         data_dir = os.environ.get('DATA_DIR', '/data')
@@ -514,44 +764,57 @@ async def train_model(request: TrainRequest):
         exp_store = ExperimentStore(store_path)
         timestamp = time.time()
 
-        print(f"🎯 Training started for {request.game}")
-        result = trainer_service.train_model(request.game)
+        print(f"🎯 Training started for {game_key}")
+        result = trainer_service.train_model(game_key)
         if result.get("status") != "success":
-            print(f"❌ Training failed for {request.game}: {result.get('message', 'unknown error')}")
+            print(f"❌ Training failed for {game_key}: {result.get('message', 'unknown error')}")
+            failed_description = (
+                f"Training failed for {game_key}. "
+                f"Reason: {result.get('message', 'unknown error')}"
+            )
             exp_store.save_experiment({
-                "experiment_id": f"train-{request.game}-{int(timestamp)}",
-                "game": request.game,
+                "experiment_id": f"train-{game_key}-{int(timestamp)}",
+                "game": game_key,
                 "score": 0,
                 "timestamp": timestamp,
                 "status": "FAILED",
                 "type": "training",
-                "error": result.get("message", "unknown error")
+                "error": result.get("message", "unknown error"),
+                "description": failed_description,
             })
             return {
+                **result,
                 "status": "error",
-                "game": request.game,
+                "game": game_key,
                 "message": result.get("message", "Training failed"),
-                **result
             }
 
-        print(f"✅ Training completed for {request.game}")
+        print(f"✅ Training completed for {game_key}")
+
+        success_description = (
+            f"Random Forest training completed for {game_key}. "
+            f"Accuracy={result.get('accuracy', 0):.4f}, "
+            f"MAE={result.get('mae', 0):.4f}, "
+            f"Samples={result.get('samples', 0)}"
+        )
 
         exp_store.save_experiment({
-            "experiment_id": f"train-{request.game}-{int(timestamp)}",
-            "game": request.game,
+            "experiment_id": f"train-{game_key}-{int(timestamp)}",
+            "game": game_key,
             "score": result.get("accuracy", 0),
             "timestamp": timestamp,
             "status": "COMPLETED",
-            "type": "training"
+            "type": "training",
+            "description": success_description,
         })
 
         return {
+            **result,
             "status": "COMPLETED",
-            "game": request.game,
-            "message": f"Successfully trained model for {request.game}",
-            "experiment_id": f"train-{request.game}-{int(timestamp)}",
+            "game": game_key,
+            "message": f"Successfully trained model for {game_key}",
+            "experiment_id": f"train-{game_key}-{int(timestamp)}",
             "score": result.get("accuracy", 0),
-            **result
         }
     except Exception as e:
         print(f"❌ Training failed for {request.game}: {str(e)}")
@@ -566,7 +829,10 @@ async def get_experiments():
     data_dir = os.environ.get('DATA_DIR', '/data')
     store_path = os.path.join(data_dir, 'experiments', "experiments.json")
     exp_store = ExperimentStore(store_path)
-    return exp_store.list_experiments()
+    experiments = exp_store.list_experiments()
+    return {
+        "experiments": experiments,
+    }
 
 @app.post("/api/predict")
 async def predict(request: PredictRequest):
@@ -574,6 +840,7 @@ async def predict(request: PredictRequest):
     Prediction endpoint for a specific game.
     """
     try:
+        game_key = _require_game_key(request.game)
         # Lazy import to avoid TensorFlow overhead during app startup
         from services.predictor import predictor_service
         data_dir = os.environ.get('DATA_DIR', '/data')
@@ -581,10 +848,10 @@ async def predict(request: PredictRequest):
         exp_store = ExperimentStore(store_path)
         timestamp = time.time()
 
-        result = predictor_service.predict_next_draw(request.game, request.recent_k)
+        result = predictor_service.predict_next_draw(game_key, request.recent_k)
         exp_store.save_experiment({
-            "experiment_id": f"predict-{request.game}-{int(timestamp)}",
-            "game": request.game,
+            "experiment_id": f"predict-{game_key}-{int(timestamp)}",
+            "game": game_key,
             "timestamp": timestamp,
             "status": "COMPLETED",
             "type": "prediction",
@@ -592,9 +859,9 @@ async def predict(request: PredictRequest):
             "prediction": result
         })
         return {
-            "status": "success",
-            "game": request.game,
-            **result
+            **result,
+            "status": "COMPLETED",
+            "game": game_key,
         }
     except Exception as e:
         return {
@@ -609,15 +876,19 @@ async def get_games():
     Returns list of available games for ingestion.
     """
     game_names = list(GAME_CONFIGS.keys())
-    return {"games": game_names}
+    return {
+        "games": game_names,
+        "titles": {game: GAME_TITLES.get(game, game) for game in game_names},
+    }
 
 @app.get("/api/games/{game}/summary", response_model=GameSummaryResponse)
 async def get_game_summary(game: str):
     """
     Get summary statistics for a specific game.
     """
-    draw_count = chroma_client.count_documents(game)
-    return GameSummaryResponse(game=game, draw_count=draw_count)
+    game_key = _require_game_key(game)
+    draw_count = chroma_client.count_documents(game_key)
+    return GameSummaryResponse(game=game_key, draw_count=draw_count)
 
 @app.get("/api/startup_status")
 async def get_startup_status():
@@ -658,12 +929,20 @@ async def start_initialization():
     Trigger background initialization/ingestion.
     """
     global _ingestion_started
-    if not _ingestion_started:
-        _ingestion_started = True
-        start_background_ingestion()
+    if _ingestion_started and startup_state.get("status") == "ingesting":
+        return {
+            "status": startup_state["status"],
+            "message": "Initialization already running",
+            "available_games": list(GAME_CONFIGS.keys()),
+        }
+
+    _reset_startup_state_for_new_run()
+    _ingestion_started = True
+    start_background_ingestion()
+
     return {
         "status": startup_state["status"],
-        "message": "Initialization started" if _ingestion_started else "Initialization already running",
+        "message": "Initialization started",
         "available_games": list(GAME_CONFIGS.keys()),
     }
 

@@ -58,27 +58,22 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
     const status = progress.status === 'completed' ? 'completed' 
                  : progress.status === 'error' ? 'error' 
                  : 'active';
+    const panelStatusClass = status === 'error' ? 'is-error' : status === 'completed' ? 'is-complete' : 'is-active';
 
     return (
-        <div style={{
-            padding: '16px',
-            backgroundColor: status === 'error' ? '#f8d7da' : status === 'completed' ? '#d4edda' : '#fff3cd',
-            border: `2px solid ${status === 'error' ? '#f5c6cb' : status === 'completed' ? '#c3e6cb' : '#ffeaa7'}`,
-            borderRadius: '8px',
-            marginTop: '16px'
-        }}>
-            <h6 style={{ marginBottom: '12px', fontWeight: 'bold' }}>
+        <div className={`ingestion-progress-panel mt-3 ${panelStatusClass}`}>
+            <h6 className="ingestion-progress-title">
                 🎰 {game.toUpperCase()} Ingestion
             </h6>
 
             {error && (
-                <div className="alert alert-danger" style={{ marginBottom: '12px', padding: '8px' }}>
+                <div className="alert alert-danger ingestion-progress-alert">
                     <strong>Error:</strong> {error}
                 </div>
             )}
 
             {progress.error && (
-                <div className="alert alert-danger" style={{ marginBottom: '12px', padding: '8px' }}>
+                <div className="alert alert-danger ingestion-progress-alert">
                     <strong>Ingestion Failed:</strong> {progress.error}
                 </div>
             )}

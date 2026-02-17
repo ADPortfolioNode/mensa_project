@@ -1,6 +1,8 @@
 import google.generativeai as genai
 from config import settings
 
+LM_UNAVAILABLE_PREFIX = "__LM_UNAVAILABLE__"
+
 class GeminiClient:
     """
     Client for interacting with Google's Gemini API.
@@ -15,13 +17,15 @@ class GeminiClient:
 
     async def generate_text(self, prompt: str) -> str:
         if not self.api_key or not self.model:
-            return "Gemini API key not configured. Please set GEMINI_API_KEY."
+            return f"{LM_UNAVAILABLE_PREFIX}:missing_key:Gemini API key not configured"
         try:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            # Handle API errors gracefully
             print(f"Error generating text with Gemini: {e}")
-            return "Sorry, I'm having trouble connecting to the Gemini API right now."
+            error_text = str(e)
+            if "429" in error_text or "RATE_LIMIT_EXCEEDED" in error_text or "ResourceExhausted" in error_text:
+                return f"{LM_UNAVAILABLE_PREFIX}:rate_limited:{error_text[:220]}"
+            return f"{LM_UNAVAILABLE_PREFIX}:api_error:{error_text[:220]}"
 
 gemini_client = GeminiClient()
