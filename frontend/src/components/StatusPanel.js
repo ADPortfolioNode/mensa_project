@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import getApiBase from '../utils/apiBase';
-import ProgressiveProgressBar from './ProgressiveProgressBar';
 
 export default function StatusPanel({ status: initial = {} }) {
+  // Normalize API base: trim, strip trailing slashes, and ensure scheme when provided
+  function normalizeApiBase(raw) {
+    const v = (raw || '').toString().trim().replace(/\/+$/, '');
+    if (!v) return '';
+    if (!/^https?:\/\//i.test(v)) {
+      return `http://${v}`;
+    }
+    return v;
+  }
+
   const API_BASE = getApiBase();
   const [status, setStatus] = useState(initial);
 
@@ -19,7 +28,7 @@ export default function StatusPanel({ status: initial = {} }) {
     load();
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
-  }, [API_BASE]);
+  }, []);
 
   return (
     <div className="card p-3">
@@ -32,10 +41,9 @@ export default function StatusPanel({ status: initial = {} }) {
           {(status.clones || []).length === 0 && <div>No active clones</div>}
           {(status.clones || []).map(id => {
             const info = (status.clone_info && status.clone_info[id]) || {};
-            const pct = Number(info.progress ?? 0);
+            const pct = info.progress ?? 0;
             return (
               <div key={id} className="mb-2">
-<<<<<<< HEAD
                 <div className="d-flex justify-content-between">
                   <small className="text-monospace">{id}</small>
                   <small>{pct}%</small>
@@ -43,16 +51,6 @@ export default function StatusPanel({ status: initial = {} }) {
                 <div className="status-panel-progress-wrap">
                   <progress className="status-panel-progress" value={pct} max="100" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100" />
                 </div>
-=======
-                <ProgressiveProgressBar
-                  current={pct}
-                  total={100}
-                  status={pct >= 100 ? 'completed' : pct > 0 ? 'active' : 'idle'}
-                  label={id}
-                  showMetadata={false}
-                  colorScheme="info"
-                />
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
                 <div className="small text-muted mt-1">
                   {(info.steps || []).slice(-3).map((s, idx) => (
                     <div key={idx}>{s.step}: {s.status}</div>

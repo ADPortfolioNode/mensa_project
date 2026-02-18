@@ -26,6 +26,7 @@ class RAGService:
         game: str = None,
         use_all_games: bool = False,
         lm_client=None,
+        lm_provider: str = "auto",
     ) -> dict:
         """
         Query using RAG pattern:
@@ -56,31 +57,25 @@ class RAGService:
         # Step 3: Build augmented prompt
         augmented_prompt = self._build_augmented_prompt(user_query, context_text)
 
-        if not self.gemini_client.is_available():
-            return {
-                "response": self._build_local_fallback_response(user_query, retrieved_docs),
-                "sources": retrieved_docs,
-                "context_count": len(retrieved_docs),
-                "game": game,
-            }
-        
-<<<<<<< HEAD
         # Step 4: Generate response with configured LM client
         active_lm_client = lm_client or self.gemini_client
-        response_text = await active_lm_client.generate_text(augmented_prompt)
-=======
-        # Step 4: Generate response with Gemini
-        response_text = await self.gemini_client.generate_text(augmented_prompt)
-
-        if isinstance(response_text, str) and "trouble connecting to the Gemini API" in response_text:
-            response_text = self._build_local_fallback_response(user_query, retrieved_docs)
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
+        selected_provider = None
+        if hasattr(active_lm_client, "generate_with_provider"):
+            lm_result = await active_lm_client.generate_with_provider(
+                augmented_prompt,
+                preferred_provider=lm_provider,
+            )
+            response_text = lm_result.get("response", "")
+            selected_provider = lm_result.get("provider")
+        else:
+            response_text = await active_lm_client.generate_text(augmented_prompt)
         
         return {
             "response": response_text,
             "sources": retrieved_docs,
             "context_count": len(retrieved_docs),
             "game": game,
+            "lm_provider": selected_provider,
         }
 
     def _build_local_fallback_response(self, user_query: str, documents: list) -> str:

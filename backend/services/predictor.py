@@ -2,11 +2,7 @@ import os
 import re
 import numpy as np
 import joblib
-<<<<<<< HEAD
-from config import GAME_PREDICTION_FORMATS
-=======
-from config import GAME_CONFIGS
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
+from config import GAME_CONFIGS, GAME_PREDICTION_FORMATS
 
 class PredictorService:
     def __init__(self):
@@ -207,12 +203,6 @@ class PredictorService:
         
         prediction = model.predict(X)
         prediction = np.array(prediction).reshape(-1)[:output_len]
-<<<<<<< HEAD
-        
-        # Round to nearest integers
-        predicted_numbers = [max(0, int(np.round(value))) for value in prediction]
-        formatted_prediction, normalized_flat = self._format_prediction(game, predicted_numbers)
-=======
 
         primary_count = int(rules.get("primary_count", 5))
         bonus_count = int(rules.get("bonus_count", 0) or 0)
@@ -224,19 +214,15 @@ class PredictorService:
         primary_numbers = self._normalize_primary_predictions(primary_raw, rules)
         bonus_numbers = self._normalize_bonus_predictions(bonus_raw, rules, include_bonus)
         predicted_numbers = primary_numbers + bonus_numbers
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
+        formatted_prediction, normalized_flat = self._format_prediction(game, predicted_numbers)
         
         return {
             "status": "success",
             "game": game,
-<<<<<<< HEAD
             "predicted_numbers": normalized_flat,
             "formatted_prediction": formatted_prediction,
-=======
-            "predicted_numbers": predicted_numbers,
             "predicted_main_numbers": primary_numbers,
             "predicted_bonus_numbers": bonus_numbers,
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
         }
 
     def predict_all_games(self, games, recent_k: int = 10):

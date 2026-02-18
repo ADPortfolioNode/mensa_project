@@ -54,22 +54,10 @@ class GeminiClient:
         return content
 
     async def generate_text(self, prompt: str) -> str:
-<<<<<<< HEAD
-        if not self.api_key or not self.model:
-            return f"{LM_UNAVAILABLE_PREFIX}:missing_key:Gemini API key not configured"
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            print(f"Error generating text with Gemini: {e}")
-            error_text = str(e)
-            if "429" in error_text or "RATE_LIMIT_EXCEEDED" in error_text or "ResourceExhausted" in error_text:
-                return f"{LM_UNAVAILABLE_PREFIX}:rate_limited:{error_text[:220]}"
-            return f"{LM_UNAVAILABLE_PREFIX}:api_error:{error_text[:220]}"
-=======
         if not self.is_available():
-            return "No LLM provider configured. Set GEMINI_API_KEY or GROK_API_KEY."
+            return f"{LM_UNAVAILABLE_PREFIX}:missing_key:No LM provider configured. Set GEMINI_API_KEY or GROK_API_KEY."
 
+        gemini_error_text = ""
         if self.api_key and self.model:
             try:
                 response = self.model.generate_content(prompt)
@@ -78,6 +66,7 @@ class GeminiClient:
             except Exception as e:
                 print(f"Error generating text with Gemini: {e}")
                 self.last_error = str(e)
+                gemini_error_text = str(e)
 
         if self.grok_api_key:
             try:
@@ -87,8 +76,15 @@ class GeminiClient:
             except Exception as e:
                 print(f"Error generating text with Grok: {e}")
                 self.last_error = str(e)
+                error_text = str(e)
+                if "429" in error_text or "RATE_LIMIT_EXCEEDED" in error_text or "ResourceExhausted" in error_text:
+                    return f"{LM_UNAVAILABLE_PREFIX}:rate_limited:{error_text[:220]}"
+                return f"{LM_UNAVAILABLE_PREFIX}:api_error:{error_text[:220]}"
 
-        return "Sorry, I'm having trouble connecting to the Gemini API right now (Grok fallback unavailable)."
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
+        if "429" in gemini_error_text or "RATE_LIMIT_EXCEEDED" in gemini_error_text or "ResourceExhausted" in gemini_error_text:
+            return f"{LM_UNAVAILABLE_PREFIX}:rate_limited:{gemini_error_text[:220]}"
+        if gemini_error_text:
+            return f"{LM_UNAVAILABLE_PREFIX}:api_error:{gemini_error_text[:220]}"
+        return f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable"
 
 gemini_client = GeminiClient()

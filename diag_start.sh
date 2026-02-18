@@ -99,12 +99,9 @@ echo "--- Stopping and removing old containers ---" >> "${LOG_FILE}"
 if ! run_compose_with_timeout 180 sh -lc "${COMPOSE_CMD} down --remove-orphans" >> "${LOG_FILE}" 2>&1; then
     echo "ERROR: timed out or failed while stopping old containers" >> "${LOG_FILE}"
 fi
-<<<<<<< HEAD
 force_remove_container mensa_frontend || true
 force_remove_container mensa_backend || true
 force_remove_container mensa_chroma || true
-=======
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
 
 # Attempt to build and start (detached mode with loop detection)
 echo "--- Building and starting new containers ---" >> "${LOG_FILE}"

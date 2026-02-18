@@ -14,10 +14,10 @@ import requests
 # Import services
 from config import GAME_CONFIGS, GAME_TITLES, resolve_game_key
 from services.gemini_client import gemini_client, LM_UNAVAILABLE_PREFIX
-from services.chatgpt_client import chatgpt_client
 from services.chroma_client import chroma_client
 from experiments.store import ExperimentStore
 from services.ingest import ingest_service
+from services.lm_router import lm_router
 from services.rag_service import rag_service
 
 # --- Global startup state tracking for initialization ---
@@ -102,6 +102,16 @@ def start_background_ingestion():
     thread.start()
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def audit_lm_connections_on_startup():
+    try:
+        snapshot = await lm_router.audit_connections(force=True)
+        ordered = snapshot.get("ordered_available", [])
+        print(f"LM audit complete. Available providers (fastest first): {ordered}")
+    except Exception as exc:
+        print(f"LM audit failed at startup: {exc}")
 
 # --- Middleware ---
 app.add_middleware(
@@ -359,8 +369,6 @@ def _render_tool_response(tool_name: str, tool_result: Dict[str, Any]) -> str:
         f"```json\n{pretty}\n```"
     )
 
-
-<<<<<<< HEAD
 def _parse_datetime(value: Any) -> Optional[datetime]:
     text = str(value or "").strip()
     if not text:
@@ -509,30 +517,6 @@ def _chat_fallback_for_lm_unavailable(user_text: str, lm_response: str, raw_game
     )
 
 
-def _resolve_lm_chain(lm_provider: Optional[str]) -> list[tuple[str, Any]]:
-    provider = (lm_provider or "auto").strip().lower()
-    if provider in {"gemini"}:
-        return [("gemini", gemini_client)]
-    if provider in {"chatgpt", "openai", "chat_gpt"}:
-        return [("chatgpt", chatgpt_client)]
-    return [
-        ("gemini", gemini_client),
-        ("chatgpt", chatgpt_client),
-    ]
-
-=======
-def _build_non_rag_fallback(user_text: str) -> str:
-    return (
-        "Gemini is currently unavailable, but core workflows are online.\n\n"
-        "Available actions right now:\n"
-        "- Run ingestion for one game or all games\n"
-        "- Train models and generate predictions\n"
-        "- Inspect Chroma collections and experiments\n\n"
-        f"Your message was: '{user_text}'. "
-        "If you want, I can help with a concrete operation (for example: 'train take5')."
-    )
-
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
 # --- API Endpoints ---
 @app.get("/api")
 async def root():
@@ -566,23 +550,17 @@ async def chat_endpoint(request: ChatRequest):
             "Be concise, practical, and provide actionable steps."
         )
 
-        lm_chain = _resolve_lm_chain(request.lm_provider)
-
         if request.use_rag:
-<<<<<<< HEAD
-            first_unavailable = None
-            for provider_name, provider_client in lm_chain:
-                result = await rag_service.query_with_rag(
-                    user_query=f"{concierge_prefix}\n\nUser request: {request.text}",
-                    game=request.game,
-                    use_all_games=request.game is None,
-                    lm_client=provider_client,
-                )
-                response_text = result.get("response", "")
-                if isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX):
-                    first_unavailable = first_unavailable or response_text
-                    continue
-
+            result = await rag_service.query_with_rag(
+                user_query=f"{concierge_prefix}\n\nUser request: {request.text}",
+                game=request.game,
+                use_all_games=request.game is None,
+                lm_client=lm_router,
+                lm_provider=request.lm_provider,
+            )
+            response_text = result.get("response", "")
+            if not (isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX)):
+                provider_name = result.get("lm_provider") or "auto"
                 return ChatResponse(
                     response=response_text,
                     sources=result.get("sources", []),
@@ -593,15 +571,8 @@ async def chat_endpoint(request: ChatRequest):
 
             fallback_text = _chat_fallback_for_lm_unavailable(
                 request.text,
-                first_unavailable or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
+                response_text or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
                 request.game,
-=======
-            # Use RAG service for context-aware responses
-            result = await rag_service.query_with_rag(
-                user_query=request.text,
-                game=request.game,
-                use_all_games=request.game is None
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
             )
             return ChatResponse(
                 response=fallback_text,
@@ -611,29 +582,21 @@ async def chat_endpoint(request: ChatRequest):
                 lm_provider="fallback",
             )
 
-        first_unavailable = None
-        for provider_name, provider_client in lm_chain:
-            response_text = await provider_client.generate_text(
-                f"{concierge_prefix}\n\nUser request: {request.text}"
-            )
-<<<<<<< HEAD
-            if isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX):
-                first_unavailable = first_unavailable or response_text
-                continue
-
+        lm_result = await lm_router.generate_with_provider(
+            f"{concierge_prefix}\n\nUser request: {request.text}",
+            preferred_provider=request.lm_provider,
+        )
+        response_text = lm_result.get("response", "")
+        provider_name = lm_result.get("provider")
+        if not (isinstance(response_text, str) and response_text.startswith(LM_UNAVAILABLE_PREFIX)):
             return ChatResponse(response=response_text, lm_provider=provider_name)
 
         fallback_text = _chat_fallback_for_lm_unavailable(
             request.text,
-            first_unavailable or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
+            response_text or f"{LM_UNAVAILABLE_PREFIX}:api_error:All configured LM providers are unavailable",
             request.game,
         )
         return ChatResponse(response=fallback_text, lm_provider="fallback")
-=======
-            if isinstance(response_text, str) and "trouble connecting to the Gemini API" in response_text:
-                response_text = _build_non_rag_fallback(request.text)
-            return ChatResponse(response=response_text)
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
         return ChatResponse(response=f"Error: {str(e)}", tool_result={"error": str(e)})

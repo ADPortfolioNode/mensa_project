@@ -58,21 +58,9 @@ const Header = () => {
     <div>
       {/* Startup Progress Bar */}
       {showProgress && startupStatus && (
-<<<<<<< HEAD
         <div className="header-startup-strip py-2 mb-3">
           <div className="container">
             <div className="header-startup-meta small mb-2">
-=======
-        <div style={{
-          background: 'linear-gradient(180deg, rgba(18, 27, 58, 0.95), rgba(12, 20, 44, 0.95))',
-          borderBottom: '1px solid rgba(110, 168, 254, 0.45)',
-          padding: '10px 0',
-          marginBottom: '10px',
-          boxShadow: '0 4px 14px rgba(6, 12, 28, 0.45)'
-        }}>
-          <div className="container">
-            <div style={{ fontSize: '12px', marginBottom: '6px', color: 'var(--text-secondary)', letterSpacing: '0.2px' }}>
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
               <strong>🎰 Lottery Data Initialization</strong>
               {startupStatus.current_game && (
                 <span className="ms-2">
@@ -82,7 +70,6 @@ const Header = () => {
                   )}
                 </span>
               )}
-<<<<<<< HEAD
               {isCompleted && <span className="ms-2 text-success">✓ Complete</span>}
             </div>
             <div className="progress header-startup-progress" role="progressbar" aria-valuenow={progressPercentage} aria-valuemin="0" aria-valuemax="100">
@@ -91,28 +78,6 @@ const Header = () => {
                 value={Math.max(0, Math.min(progressPercentage, 100))}
                 max="100"
               />
-=======
-              {isCompleted && <span style={{ marginLeft: '8px', color: '#8affd2' }}>✓ Complete</span>}
-            </div>
-            <div style={{
-              width: '100%',
-              backgroundColor: 'rgba(26, 40, 80, 0.95)',
-              border: '1px solid rgba(110, 168, 254, 0.35)',
-              borderRadius: '4px',
-              height: '6px',
-              overflow: 'hidden',
-              position: 'relative'
-            }}>
-              <div style={{
-                width: `${progressPercentage}%`,
-                background: isCompleted
-                  ? 'linear-gradient(90deg, rgba(111, 255, 188, 0.95), rgba(84, 220, 170, 0.95))'
-                  : 'linear-gradient(90deg, var(--accent-green-dark), var(--accent-green), var(--accent-green-light))',
-                height: '100%',
-                transition: 'width 0.3s ease',
-                borderRadius: '4px'
-              }} />
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
             </div>
           </div>
         </div>
@@ -121,10 +86,10 @@ const Header = () => {
       {/* Main Header */}
       <div className="container py-4">
         <div className="alert alert-info">
-          <h4 style={{ marginBottom: '0.4rem', letterSpacing: '0.3px' }}>Welcome to Mensa Predictive Dashboard</h4>
-          <p style={{ marginBottom: 0 }}>Use this app to predict lottery numbers. Follow the workflow: 1. Ingest data, 2. Train the model, 3. Make predictions.</p>
+          <h4>Welcome to Mensa Predictive Dashboard</h4>
+          <p>Use this app to predict lottery numbers. Follow the workflow: 1. Ingest data, 2. Train the model, 3. Make predictions.</p>
         </div>
-        <h2 style={{ marginTop: '0.2rem', marginBottom: 0, letterSpacing: '0.25px' }}>Mensa Predictive Dashboard</h2>
+        <h2>Mensa Predictive Dashboard</h2>
       </div>
     </div>
   );

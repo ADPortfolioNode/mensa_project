@@ -12,14 +12,35 @@ class ChatGPTClient:
     def __init__(self):
         self.api_key = settings.CHAT_GPT_API_KEY or settings.OPENAI_API_KEY
         self.model_name = "gpt-4o-mini"
-        self.client = OpenAI(api_key=self.api_key) if self.api_key else None
+        self.client = None
+        self.init_error = None
 
-    async def generate_text(self, prompt: str) -> str:
-        if not self.api_key or not self.client:
-            return f"{LM_UNAVAILABLE_PREFIX}:missing_key:ChatGPT API key not configured"
+    def _get_client(self):
+        if self.client is not None:
+            return self.client
+        if not self.api_key:
+            return None
 
         try:
-            response = self.client.chat.completions.create(
+            self.client = OpenAI(api_key=self.api_key)
+            self.init_error = None
+            return self.client
+        except Exception as e:
+            self.init_error = str(e)
+            print(f"Error initializing OpenAI client: {e}")
+            return None
+
+    async def generate_text(self, prompt: str) -> str:
+        if not self.api_key:
+            return f"{LM_UNAVAILABLE_PREFIX}:missing_key:ChatGPT API key not configured"
+
+        client = self._get_client()
+        if not client:
+            error_text = self.init_error or "ChatGPT client initialization failed"
+            return f"{LM_UNAVAILABLE_PREFIX}:api_error:{error_text[:220]}"
+
+        try:
+            response = client.chat.completions.create(
                 model=self.model_name,
                 messages=[
                     {"role": "user", "content": prompt},

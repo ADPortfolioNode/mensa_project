@@ -10,8 +10,9 @@ COPY . .
 RUN npm run build
 
 FROM nginx:alpine
-# Copy build output from builder stage
-COPY --from=builder /app/build /usr/share/nginx/html
+# Remove default nginx page content, then copy React build output
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=builder /app/build/ /usr/share/nginx/html/
 # Use custom nginx config for API proxy
 COPY nginx.conf /etc/nginx/nginx.conf
 # Expose the standard HTTP port

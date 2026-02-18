@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import './TrainingCard.css';
-import ProgressiveProgressBar from './ProgressiveProgressBar';
 
 export default function TrainingCard({ trainStatus, trainProgress, iterations, accuracy, onTrain, selectedGame, disabled }) {
   const [expanded, setExpanded] = useState(false);
@@ -15,29 +14,16 @@ export default function TrainingCard({ trainStatus, trainProgress, iterations, a
         <h3>Model Training</h3>
         <div className="training-status">
           <span className={`status-badge ${trainStatus}`}>{trainStatus}</span>
-<<<<<<< HEAD
           {trainStatus === 'in progress' && (
             <div className="training-progress-wrap">
               <progress className="training-progress" value={trainProgress} max="100" />
             </div>
           )}
-=======
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
         </div>
         <button className="expand-btn">{expanded ? '−' : '+'}</button>
       </div>
 
       <div className="training-card-body">
-        {trainStatus === 'in progress' && (
-          <ProgressiveProgressBar
-            current={trainProgress}
-            total={100}
-            status="active"
-            label="Training Progress"
-            showMetadata={false}
-            colorScheme="success"
-          />
-        )}
         <button
           onClick={onTrain}
           disabled={disabled || !selectedGame}

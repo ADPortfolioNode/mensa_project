@@ -500,19 +500,8 @@ export default function Dashboard() {
   }, [ingestStatus, hasStoredDataForSelection]);
 
   const startTrain = useCallback(async () => {
-<<<<<<< HEAD
     if (effectiveIngestStatus !== 'completed' || !selectedTrainGame) {
       alert('Please complete data ingestion first and select a game.');
-=======
-    if (!selectedTrainGame) {
-      alert('Please select a game for training.');
-      return;
-    }
-
-    const selectedGameDrawCount = Number(gameContents[selectedTrainGame] || 0);
-    if (selectedGameDrawCount <= 0) {
-      alert(`No ingested data found for ${selectedTrainGame.toUpperCase()}. Please run ingestion for this game first.`);
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
       return;
     }
     if (selectedTrainGameStoredDraws <= 0) {
@@ -525,7 +514,7 @@ export default function Dashboard() {
     setTrainStartTime(Date.now());
     setExpandedCard('train');
     
-    const interval = setInterval(() => setTrainProgress((p) => Math.min(p + 1, 97)), 400);
+    const interval = setInterval(() => setTrainProgress(p => Math.min(p + 5, 95)), 2000);
     try {
       const response = await axios.post(`${API_BASE}/api/train`, { 
         game: selectedTrainGame,
@@ -560,17 +549,9 @@ export default function Dashboard() {
       setTrainErrorMessage(e?.response?.data?.detail || e.message || 'Training request failed.');
       alert(`Training failed due to an error: ${e.response?.data?.detail || e.message}`);
     }
-<<<<<<< HEAD
   }, [effectiveIngestStatus, selectedTrainGame, selectedTrainGameStoredDraws, trainParams, API_BASE]);
 
   const isTrained = completedTrainingExperiments.length > 0;
-=======
-  }, [selectedTrainGame, trainParams, API_BASE, gameContents]);
-
-  const isTrained = experiments.length > 0;
-  const selectedTrainGameDraws = selectedTrainGame ? Number(gameContents[selectedTrainGame] || 0) : 0;
-  const canTrainSelectedGame = Boolean(selectedTrainGame) && selectedTrainGameDraws > 0;
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
 
   const getGameColorScheme = (gameName) => {
     const idx = games.findIndex((name) => name === gameName);
@@ -986,11 +967,7 @@ export default function Dashboard() {
             <button 
               className="btn btn-success" 
               onClick={startTrain} 
-<<<<<<< HEAD
               disabled={trainStatus === 'in progress' || effectiveIngestStatus !== 'completed' || !selectedTrainGame || selectedTrainGameStoredDraws <= 0}
-=======
-              disabled={trainStatus === 'in progress' || !canTrainSelectedGame}
->>>>>>> 165dff8cc451c862093412a10d4f2db017f0a8f6
             >
               {trainStatus === 'in progress' ? 'Training...' : 'Start Training'}
             </button>
