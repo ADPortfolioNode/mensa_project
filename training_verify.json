@@ -1,0 +1,87 @@
+﻿{
+    "checked_games":  [
+                          {
+                              "game":  "take5",
+                              "status":  "COMPLETED",
+                              "message":  "Successfully trained model for take5",
+                              "accuracy":  0.8650575277128616,
+                              "attempts":  12,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "pick3",
+                              "status":  "COMPLETED",
+                              "message":  "Successfully trained model for pick3",
+                              "accuracy":  0.8522017070200805,
+                              "attempts":  12,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "powerball",
+                              "status":  "COMPLETED",
+                              "message":  "Successfully trained model for powerball",
+                              "accuracy":  0.8745242040129584,
+                              "attempts":  12,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "megamillions",
+                              "status":  "COMPLETED",
+                              "message":  "Successfully trained model for megamillions",
+                              "accuracy":  0.878742732628175,
+                              "attempts":  12,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "pick10",
+                              "status":  "COMPLETED",
+                              "message":  "Successfully trained model for pick10",
+                              "accuracy":  0.9394011336687441,
+                              "attempts":  12,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "cash4life",
+                              "status":  "error",
+                              "message":  "{\"error\":\"DatabaseError(\u0027database disk image is malformed\u0027)\"}",
+                              "accuracy":  null,
+                              "attempts":  null,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "quickdraw",
+                              "status":  "error",
+                              "message":  "{\"error\":\"DatabaseError(\u0027database disk image is malformed\u0027)\"}",
+                              "accuracy":  null,
+                              "attempts":  null,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          },
+                          {
+                              "game":  "nylotto",
+                              "status":  "error",
+                              "message":  "{\"error\":\"DatabaseError(\u0027database disk image is malformed\u0027)\"}",
+                              "accuracy":  null,
+                              "attempts":  null,
+                              "train_size":  null,
+                              "validation_size":  null,
+                              "retained_previous_model":  null
+                          }
+                      ],
+    "selected_game":  null,
+    "first_run":  null,
+    "second_run":  null
+}

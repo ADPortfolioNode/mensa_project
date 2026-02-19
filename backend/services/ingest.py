@@ -189,11 +189,13 @@ class IngestService:
         return ordered
 
     def _process_endpoints(self, game: str, endpoints: list[str], collection, column_names: list[str],
-                           total_rows_processed: int, progress_callback=None):
-        """Process a list of endpoints and return (rows_added, updated_column_names)."""
+                           total_rows_processed: int, progress_callback=None, existing_ids: set[str] | None = None):
+        """Process a list of endpoints and return (rows_processed, rows_added, updated_column_names)."""
         batch_size = self.batch_size
         rows_before = total_rows_processed
+        rows_added = 0
         discovered_total_rows = 0
+        existing_ids = existing_ids or set()
 
         for endpoint_idx, endpoint in enumerate(endpoints):
             success = False
@@ -257,8 +259,14 @@ class IngestService:
                                 else:
                                     print(f"  ⚠ Skipping row {j + row_idx}: unsupported row type {type(row)}")
                                     continue
+                                row_id = hashlib.md5(str(row).encode()).hexdigest()
+                                total_rows_processed += 1
+
+                                if row_id in existing_ids:
+                                    continue
+
                                 metadatas.append(metadata_item)
-                                ids.append(hashlib.md5(str(row).encode()).hexdigest())
+                                ids.append(row_id)
 
                             documents = [str(item) for item in metadatas]
 
@@ -275,8 +283,9 @@ class IngestService:
                                         metadatas=metadatas,
                                         ids=ids
                                     )
+                                existing_ids.update(ids)
+                                rows_added += len(ids)
 
-                            total_rows_processed += len(batch)
                             if progress_callback:
                                 total_for_progress = max(discovered_total_rows, total_rows_processed - rows_before, 1)
                                 progress_callback(total_rows_processed, rows_before + total_for_progress)
@@ -312,7 +321,7 @@ class IngestService:
                 print(f"  ✗ Failed to fetch from endpoint: {last_error}")
                 continue
 
-        return total_rows_processed - rows_before, column_names
+        return total_rows_processed - rows_before, rows_added, column_names
     
     def fetch_and_sync(self, game: str, progress_callback=None, force: bool = False):
         """
@@ -354,49 +363,49 @@ class IngestService:
             raise Exception(f"Failed to connect to ChromaDB collection '{collection_name}': {str(conn_error)}")
 
         existing_count = collection.count()
-        if existing_count > 0 and not force:
-            print(
-                f"↷ [{game_key.upper()}] Skipping ingest: {existing_count} records already exist "
-                f"(use force=True to reload)."
-            )
-            if progress_callback:
-                progress_callback(existing_count, existing_count)
-            return {
-                "status": "success",
-                "added": 0,
-                "total": existing_count,
-                "processed": 0,
-                "skipped_existing": True,
-            }
+        existing_ids: set[str] = set()
 
-        rows_added, column_names = self._process_endpoints(
+        if existing_count > 0 and not force:
+            print(f"↻ [{game_key.upper()}] Existing records detected ({existing_count}). Incremental sync: only missing draws will be added.")
+            try:
+                existing_payload = collection.get(include=[])
+                existing_ids = set(existing_payload.get("ids") or [])
+                print(f"  ✓ Loaded {len(existing_ids)} existing IDs for dedupe")
+            except Exception as existing_error:
+                print(f"  ⚠ Could not pre-load existing IDs ({existing_error}); falling back to upsert-only sync")
+
+        rows_processed, rows_added, column_names = self._process_endpoints(
             game=game_key,
             endpoints=endpoints,
             collection=collection,
             column_names=column_names,
             total_rows_processed=total_rows_processed,
             progress_callback=progress_callback,
+            existing_ids=existing_ids,
         )
-        total_rows_processed += rows_added
+        total_rows_processed += rows_processed
+        total_rows_added = rows_added
 
-        if rows_added == 0 and self.fallback_on_empty:
+        if rows_processed == 0 and self.fallback_on_empty:
             print(f"⚠ [{game_key.upper()}] No rows from configured endpoints; trying catalog fallback candidates...")
             fallback_endpoints = self._fetch_catalog_endpoints(game_key)
             configured_set = set(endpoints)
             fallback_endpoints = [ep for ep in fallback_endpoints if ep not in configured_set]
 
             if fallback_endpoints:
-                fallback_added, column_names = self._process_endpoints(
+                fallback_processed, fallback_added, column_names = self._process_endpoints(
                     game=game_key,
                     endpoints=fallback_endpoints,
                     collection=collection,
                     column_names=column_names,
                     total_rows_processed=total_rows_processed,
                     progress_callback=progress_callback,
+                    existing_ids=existing_ids,
                 )
-                total_rows_processed += fallback_added
+                total_rows_processed += fallback_processed
+                total_rows_added += fallback_added
 
-        if total_rows_processed == 0:
+        if total_rows_processed == 0 and existing_count == 0:
             raise Exception(f"No data was successfully ingested for game '{game_key}'. Check backend logs for details.")
 
         if progress_callback:
@@ -407,7 +416,7 @@ class IngestService:
 
         print(
             f"✓ [{game_key.upper()}] Ingestion complete: processed={total_rows_processed}, "
-            f"net_added={net_added}, total={final_total}"
+            f"added_in_run={total_rows_added}, net_added={net_added}, total={final_total}"
         )
         return {
             "status": "success",
@@ -415,6 +424,8 @@ class IngestService:
             "total": final_total,
             "processed": total_rows_processed,
             "skipped_existing": False,
+            "incremental": bool(existing_count > 0 and not force),
+            "added_in_run": total_rows_added,
         }
 
 ingest_service = IngestService()

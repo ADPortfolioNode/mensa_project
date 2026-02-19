@@ -109,7 +109,17 @@ const StartupProgress = ({ onComplete }) => {
     // Fall back to the number of games if backend omits total
     const totalVal = Number(status.total ?? gameEntries.length ?? 0);
     const rowsFetched = Number(status.current_game_rows_fetched ?? 0);
-    const overallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : 0;
+    const rowsTotal = Number(status.current_game_rows_total ?? 0);
+    const completedGameCount = gameEntries.filter(([, gameData]) => {
+        const gameStatus = String(gameData?.status || '').toLowerCase();
+        return gameStatus === 'completed' || gameStatus === 'failed';
+    }).length;
+    const currentGameFraction = rowsTotal > 0 ? Math.max(0, Math.min(rowsFetched / rowsTotal, 1)) : 0;
+    const fallbackOverallProgress = gameEntries.length > 0
+        ? ((completedGameCount + currentGameFraction) / gameEntries.length) * 100
+        : 0;
+    const backendOverallProgress = totalVal > 0 ? (progressVal / totalVal) * 100 : fallbackOverallProgress;
+    const overallProgress = Math.max(0, Math.min(backendOverallProgress, 100));
     const isIngesting = status.status === 'ingesting';
     const isCompleted = status.status === 'completed';
     const hasGamesConfigured = gameEntries.length > 0;
@@ -194,8 +204,13 @@ const StartupProgress = ({ onComplete }) => {
             {/* Progress Bar */}
             <div className="mb-4">
                 <h4 className="mb-2">
-                    Download Progress: {progressVal.toFixed(1)} of {totalVal} games
-                    {rowsFetched > 0 && (
+                    Download Progress: {Math.round(overallProgress)}% ({progressVal.toFixed(1)} of {totalVal} games)
+                    {rowsFetched > 0 && rowsTotal > 0 && (
+                        <span className="small text-muted">
+                            {' '}({rowsFetched.toLocaleString()} / {rowsTotal.toLocaleString()} rows in {status.current_game})
+                        </span>
+                    )}
+                    {rowsFetched > 0 && rowsTotal <= 0 && (
                         <span className="small text-muted">
                             {' '}({rowsFetched.toLocaleString()} rows in {status.current_game})
                         </span>

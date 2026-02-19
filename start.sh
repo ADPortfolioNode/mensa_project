@@ -27,6 +27,54 @@ choose_compose_command() {
     echo "Using compose command: ${COMPOSE_CMD}"
 }
 
+compose_cmd() {
+    if [ "${COMPOSE_CMD}" = "docker compose" ]; then
+        docker compose "$@"
+    else
+        docker-compose "$@"
+    fi
+}
+
+emit_startup_failure_bundle() {
+    echo ""
+    echo "--- STARTUP FAILURE SNAPSHOT ---" >&2
+    echo "compose command: ${COMPOSE_CMD}" >&2
+    echo "" >&2
+    echo "[compose ps]" >&2
+    compose_cmd ps >&2 || true
+    echo "" >&2
+    echo "[docker info top]" >&2
+    docker info 2>&1 | sed -n '1,60p' >&2 || true
+    echo "" >&2
+    echo "[service logs tail]" >&2
+    compose_cmd logs --tail 80 backend frontend chroma >&2 || true
+    echo "--- END SNAPSHOT ---" >&2
+}
+
+build_images_windows_direct() {
+    local node_version
+    node_version="${NODE_VERSION:-22.13.1}"
+
+    echo "Building backend image directly (Windows stability path)..."
+    if ! run_compose_with_timeout "${START_BUILD_TIMEOUT}" env DOCKER_BUILDKIT=1 docker build --progress=plain -t mensa_project-backend:latest --build-arg "CACHE_BUSTER=${BACKEND_CACHE_BUSTER}" -f backend/Dockerfile backend; then
+        return 1
+    fi
+
+    echo "Building frontend image directly (Windows stability path)..."
+    if ! run_compose_with_timeout "${START_BUILD_TIMEOUT}" env DOCKER_BUILDKIT=1 docker build --progress=plain -t mensa_project-frontend:latest --build-arg "NODE_VERSION=${node_version}" -f frontend/Dockerfile frontend; then
+        return 1
+    fi
+
+    return 0
+}
+
+is_windows_shell() {
+    case "$(uname -s 2>/dev/null || echo unknown)" in
+        MINGW*|MSYS*|CYGWIN*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 configure_build_backend() {
     # BuildKit can intermittently fail on some Docker Desktop setups with:
     # "failed to receive status ... EOF" during large layer operations.
@@ -162,30 +210,47 @@ check_docker_version() {
 }
 
 run_compose_up_with_retries() {
-    local attempts=3
-    local delay=20 # Increased delay
+    local attempts=${START_UP_ATTEMPTS}
+    local delay=${START_RETRY_DELAY}
+
+    if [ "${attempts}" -lt 1 ]; then
+        attempts=1
+    fi
+
     for i in $(seq 1 ${attempts}); do
         echo "Attempt ${i}/${attempts}: bring up compose stack"
 
         # If BUILD requested, run an explicit build step first (supports --no-cache)
         if [ "${BUILD}" = true ]; then
-            echo "Building images (no-cache)..."
-            if ! eval "${COMPOSE_CMD} build --no-cache"; then
-                echo "Compose build failed; retrying in ${delay}s..."
-                sleep ${delay}
-                delay=$((delay * 2))
-                continue
+            if is_windows_shell; then
+                echo "Building images via direct docker build on Windows shell for stability..."
+                if ! build_images_windows_direct; then
+                    echo "Compose build failed; retrying in ${delay}s..."
+                    sleep ${delay}
+                    delay=$((delay * 2))
+                    continue
+                fi
+            else
+                echo "Building images (no-cache)..."
+                if ! run_compose_with_timeout "${START_BUILD_TIMEOUT}" compose_cmd build --no-cache; then
+                    echo "Compose build failed; retrying in ${delay}s..."
+                    sleep ${delay}
+                    delay=$((delay * 2))
+                    continue
+                fi
             fi
         fi
 
         echo "Starting services..."
-        if run_compose_with_timeout 5400 sh -lc "${COMPOSE_CMD} up -d --force-recreate"; then
+        if run_compose_with_timeout "${START_UP_TIMEOUT}" compose_cmd up -d --force-recreate; then
             return 0
         fi
 
-        echo "Compose up failed; retrying in ${delay}s..."
-        sleep ${delay}
-        delay=$((delay * 2))
+        if [ "${i}" -lt "${attempts}" ]; then
+            echo "Compose up failed; retrying in ${delay}s..."
+            sleep ${delay}
+            delay=$((delay * 2))
+        fi
     done
     return 1
 }
@@ -194,32 +259,28 @@ run_compose_with_timeout() {
     local seconds="$1"
     shift
     local cmd_preview="$*"
-    if command -v timeout >/dev/null 2>&1 && timeout --version 2>/dev/null | grep -qi "coreutils"; then
-        timeout "${seconds}"s "$@"
-    elif command -v gtimeout >/dev/null 2>&1; then
-        gtimeout "${seconds}"s "$@"
-    else
-        "$@" &
-        local cmd_pid=$!
-        local elapsed=0
 
-        while kill -0 "${cmd_pid}" 2>/dev/null; do
-            if [ "${elapsed}" -gt 0 ] && [ $((elapsed % 10)) -eq 0 ]; then
-                echo "... still waiting (${elapsed}s/${seconds}s): ${cmd_preview}"
-            fi
-            if [ "${elapsed}" -ge "${seconds}" ]; then
-                kill -TERM "${cmd_pid}" 2>/dev/null || true
-                sleep 2
-                kill -KILL "${cmd_pid}" 2>/dev/null || true
-                wait "${cmd_pid}" 2>/dev/null || true
-                return 124
-            fi
-            sleep 1
-            elapsed=$((elapsed + 1))
-        done
+    "$@" &
+    local cmd_pid=$!
+    local elapsed=0
 
-        wait "${cmd_pid}"
-    fi
+    while kill -0 "${cmd_pid}" 2>/dev/null; do
+        if [ "${elapsed}" -gt 0 ] && [ $((elapsed % 10)) -eq 0 ]; then
+            echo "... still waiting (${elapsed}s/${seconds}s): ${cmd_preview}"
+        fi
+        if [ "${elapsed}" -ge "${seconds}" ]; then
+            kill -TERM "-${cmd_pid}" 2>/dev/null || kill -TERM "${cmd_pid}" 2>/dev/null || true
+            sleep 2
+            kill -KILL "-${cmd_pid}" 2>/dev/null || kill -KILL "${cmd_pid}" 2>/dev/null || true
+            wait "${cmd_pid}" 2>/dev/null || true
+            echo "TIMEOUT: command exceeded ${seconds}s: ${cmd_preview}" >&2
+            return 124
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    wait "${cmd_pid}"
 }
 
 confirm_prune() {
@@ -247,6 +308,40 @@ run_prune() {
     fi
 }
 
+force_cleanup_mensa_runtime_once() {
+    echo "Attempting one-time forced cleanup for stuck Mensa containers..."
+
+    run_compose_with_timeout 30 docker rm -f mensa_frontend mensa_backend mensa_chroma >/dev/null 2>&1 || true
+    run_compose_with_timeout 20 docker network rm mensa_project_default >/dev/null 2>&1 || true
+    if ! is_windows_shell; then
+        run_compose_with_timeout 30 docker network prune -f >/dev/null 2>&1 || true
+    fi
+
+    echo "Forced cleanup pass completed."
+}
+
+kill_stale_cleanup_jobs() {
+    if command -v pkill >/dev/null 2>&1; then
+        pkill -f "docker compose down --remove-orphans" >/dev/null 2>&1 || true
+        pkill -f "sh -lc docker compose down --remove-orphans" >/dev/null 2>&1 || true
+        pkill -f "docker compose up -d --force-recreate" >/dev/null 2>&1 || true
+        pkill -f "docker compose up -d --build --force-recreate" >/dev/null 2>&1 || true
+        pkill -f "sh -lc docker compose up -d --force-recreate" >/dev/null 2>&1 || true
+        pkill -f "sh -lc docker compose up -d --build --force-recreate" >/dev/null 2>&1 || true
+        pkill -f "docker-compose up -d --force-recreate" >/dev/null 2>&1 || true
+        pkill -f "docker-compose up -d --build --force-recreate" >/dev/null 2>&1 || true
+        pkill -f "docker rm -f mensa_frontend mensa_backend mensa_chroma" >/dev/null 2>&1 || true
+        pkill -f "docker network prune -f" >/dev/null 2>&1 || true
+        pkill -f "docker network rm mensa_project_default" >/dev/null 2>&1 || true
+    fi
+
+    if is_windows_shell && command -v powershell.exe >/dev/null 2>&1; then
+        powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \
+            \$_.CommandLine -match 'docker compose down --remove-orphans|sh -lc docker compose down --remove-orphans|docker compose up -d --force-recreate|docker compose up -d --build --force-recreate|sh -lc docker compose up -d --force-recreate|sh -lc docker compose up -d --build --force-recreate|docker-compose up -d --force-recreate|docker-compose up -d --build --force-recreate|docker rm -f mensa_frontend mensa_backend mensa_chroma|docker network prune -f|docker network rm mensa_project_default' \
+        } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }" >/dev/null 2>&1 || true
+    fi
+}
+
 # --- Main Script ---
 
 PRUNE=false
@@ -254,6 +349,10 @@ AUTOMATIC_YES=false
 WAIT_FOR_INGEST=true
 BUILD=false
 DIAG_RUN=false
+START_BUILD_TIMEOUT=${START_BUILD_TIMEOUT:-900}
+START_UP_TIMEOUT=${START_UP_TIMEOUT:-600}
+START_UP_ATTEMPTS=${START_UP_ATTEMPTS:-1}
+START_RETRY_DELAY=${START_RETRY_DELAY:-15}
 
 while [[ ${#} -gt 0 ]]; do
     case "$1" in
@@ -270,6 +369,11 @@ done
 # --- Execution Flow ---
 
 if [ "${DIAG_RUN}" = true ]; then
+    if is_windows_shell && command -v powershell.exe >/dev/null 2>&1; then
+        powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \
+            \$_.CommandLine -match 'bash.exe\" \"/e/.*/diag_start.sh' \
+        } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }" >/dev/null 2>&1 || true
+    fi
     if [ -f "./diag_start.sh" ]; then
         exec ./diag_start.sh
     else
@@ -327,8 +431,12 @@ echo ""
 
 # 4. Stop and remove old containers and orphans
 echo "Stopping and removing any old containers..."
-if ! run_compose_with_timeout 180 sh -lc "${COMPOSE_CMD} down --remove-orphans"; then
-    echo "WARNING: compose down timed out; continuing startup." >&2
+kill_stale_cleanup_jobs
+if is_windows_shell; then
+    echo "Windows shell detected; skipping compose down/cleanup to avoid CLI hang."
+elif ! run_compose_with_timeout 60 compose_cmd down --remove-orphans --timeout 25; then
+    echo "WARNING: compose down timed out/failed; running one-time forced cleanup." >&2
+    force_cleanup_mensa_runtime_once
 fi
 echo ""
 
@@ -336,6 +444,7 @@ echo ""
 echo "Building and starting services (this may take a few minutes on first run)..."
 if ! run_compose_up_with_retries; then
     echo "ERROR: docker-compose failed after retries. This is often a Docker environment issue." >&2
+    emit_startup_failure_bundle
     echo "Suggestion: Restart Docker Desktop and try again." >&2
     echo "For a detailed error log, run this script with the --diag flag: ./start.sh --diag" >&2
     exit 1
@@ -350,8 +459,18 @@ wait_for_service() {
     echo "Waiting for ${svc_name} to be running/healthy (timeout ${max_checks}*${interval}s)..."
     
     for i in $(seq 1 ${max_checks}); do
-        local container
-        container=$(docker ps -a --filter "name=${container_name}" --format "{{.Names}}" | head -n1 || true)
+        local container_id container
+        container_id=$(eval "${COMPOSE_CMD} ps -q ${svc_name}" 2>/dev/null || true)
+        container=""
+
+        if [ -n "${container_id}" ]; then
+            container=$(docker inspect --format '{{.Name}}' "${container_id}" 2>/dev/null | sed 's#^/##' || true)
+        fi
+
+        if [ -z "${container}" ]; then
+            container=$(docker ps -a --filter "name=${container_name}" --format "{{.Names}}" | head -n1 || true)
+        fi
+
         if [ -z "${container}" ]; then
             echo "  ${svc_name} -> container not found yet..."
             sleep ${interval}
@@ -395,8 +514,8 @@ wait_for_service() {
     echo "✗ ERROR: Timed out waiting for ${svc_name} to become ready." >&2
     echo "--- STATUS OF ${container_name} ---" >&2
     docker ps -a --filter "name=${container_name}" >&2
-    echo "--- LOGS FOR ${container_name} ---" >&2
-    docker logs "${container_name}" --tail 100 || true
+    echo "--- LOGS FOR ${svc_name} ---" >&2
+    eval "${COMPOSE_CMD} logs --tail 100 ${svc_name}" || true
     echo "------------------------------------" >&2
     return 1
 }
@@ -420,8 +539,9 @@ _print_progress_bar() {
     
     local empty=$((width - filled))
     printf "["
-    printf "%.0s█" $(seq 1 $filled)
-    printf "%.0s░" $(seq 1 $empty)
+    local i
+    for ((i=0; i<filled; i++)); do printf "█"; done
+    for ((i=0; i<empty; i++)); do printf "░"; done
     printf "] %d/%d (%d%%)\n" "$progress" "$total" "$percentage"
 }
 
@@ -453,9 +573,9 @@ monitor_ingestion_progress() {
     local printed_lines=0
     while true; do
         local response
-        response=$(curl -s "${api_endpoint}")
+        response=$(curl -s "${api_endpoint}" || true)
         local status
-        status=$(echo "${response}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+        status=$(echo "${response}" | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
 
         if [ -z "${status}" ]; then
             echo "WARNING: Could not parse status from API response. Retrying..."
@@ -471,8 +591,11 @@ monitor_ingestion_progress() {
         local progress total current_game current_task
         progress=$(echo "${response}" | grep -o '"progress":[0-9]*' | cut -d':' -f2 | sed 's/,//g' || echo 0)
         total=$(echo "${response}" | grep -o '"total":[0-9]*' | cut -d':' -f2 | sed 's/,//g' || echo 1)
-        current_game=$(echo "${response}" | grep -o '"current_game":"[^"]*"' | cut -d'"' -f4)
-        current_task=$(echo "${response}" | grep -o '"current_task":"[^"]*"' | cut -d'"' -f4)
+        current_game=$(echo "${response}" | grep -o '"current_game":"[^"]*"' | cut -d'"' -f4 || true)
+        current_task=$(echo "${response}" | grep -o '"current_task":"[^"]*"' | cut -d'"' -f4 || true)
+
+        [ -n "${current_game}" ] || current_game="n/a"
+        [ -n "${current_task}" ] || current_task="n/a"
 
         echo "Data Ingestion Status: [${status}]"
         _print_progress_bar "${progress:-0}" "${total:-1}"

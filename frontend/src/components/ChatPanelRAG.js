@@ -18,7 +18,7 @@ const API_ENDPOINTS = [
     { label: 'List Experiments', method: 'GET', path: '/api/experiments', description: 'List saved training/prediction experiments.', sampleBody: '' },
     { label: 'Predict Next Draw', method: 'POST', path: '/api/predict', description: 'Run prediction for a game.', sampleBody: '{\n  "game": "pick3",\n  "recent_k": 10\n}' },
     { label: 'Chroma Status', method: 'GET', path: '/api/chroma/status', description: 'Get ChromaDB health/status.', sampleBody: '' },
-    { label: 'Health Check', method: 'GET', path: '/health', description: 'Backend health endpoint.', sampleBody: '' },
+    { label: 'Health Check', method: 'GET', path: '/api/health', description: 'Backend health endpoint.', sampleBody: '' },
 ];
 
 const NEXT_SCHEDULED_DRAW_BY_GAME = {
@@ -55,7 +55,7 @@ function buildInitialConciergeGreeting(selectedGame) {
         .join('\n');
 
     return (
-        'Hi! I am your Mensa Concierge — friendly, helpful, and expert in Python, React, and ChromaDB RAG. '\n+
+        'Hi! I am your Mensa Concierge — friendly, helpful, and expert in Python, React, and ChromaDB RAG. '
         + 'I can chat, manage files, run internet search, and perform self diagnostics.\n\n'
         + '**Next scheduled draw per game (ET):**\n'
         + `${drawLines}\n\n`

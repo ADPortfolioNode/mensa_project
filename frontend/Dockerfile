@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps || npm ci
 COPY . .
-RUN npm run build
+RUN npm run build && test -f /app/build/index.html
 
 FROM nginx:alpine
 # Remove default nginx page content, then copy React build output

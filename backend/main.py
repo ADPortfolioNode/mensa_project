@@ -174,6 +174,25 @@ def _workspace_roots() -> list[Path]:
     return [path.resolve() for path in candidates if path.exists()]
 
 
+def _map_container_style_path(path_obj: Path, workspace_root: Path) -> Path:
+    """
+    Map container-style absolute paths (e.g. /app/backend/...) to the active
+    workspace root when the API is running outside the container.
+    """
+    posix_path = path_obj.as_posix()
+
+    if posix_path in {"/app", "/workspace"}:
+        return workspace_root.resolve()
+
+    for prefix in ("/app/", "/workspace/"):
+        if posix_path.startswith(prefix):
+            rel = posix_path[len(prefix):]
+            if rel:
+                return (workspace_root / rel).resolve()
+
+    return path_obj.resolve()
+
+
 def _resolve_safe_path(raw_path: str) -> Path:
     if not raw_path:
         raise ValueError("Path is required")
@@ -185,6 +204,11 @@ def _resolve_safe_path(raw_path: str) -> Path:
 
     if p.is_absolute():
         resolved = p.resolve()
+
+        # Compatibility: if caller passed a container path while backend runs
+        # locally, remap /app/... to current workspace root.
+        if not resolved.exists():
+            resolved = _map_container_style_path(p, roots[0])
     else:
         resolved = (roots[0] / p).resolve()
 
@@ -511,9 +535,23 @@ def _chat_fallback_for_lm_unavailable(user_text: str, lm_response: str, raw_game
             "You can still use this app for ingestion, training, and predictions while LM access is down."
         )
 
+    snapshots = _draw_schedule_fallback_context(raw_game)
+    local_data_line = ""
+    if snapshots:
+        top = snapshots[:2]
+        parts = []
+        for item in top:
+            game = str(item.get("game", "")).upper()
+            latest_date = item.get("latest_draw_date") or "unknown"
+            latest_numbers = item.get("latest_numbers") or "unknown"
+            parts.append(f"{game}: {latest_date} / {latest_numbers}")
+        local_data_line = " Latest local records: " + " | ".join(parts) + "."
+
     return (
-        f"I can’t use the LM right now because {reason_message} "
-        "Please retry shortly, or update backend LM quota/key configuration."
+        f"LM providers are currently unavailable ({reason_message}). "
+        "Local mode is active, and you can continue normally: run ingest, train models, generate predictions, and inspect Chroma collections."
+        f"{local_data_line} "
+        "If you need conversational LM output, retry shortly or update LM key/quota settings."
     )
 
 
@@ -702,11 +740,16 @@ async def ingest_data(request: IngestRequest):
         }
         print(f"✅ Manual ingestion completed for {game_key}")
         skipped_existing = bool(result.get("skipped_existing", False))
-        response_message = (
-            f"Skipped ingest for {game_key}: records already exist"
-            if skipped_existing
-            else f"Successfully ingested {game_key}"
-        )
+        incremental_mode = bool(result.get("incremental", False))
+        added_count = int(result.get("added", 0) or 0)
+        if skipped_existing:
+            response_message = f"Skipped ingest for {game_key}: records already exist"
+        elif incremental_mode and added_count == 0:
+            response_message = f"No missing draws found for {game_key}; data is already up to date"
+        elif incremental_mode:
+            response_message = f"Incrementally updated {game_key} with {added_count} missing draws"
+        else:
+            response_message = f"Successfully ingested {game_key}"
         return {
             "status": "completed",
             "game": game_key,
@@ -714,6 +757,8 @@ async def ingest_data(request: IngestRequest):
             "total": result.get("total", 0),
             "processed": result.get("processed", 0),
             "skipped_existing": skipped_existing,
+            "incremental": incremental_mode,
+            "added_in_run": result.get("added_in_run", result.get("added", 0)),
             "message": response_message,
         }
     except Exception as e:

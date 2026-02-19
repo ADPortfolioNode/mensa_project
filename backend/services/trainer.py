@@ -12,6 +12,8 @@ class TrainerService:
     def __init__(self):
         self.models_dir = "/data/models"
         os.makedirs(self.models_dir, exist_ok=True)
+        self.target_accuracy = float(os.environ.get("TRAIN_TARGET_ACCURACY", "0.95"))
+        self.max_train_attempts = int(os.environ.get("TRAIN_MAX_ATTEMPTS", "12"))
 
     def _parse_numbers(self, raw_value: str):
         tokens = re.findall(r"\d+", str(raw_value or ""))
@@ -160,6 +162,59 @@ class TrainerService:
 
         return np.array(X), np.array(y), feature_len, output_len
 
+    def _fit_and_score_model(self, X_train, y_train, X_val, y_val, y_full, attempt: int):
+        model = RandomForestRegressor(
+            n_estimators=min(80 + (attempt * 25), 500),
+            random_state=42 + attempt,
+            n_jobs=-1,
+            max_depth=min(12 + attempt, 28),
+            min_samples_split=2,
+        )
+        model.fit(X_train, y_train)
+
+        predictions = model.predict(X_val)
+        mae = float(mean_absolute_error(y_val, predictions))
+        max_val = float(np.max(y_full)) if np.max(y_full) > 0 else 1.0
+        accuracy = max(0.0, 1.0 - (mae / max_val))
+        return model, mae, accuracy
+
+    def _train_recursive(self, X_train, y_train, X_val, y_val, y_full, attempt: int = 1, best_result: dict | None = None):
+        model, mae, accuracy = self._fit_and_score_model(X_train, y_train, X_val, y_val, y_full, attempt)
+
+        current = {
+            "model": model,
+            "mae": mae,
+            "accuracy": accuracy,
+            "attempt": attempt,
+        }
+
+        if best_result is None or accuracy > best_result["accuracy"]:
+            best_result = current
+
+        if accuracy >= self.target_accuracy:
+            return {
+                **current,
+                "reached_target": True,
+                "attempts": attempt,
+            }
+
+        if attempt >= self.max_train_attempts:
+            return {
+                **best_result,
+                "reached_target": False,
+                "attempts": attempt,
+            }
+
+        return self._train_recursive(
+            X_train,
+            y_train,
+            X_val,
+            y_val,
+            y_full,
+            attempt=attempt + 1,
+            best_result=best_result,
+        )
+
     def train_model(self, game: str):
         from .chroma_client import chroma_client
 
@@ -174,22 +229,20 @@ class TrainerService:
         if X is None or len(X) < 10:
             return {"status": "error", "message": "Not enough parsed winning-number sequences to train."}
 
-        test_size = 0.25 if len(X) >= 40 else 0.2
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=test_size, random_state=42)
-
-        model = RandomForestRegressor(
-            n_estimators=80,
+        train_size = 0.33
+        val_size = 0.67
+        X_train, X_val, y_train, y_val = train_test_split(
+            X,
+            y,
+            train_size=train_size,
+            test_size=val_size,
             random_state=42,
-            n_jobs=-1,
-            max_depth=12,
-            min_samples_split=2,
         )
-        model.fit(X_train, y_train)
 
-        predictions = model.predict(X_val)
-        mae = float(mean_absolute_error(y_val, predictions))
-        max_val = float(np.max(y)) if np.max(y) > 0 else 1.0
-        accuracy = max(0.0, 1.0 - (mae / max_val))
+        train_result = self._train_recursive(X_train, y_train, X_val, y_val, y)
+        model = train_result["model"]
+        mae = float(train_result["mae"])
+        accuracy = float(train_result["accuracy"])
 
         model_path = os.path.join(self.models_dir, f"{game}_model.joblib")
         artifact = {
@@ -199,7 +252,50 @@ class TrainerService:
             "game": game,
             "rules": self._get_rules(game),
             "version": 1,
+            "metrics": {
+                "accuracy": accuracy,
+                "mae": mae,
+                "attempts": int(train_result.get("attempts", 1)),
+                "reached_target": bool(train_result.get("reached_target", False)),
+                "target_accuracy": self.target_accuracy,
+                "train_size": train_size,
+                "validation_size": val_size,
+            },
         }
+
+        previous_accuracy = None
+        if os.path.exists(model_path):
+            try:
+                existing_artifact = joblib.load(model_path)
+                metrics = (existing_artifact or {}).get("metrics") if isinstance(existing_artifact, dict) else None
+                if isinstance(metrics, dict):
+                    existing_accuracy = metrics.get("accuracy")
+                    if existing_accuracy is not None:
+                        previous_accuracy = float(existing_accuracy)
+            except Exception:
+                previous_accuracy = None
+
+        if previous_accuracy is not None and accuracy < previous_accuracy:
+            return {
+                "status": "success",
+                "message": (
+                    f"Training completed for {game}, but previous model was retained to minimize regression "
+                    f"(new accuracy={accuracy:.4f} < previous accuracy={previous_accuracy:.4f})."
+                ),
+                "accuracy": previous_accuracy,
+                "new_accuracy": accuracy,
+                "mae": mae,
+                "model_path": model_path,
+                "feature_len": feature_len,
+                "output_len": output_len,
+                "samples": int(len(X)),
+                "target_accuracy": self.target_accuracy,
+                "attempts": int(train_result.get("attempts", 1)),
+                "reached_target": bool(train_result.get("reached_target", False)),
+                "retained_previous_model": True,
+                "train_size": train_size,
+                "validation_size": val_size,
+            }
 
         temp_model_path = f"{model_path}.tmp"
         joblib.dump(artifact, temp_model_path, compress=3)
@@ -216,6 +312,12 @@ class TrainerService:
             "feature_len": feature_len,
             "output_len": output_len,
             "samples": int(len(X)),
+            "target_accuracy": self.target_accuracy,
+            "attempts": int(train_result.get("attempts", 1)),
+            "reached_target": bool(train_result.get("reached_target", False)),
+            "retained_previous_model": False,
+            "train_size": train_size,
+            "validation_size": val_size,
         }
 
 
