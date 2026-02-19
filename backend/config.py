@@ -209,6 +209,51 @@ GAME_PREDICTION_FORMATS = {
     },
 }
 
+GAME_PREDICTION_SCHEDULES = {
+    "take5": {
+        "daily_draws": 2,
+        "weekday_draws": {},
+    },
+    "pick3": {
+        "daily_draws": 2,
+        "weekday_draws": {},
+    },
+    "powerball": {
+        "daily_draws": 0,
+        "weekday_draws": {
+            0: 1,
+            2: 1,
+            5: 1,
+        },
+    },
+    "megamillions": {
+        "daily_draws": 0,
+        "weekday_draws": {
+            1: 1,
+            4: 1,
+        },
+    },
+    "pick10": {
+        "daily_draws": 1,
+        "weekday_draws": {},
+    },
+    "cash4life": {
+        "daily_draws": 1,
+        "weekday_draws": {},
+    },
+    "quickdraw": {
+        "daily_draws": 360,
+        "weekday_draws": {},
+    },
+    "nylotto": {
+        "daily_draws": 0,
+        "weekday_draws": {
+            2: 1,
+            5: 1,
+        },
+    },
+}
+
 
 def _normalize_game_token(value: str | None) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "", (value or "").strip().lower())

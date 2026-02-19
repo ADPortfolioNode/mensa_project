@@ -1,12 +1,39 @@
 import os
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import numpy as np
 import joblib
-from config import GAME_CONFIGS, GAME_PREDICTION_FORMATS
+from config import GAME_CONFIGS, GAME_PREDICTION_FORMATS, GAME_PREDICTION_SCHEDULES
 
 class PredictorService:
     def __init__(self):
         self.models_dir = "/data/models"
+        self.prediction_timezone = os.getenv("PREDICTION_TIMEZONE", "America/New_York")
+        self.max_session_draws = int(os.getenv("PREDICTION_MAX_SESSION_DRAWS", "400"))
+
+    def _current_prediction_datetime(self):
+        try:
+            return datetime.now(ZoneInfo(self.prediction_timezone))
+        except Exception:
+            return datetime.utcnow()
+
+    def _get_session_draw_count(self, game: str, when: datetime):
+        schedule = GAME_PREDICTION_SCHEDULES.get(game, {}) or {}
+        daily_draws = int(schedule.get("daily_draws", 1) or 0)
+        weekday_draws = schedule.get("weekday_draws", {}) or {}
+        weekday = int(when.weekday())
+
+        if weekday_draws:
+            draw_count = int(weekday_draws.get(weekday, daily_draws) or 0)
+        else:
+            draw_count = daily_draws
+
+        draw_count = max(0, draw_count)
+        if self.max_session_draws > 0:
+            draw_count = min(draw_count, self.max_session_draws)
+
+        return draw_count
 
     def _parse_numbers(self, raw_value):
         return [int(token) for token in re.findall(r"\d+", str(raw_value or ""))]
@@ -161,7 +188,62 @@ class PredictorService:
 
         return formatted, main_values + bonus_values
 
+    def _predict_from_artifact(self, artifact: dict, X):
+        model_strategy = str((artifact or {}).get("model_strategy", "single"))
+        primary_model = (artifact or {}).get("model")
+        if primary_model is None:
+            raise ValueError("Model artifact for prediction is invalid.")
+
+        if model_strategy == "ensemble":
+            secondary_model = (artifact or {}).get("secondary_model")
+            if secondary_model is None:
+                raise ValueError("Ensemble model artifact is missing secondary model.")
+            blend_weight = float((artifact or {}).get("blend_weight", 0.7))
+            blend_weight = max(0.0, min(1.0, blend_weight))
+            primary_pred = np.asarray(primary_model.predict(X), dtype=float)
+            secondary_pred = np.asarray(secondary_model.predict(X), dtype=float)
+            return (blend_weight * primary_pred) + ((1.0 - blend_weight) * secondary_pred)
+
+        return np.asarray(primary_model.predict(X), dtype=float)
+
+    def _predict_first_draw_payload(self, game: str):
+        format_spec = GAME_PREDICTION_FORMATS.get(game, {}) or {}
+        return {
+            "predicted_numbers": [],
+            "formatted_prediction": {
+                "main_numbers": [],
+                "bonus_numbers": [],
+                "main_label": format_spec.get("main_label", "Numbers"),
+                "bonus_label": format_spec.get("bonus_label", "Bonus"),
+                "has_bonus": int(format_spec.get("bonus_count", 0) or 0) > 0,
+            },
+            "predicted_main_numbers": [],
+            "predicted_bonus_numbers": [],
+        }
+
     def predict_next_draw(self, game: str, recent_k: int = 10):
+        session_result = self.predict_prediction_session(game=game, recent_k=recent_k)
+        if session_result.get("status") != "success":
+            return session_result
+
+        first_draw = session_result.get("prediction_session", [])
+        first_payload = first_draw[0] if first_draw else self._predict_first_draw_payload(game)
+
+        return {
+            "status": "success",
+            "game": game,
+            **first_payload,
+            "prediction_session": session_result.get("prediction_session", []),
+            "session_draw_count": session_result.get("session_draw_count", 0),
+            "prediction_date": session_result.get("prediction_date"),
+            "prediction_weekday": session_result.get("prediction_weekday"),
+            "prediction_timezone": session_result.get("prediction_timezone"),
+            "predicted_for_date": session_result.get("prediction_date"),
+            "model_strategy": session_result.get("model_strategy", "single"),
+            "blend_weight": session_result.get("blend_weight"),
+        }
+
+    def predict_prediction_session(self, game: str, recent_k: int = 10):
         # Lazy import to avoid ChromaDB connection during module import
         from .chroma_client import chroma_client
         
@@ -176,6 +258,8 @@ class PredictorService:
         except Exception as exc:
             return {"status": "error", "message": f"Unable to load model for game '{game}': {str(exc)}"}
         model = artifact.get("model")
+        model_strategy = str(artifact.get("model_strategy", "single"))
+        blend_weight = artifact.get("blend_weight")
         feature_len = int(artifact.get("feature_len", 10))
         output_len = int(artifact.get("output_len", 6))
         rules = artifact.get("rules") or self._get_rules(game)
@@ -195,34 +279,68 @@ class PredictorService:
         if not sequences:
             return {"status": "error", "message": "No valid sequences found."}
         
-        # Use the most recent sequence
-        seq = sequences[0]
-        seq = seq + [0] * (feature_len - len(seq)) if len(seq) < feature_len else seq[:feature_len]
-        
-        X = np.array([seq])
-        
-        prediction = model.predict(X)
-        prediction = np.array(prediction).reshape(-1)[:output_len]
+        prediction_dt = self._current_prediction_datetime()
+        session_draw_count = self._get_session_draw_count(game, prediction_dt)
+
+        if session_draw_count <= 0:
+            return {
+                "status": "success",
+                "game": game,
+                "prediction_session": [],
+                "session_draw_count": 0,
+                "prediction_date": prediction_dt.date().isoformat(),
+                "prediction_weekday": prediction_dt.strftime("%A"),
+                "prediction_timezone": self.prediction_timezone,
+                "message": f"No scheduled draws for {game} on {prediction_dt.strftime('%A')}.",
+            }
 
         primary_count = int(rules.get("primary_count", 5))
         bonus_count = int(rules.get("bonus_count", 0) or 0)
         include_bonus = bonus_count > 0 and output_len >= (primary_count + bonus_count)
 
-        primary_raw = prediction[:primary_count]
-        bonus_raw = prediction[primary_count:primary_count + bonus_count] if include_bonus else []
+        seq = sequences[0]
+        seq = seq + [0] * (feature_len - len(seq)) if len(seq) < feature_len else seq[:feature_len]
 
-        primary_numbers = self._normalize_primary_predictions(primary_raw, rules)
-        bonus_numbers = self._normalize_bonus_predictions(bonus_raw, rules, include_bonus)
-        predicted_numbers = primary_numbers + bonus_numbers
-        formatted_prediction, normalized_flat = self._format_prediction(game, predicted_numbers)
-        
+        session_predictions = []
+        current_seq = list(seq)
+
+        for draw_index in range(session_draw_count):
+            X = np.array([current_seq])
+            prediction = self._predict_from_artifact(artifact, X)
+            prediction = np.array(prediction).reshape(-1)[:output_len]
+
+            primary_raw = prediction[:primary_count]
+            bonus_raw = prediction[primary_count:primary_count + bonus_count] if include_bonus else []
+
+            primary_numbers = self._normalize_primary_predictions(primary_raw, rules)
+            bonus_numbers = self._normalize_bonus_predictions(bonus_raw, rules, include_bonus)
+            predicted_numbers = primary_numbers + bonus_numbers
+            formatted_prediction, normalized_flat = self._format_prediction(game, predicted_numbers)
+
+            session_predictions.append({
+                "draw_index": draw_index + 1,
+                "prediction_date": prediction_dt.date().isoformat(),
+                "prediction_weekday": prediction_dt.strftime("%A"),
+                "prediction_timezone": self.prediction_timezone,
+                "predicted_numbers": normalized_flat,
+                "formatted_prediction": formatted_prediction,
+                "predicted_main_numbers": primary_numbers,
+                "predicted_bonus_numbers": bonus_numbers,
+            })
+
+            next_seq = list(normalized_flat)
+            current_seq = next_seq + [0] * (feature_len - len(next_seq)) if len(next_seq) < feature_len else next_seq[:feature_len]
+
         return {
             "status": "success",
             "game": game,
-            "predicted_numbers": normalized_flat,
-            "formatted_prediction": formatted_prediction,
-            "predicted_main_numbers": primary_numbers,
-            "predicted_bonus_numbers": bonus_numbers,
+            "prediction_session": session_predictions,
+            "session_draw_count": len(session_predictions),
+            "prediction_date": prediction_dt.date().isoformat(),
+            "prediction_weekday": prediction_dt.strftime("%A"),
+            "prediction_timezone": self.prediction_timezone,
+            "model_strategy": model_strategy,
+            "blend_weight": blend_weight,
         }
 
     def predict_all_games(self, games, recent_k: int = 10):

@@ -14,6 +14,7 @@ class TrainerService:
         os.makedirs(self.models_dir, exist_ok=True)
         self.target_accuracy = float(os.environ.get("TRAIN_TARGET_ACCURACY", "0.95"))
         self.max_train_attempts = int(os.environ.get("TRAIN_MAX_ATTEMPTS", "12"))
+        self.blend_step = float(os.environ.get("TRAIN_BLEND_STEP", "0.1"))
 
     def _parse_numbers(self, raw_value: str):
         tokens = re.findall(r"\d+", str(raw_value or ""))
@@ -162,6 +163,12 @@ class TrainerService:
 
         return np.array(X), np.array(y), feature_len, output_len
 
+    def _score_predictions(self, y_true, y_pred, y_full):
+        mae = float(mean_absolute_error(y_true, y_pred))
+        max_val = float(np.max(y_full)) if np.max(y_full) > 0 else 1.0
+        accuracy = max(0.0, 1.0 - (mae / max_val))
+        return mae, accuracy
+
     def _fit_and_score_model(self, X_train, y_train, X_val, y_val, y_full, attempt: int):
         model = RandomForestRegressor(
             n_estimators=min(80 + (attempt * 25), 500),
@@ -173,19 +180,52 @@ class TrainerService:
         model.fit(X_train, y_train)
 
         predictions = model.predict(X_val)
-        mae = float(mean_absolute_error(y_val, predictions))
-        max_val = float(np.max(y_full)) if np.max(y_full) > 0 else 1.0
-        accuracy = max(0.0, 1.0 - (mae / max_val))
-        return model, mae, accuracy
+        mae, accuracy = self._score_predictions(y_val, predictions, y_full)
+        return model, mae, accuracy, predictions
+
+    def _predict_with_artifact(self, artifact: dict, X):
+        model_strategy = str((artifact or {}).get("model_strategy", "single"))
+        primary_model = (artifact or {}).get("model")
+        if primary_model is None:
+            raise ValueError("Model artifact is missing primary model")
+
+        if model_strategy == "ensemble":
+            secondary_model = (artifact or {}).get("secondary_model")
+            if secondary_model is None:
+                raise ValueError("Ensemble artifact is missing secondary model")
+            blend_weight = float((artifact or {}).get("blend_weight", 0.7))
+            blend_weight = max(0.0, min(1.0, blend_weight))
+            primary_pred = np.asarray(primary_model.predict(X), dtype=float)
+            secondary_pred = np.asarray(secondary_model.predict(X), dtype=float)
+            return (blend_weight * primary_pred) + ((1.0 - blend_weight) * secondary_pred)
+
+        return np.asarray(primary_model.predict(X), dtype=float)
+
+    def _find_best_blend(self, candidate_predictions, previous_predictions, y_val, y_full):
+        best = None
+        step = self.blend_step if self.blend_step > 0 else 0.1
+        weight = step
+        while weight < 1.0:
+            blend_pred = (weight * candidate_predictions) + ((1.0 - weight) * previous_predictions)
+            mae, accuracy = self._score_predictions(y_val, blend_pred, y_full)
+            if best is None or accuracy > best["accuracy"]:
+                best = {
+                    "weight": float(weight),
+                    "mae": float(mae),
+                    "accuracy": float(accuracy),
+                }
+            weight = round(weight + step, 10)
+        return best
 
     def _train_recursive(self, X_train, y_train, X_val, y_val, y_full, attempt: int = 1, best_result: dict | None = None):
-        model, mae, accuracy = self._fit_and_score_model(X_train, y_train, X_val, y_val, y_full, attempt)
+        model, mae, accuracy, predictions = self._fit_and_score_model(X_train, y_train, X_val, y_val, y_full, attempt)
 
         current = {
             "model": model,
             "mae": mae,
             "accuracy": accuracy,
             "attempt": attempt,
+            "predictions": predictions,
         }
 
         if best_result is None or accuracy > best_result["accuracy"]:
@@ -240,51 +280,111 @@ class TrainerService:
         )
 
         train_result = self._train_recursive(X_train, y_train, X_val, y_val, y)
-        model = train_result["model"]
-        mae = float(train_result["mae"])
-        accuracy = float(train_result["accuracy"])
+        candidate_model = train_result["model"]
+        candidate_predictions = np.asarray(train_result.get("predictions"), dtype=float)
+        candidate_mae = float(train_result["mae"])
+        candidate_accuracy = float(train_result["accuracy"])
 
         model_path = os.path.join(self.models_dir, f"{game}_model.joblib")
+        previous_artifact = None
+        previous_model = None
+        previous_accuracy = None
+        previous_mae = None
+        previous_predictions = None
+        if os.path.exists(model_path):
+            try:
+                existing_artifact = joblib.load(model_path)
+                if isinstance(existing_artifact, dict):
+                    previous_artifact = existing_artifact
+                    previous_model = existing_artifact.get("model")
+                    if previous_model is not None:
+                        try:
+                            previous_predictions = self._predict_with_artifact(existing_artifact, X_val)
+                            previous_mae, previous_accuracy = self._score_predictions(y_val, previous_predictions, y)
+                        except Exception:
+                            previous_predictions = None
+                            previous_mae = None
+                            previous_accuracy = None
+            except Exception:
+                previous_artifact = None
+                previous_model = None
+                previous_accuracy = None
+                previous_mae = None
+                previous_predictions = None
+
+        selected_strategy = "single"
+        selected_model = candidate_model
+        selected_secondary_model = None
+        selected_blend_weight = None
+        selected_accuracy = candidate_accuracy
+        selected_mae = candidate_mae
+        retained_previous_model = False
+        used_previous_training = previous_predictions is not None
+
+        if previous_accuracy is not None and previous_accuracy > selected_accuracy:
+            selected_strategy = str((previous_artifact or {}).get("model_strategy", "single"))
+            selected_model = (previous_artifact or {}).get("model")
+            selected_secondary_model = (previous_artifact or {}).get("secondary_model")
+            selected_blend_weight = (previous_artifact or {}).get("blend_weight")
+            selected_accuracy = float(previous_accuracy)
+            selected_mae = float(previous_mae) if previous_mae is not None else selected_mae
+            retained_previous_model = True
+
+        blend_candidate = None
+        if previous_predictions is not None and previous_model is not None:
+            blend_candidate = self._find_best_blend(candidate_predictions, previous_predictions, y_val, y)
+
+        if (
+            blend_candidate is not None
+            and previous_model is not None
+            and blend_candidate["accuracy"] > selected_accuracy
+        ):
+            selected_strategy = "ensemble"
+            selected_model = candidate_model
+            selected_secondary_model = previous_model
+            selected_blend_weight = float(blend_candidate["weight"])
+            selected_accuracy = float(blend_candidate["accuracy"])
+            selected_mae = float(blend_candidate["mae"])
+            retained_previous_model = False
+
         artifact = {
-            "model": model,
+            "model": selected_model,
+            "secondary_model": selected_secondary_model,
+            "blend_weight": selected_blend_weight,
+            "model_strategy": selected_strategy,
             "feature_len": feature_len,
             "output_len": output_len,
             "game": game,
             "rules": self._get_rules(game),
-            "version": 1,
+            "version": 2,
             "metrics": {
-                "accuracy": accuracy,
-                "mae": mae,
+                "accuracy": selected_accuracy,
+                "mae": selected_mae,
                 "attempts": int(train_result.get("attempts", 1)),
                 "reached_target": bool(train_result.get("reached_target", False)),
                 "target_accuracy": self.target_accuracy,
                 "train_size": train_size,
                 "validation_size": val_size,
+                "candidate_accuracy": candidate_accuracy,
+                "candidate_mae": candidate_mae,
+                "previous_accuracy": previous_accuracy,
+                "previous_mae": previous_mae,
+                "used_previous_training": used_previous_training,
+                "model_strategy": selected_strategy,
+                "blend_weight": selected_blend_weight,
             },
         }
 
-        previous_accuracy = None
-        if os.path.exists(model_path):
-            try:
-                existing_artifact = joblib.load(model_path)
-                metrics = (existing_artifact or {}).get("metrics") if isinstance(existing_artifact, dict) else None
-                if isinstance(metrics, dict):
-                    existing_accuracy = metrics.get("accuracy")
-                    if existing_accuracy is not None:
-                        previous_accuracy = float(existing_accuracy)
-            except Exception:
-                previous_accuracy = None
-
-        if previous_accuracy is not None and accuracy < previous_accuracy:
+        if retained_previous_model:
             return {
                 "status": "success",
                 "message": (
                     f"Training completed for {game}, but previous model was retained to minimize regression "
-                    f"(new accuracy={accuracy:.4f} < previous accuracy={previous_accuracy:.4f})."
+                    f"(new accuracy={candidate_accuracy:.4f} < previous accuracy={previous_accuracy:.4f})."
                 ),
                 "accuracy": previous_accuracy,
-                "new_accuracy": accuracy,
-                "mae": mae,
+                "new_accuracy": candidate_accuracy,
+                "mae": selected_mae,
                 "model_path": model_path,
                 "feature_len": feature_len,
                 "output_len": output_len,
@@ -293,6 +393,9 @@ class TrainerService:
                 "attempts": int(train_result.get("attempts", 1)),
                 "reached_target": bool(train_result.get("reached_target", False)),
                 "retained_previous_model": True,
+                "used_previous_training": used_previous_training,
+                "model_strategy": selected_strategy,
+                "blend_weight": selected_blend_weight,
                 "train_size": train_size,
                 "validation_size": val_size,
             }
@@ -306,16 +409,21 @@ class TrainerService:
         return {
             "status": "success",
             "message": f"Trained {game} model",
-            "accuracy": accuracy,
-            "mae": mae,
+            "accuracy": selected_accuracy,
+            "mae": selected_mae,
             "model_path": model_path,
             "feature_len": feature_len,
             "output_len": output_len,
             "samples": int(len(X)),
             "target_accuracy": self.target_accuracy,
             "attempts": int(train_result.get("attempts", 1)),
-            "reached_target": bool(train_result.get("reached_target", False)),
+            "reached_target": bool(train_result.get("reached_target", False)) or bool(selected_accuracy >= self.target_accuracy),
             "retained_previous_model": False,
+            "used_previous_training": used_previous_training,
+            "model_strategy": selected_strategy,
+            "blend_weight": selected_blend_weight,
+            "candidate_accuracy": candidate_accuracy,
+            "previous_accuracy": previous_accuracy,
             "train_size": train_size,
             "validation_size": val_size,
         }

@@ -5,6 +5,7 @@ import threading
 import time
 import os
 import json
+import joblib
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -153,6 +154,44 @@ class PredictRequest(BaseModel):
 class GameSummaryResponse(BaseModel):
     game: str
     draw_count: int
+
+
+def _load_model_metadata(game_key: str) -> dict:
+    data_dir = os.environ.get('DATA_DIR', '/data')
+    model_path = Path(data_dir) / 'models' / f"{game_key}_model.joblib"
+
+    if not model_path.exists():
+        return {
+            "game": game_key,
+            "exists": False,
+            "model_path": str(model_path),
+            "message": "Model not found",
+        }
+
+    try:
+        artifact = joblib.load(str(model_path))
+        metrics = (artifact or {}).get("metrics", {}) if isinstance(artifact, dict) else {}
+        return {
+            "game": game_key,
+            "exists": True,
+            "model_path": str(model_path),
+            "model_version": (artifact or {}).get("version") if isinstance(artifact, dict) else None,
+            "model_strategy": (artifact or {}).get("model_strategy", "single") if isinstance(artifact, dict) else "single",
+            "blend_weight": (artifact or {}).get("blend_weight") if isinstance(artifact, dict) else None,
+            "feature_len": (artifact or {}).get("feature_len") if isinstance(artifact, dict) else None,
+            "output_len": (artifact or {}).get("output_len") if isinstance(artifact, dict) else None,
+            "metrics": metrics if isinstance(metrics, dict) else {},
+            "updated_at": datetime.fromtimestamp(model_path.stat().st_mtime).isoformat(),
+            "size_bytes": int(model_path.stat().st_size),
+        }
+    except Exception as exc:
+        return {
+            "game": game_key,
+            "exists": True,
+            "model_path": str(model_path),
+            "status": "error",
+            "message": str(exc),
+        }
 
 
 def _require_game_key(raw_game: str) -> str:
@@ -905,6 +944,38 @@ async def predict(request: PredictRequest):
             "game": request.game,
             "message": str(e)
         }
+
+
+@app.get("/api/models/{game}/metadata")
+async def get_model_metadata(game: str):
+    """
+    Returns persisted model artifact metadata for a specific game.
+    """
+    try:
+        game_key = _require_game_key(game)
+        metadata = _load_model_metadata(game_key)
+        return {
+            "status": "ok",
+            "metadata": metadata,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "game": game,
+            "message": str(e)
+        }
+
+
+@app.get("/api/models/metadata")
+async def get_all_model_metadata():
+    """
+    Returns persisted model artifact metadata for all configured games.
+    """
+    all_metadata = [_load_model_metadata(game_key) for game_key in GAME_CONFIGS.keys()]
+    return {
+        "status": "ok",
+        "models": all_metadata,
+    }
 
 @app.get("/api/games")
 async def get_games():

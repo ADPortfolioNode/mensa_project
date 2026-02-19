@@ -638,7 +638,7 @@ export default function Dashboard() {
       </div>
       <WorkflowSummary />
       <div className="row g-4 mb-4">
-        <div className="col-12 col-lg-4">
+        <div className="col-12">
           <div className="card h-100">
             <div className="card-body">
               <h4 className="text-neon mb-3">Mensa Concierge</h4>
@@ -648,22 +648,11 @@ export default function Dashboard() {
               <p className="mb-0 text-muted">
                 Use built-in tools for file management, internet search, and self diagnostics directly from chat.
               </p>
+              <div className="mt-4">
+                <ChatPanelRAG game={selectedGame} />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="col-12 col-lg-8">
-          <ExpandableCard
-            title="Concierge Chat"
-            neonBorder={true}
-            metadata={{
-              'Persona': 'Friendly Expert Developer',
-              'Tools': 'Files, Search, Diagnostics',
-              'Context': selectedGame ? selectedGame.toUpperCase() : 'All Games'
-            }}
-            onToggle={(expanded) => setExpandedCard(expanded ? 'chat' : null)}
-          >
-            <ChatPanelRAG game={selectedGame} />
-          </ExpandableCard>
         </div>
       </div>
       <div className="mb-4">

@@ -1,0 +1,85 @@
+﻿{
+    "selected_game":  "take5",
+    "scan_results":  [
+                         {
+                             "game":  "take5",
+                             "train_status":  "COMPLETED",
+                             "train_message":  "Successfully trained model for take5",
+                             "accuracy":  0.8650575277128616,
+                             "candidate_accuracy":  null,
+                             "previous_accuracy":  null,
+                             "used_previous_training":  null,
+                             "model_strategy":  null,
+                             "blend_weight":  null,
+                             "retained_previous_model":  null
+                         }
+                     ],
+    "train_run_1":  {
+                        "status":  "COMPLETED",
+                        "message":  "Successfully trained model for take5",
+                        "accuracy":  0.8650575277128616,
+                        "mae":  5.262756419198397,
+                        "model_path":  "/data/models/take5_model.joblib",
+                        "feature_len":  6,
+                        "output_len":  6,
+                        "samples":  1912,
+                        "target_accuracy":  0.98,
+                        "attempts":  12,
+                        "reached_target":  false,
+                        "game":  "take5",
+                        "experiment_id":  "train-take5-1771520778",
+                        "score":  0.8650575277128616
+                    },
+    "train_run_2":  {
+                        "status":  "COMPLETED",
+                        "message":  "Successfully trained model for take5",
+                        "accuracy":  0.8650575277128616,
+                        "mae":  5.262756419198397,
+                        "model_path":  "/data/models/take5_model.joblib",
+                        "feature_len":  6,
+                        "output_len":  6,
+                        "samples":  1912,
+                        "target_accuracy":  0.98,
+                        "attempts":  12,
+                        "reached_target":  false,
+                        "game":  "take5",
+                        "experiment_id":  "train-take5-1771520818",
+                        "score":  0.8650575277128616
+                    },
+    "predict_result":  {
+                           "status":  "COMPLETED",
+                           "game":  "take5",
+                           "predicted_numbers":  [
+                                                     8,
+                                                     14,
+                                                     19,
+                                                     24,
+                                                     30
+                                                 ],
+                           "formatted_prediction":  {
+                                                        "main_numbers":  [
+                                                                             8,
+                                                                             14,
+                                                                             19,
+                                                                             24,
+                                                                             30
+                                                                         ],
+                                                        "bonus_numbers":  [
+
+                                                                          ],
+                                                        "main_label":  "Numbers",
+                                                        "bonus_label":  "Bonus",
+                                                        "has_bonus":  false
+                                                    },
+                           "predicted_main_numbers":  [
+                                                          8,
+                                                          14,
+                                                          19,
+                                                          24,
+                                                          30
+                                                      ],
+                           "predicted_bonus_numbers":  [
+                                                           1
+                                                       ]
+                       }
+}
