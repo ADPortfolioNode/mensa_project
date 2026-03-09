@@ -2,6 +2,7 @@ import chromadb
 from chromadb.config import Settings
 from config import settings
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import requests
 
 class ChromaClient:
     def __init__(self):
@@ -11,9 +12,10 @@ class ChromaClient:
     def client(self):
         if self._client is None:
             # Lazy initialization - only connect when first accessed
+            # chromadb.HttpClient expects a full host URL (including scheme).
+            base = f"http://{settings.CHROMA_HOST}:{settings.CHROMA_PORT}"
             self._client = chromadb.HttpClient(
-                host=settings.CHROMA_HOST,
-                port=settings.CHROMA_PORT,
+                host=base,
                 settings=Settings(anonymized_telemetry=False),
             )
         return self._client
@@ -23,7 +25,15 @@ class ChromaClient:
             self.client.heartbeat()
             return {"status": "ok"}
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            # Fallback: try a raw HTTP check to the Chroma pre-flight endpoint
+            try:
+                url = f"http://{settings.CHROMA_HOST}:{settings.CHROMA_PORT}/api/v1/pre-flight-checks"
+                r = requests.get(url, timeout=3)
+                if r.status_code == 200:
+                    return {"status": "ok", "http_status": r.status_code}
+                return {"status": "error", "message": f"http_status={r.status_code}", "body": r.text[:200]}
+            except Exception as http_exc:
+                return {"status": "error", "message": str(e), "http_error": str(http_exc)}
 
     def list_collections(self):
         return self.client.list_collections()
