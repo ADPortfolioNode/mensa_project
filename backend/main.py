@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import threading
@@ -37,6 +39,120 @@ startup_state = {
 
 # Track manual ingestion progress globally
 manual_ingest_state = {}
+
+# Manual ingestion queue to serialize manual ingests (avoid parallel runs)
+from collections import deque
+manual_ingest_queue: deque[dict] = deque()
+manual_ingest_worker_running = False
+manual_ingest_queue_lock = threading.Lock()
+# Monotonic sequence for enqueued jobs to provide stable IDs even if the
+# worker consumes jobs quickly (prevents duplicate "position=1" confusion).
+manual_ingest_seq = 0
+
+
+def _start_manual_ingest_worker_if_needed():
+    global manual_ingest_worker_running
+
+    def worker():
+        global manual_ingest_worker_running
+        try:
+            while True:
+                with manual_ingest_queue_lock:
+                    if not manual_ingest_queue:
+                        manual_ingest_worker_running = False
+                        return
+                    job = manual_ingest_queue.popleft()
+
+                game_key = job.get("game")
+                force = job.get("force", False)
+
+                # Mark queued -> ingesting
+                set_manual_ingest_state(game_key, {
+                    "status": "ingesting",
+                    "rows_fetched": 0,
+                    "total_rows": 0,
+                    "progress": 0,
+                    "queued": False,
+                })
+
+                def progress_callback(rows_fetched, total_rows):
+                    set_manual_ingest_state(game_key, {
+                        "status": "ingesting",
+                        "rows_fetched": rows_fetched,
+                        "total_rows": total_rows,
+                        "progress": (rows_fetched / total_rows * 100) if total_rows > 0 else 0,
+                    })
+
+                try:
+                    print(f"📥 [QUEUE] Starting ingest for {game_key}")
+                    result = ingest_service.fetch_and_sync(
+                        game_key,
+                        progress_callback=progress_callback,
+                        force=force,
+                    )
+
+                    set_manual_ingest_state(game_key, {
+                        "status": "completed",
+                        "rows_fetched": result.get("total", 0),
+                        "total_rows": result.get("total", 0),
+                        "progress": 100,
+                        "added": result.get("added", 0),
+                    })
+                    print(f"✅ [QUEUE] Completed ingest for {game_key}")
+                except Exception as exc:
+                    set_manual_ingest_state(game_key, {
+                        "status": "error",
+                        "error": str(exc),
+                    })
+                    print(f"❌ [QUEUE] Ingest failed for {game_key}: {exc}")
+
+        except Exception:
+            manual_ingest_worker_running = False
+            raise
+
+    with manual_ingest_queue_lock:
+        if manual_ingest_worker_running:
+            return
+        manual_ingest_worker_running = True
+    thread = threading.Thread(target=worker, daemon=True, name="ManualIngestWorker")
+    thread.start()
+
+# Persistent ingest state file (inside DATA_DIR)
+_ingest_state_file = Path(os.environ.get('DATA_DIR', '/data')) / 'ingest_state.json'
+
+def _load_manual_ingest_state():
+    global manual_ingest_state
+    try:
+        if _ingest_state_file.exists():
+            with _ingest_state_file.open('r', encoding='utf-8') as fh:
+                data = json.load(fh) or {}
+                if isinstance(data, dict):
+                    manual_ingest_state.clear()
+                    manual_ingest_state.update(data)
+    except Exception as e:
+        print(f"⚠ Failed to load manual ingest state from {_ingest_state_file}: {e}")
+
+def _save_manual_ingest_state():
+    try:
+        _ingest_state_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _ingest_state_file.with_suffix('.tmp')
+        with tmp.open('w', encoding='utf-8') as fh:
+            json.dump(manual_ingest_state, fh, ensure_ascii=False, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(str(tmp), str(_ingest_state_file))
+    except Exception as e:
+        print(f"⚠ Failed to persist manual ingest state to {_ingest_state_file}: {e}")
+
+def set_manual_ingest_state(game_key: str, state: dict):
+    manual_ingest_state[game_key] = state
+    _save_manual_ingest_state()
+
+# Load persisted state at startup (best-effort)
+try:
+    _load_manual_ingest_state()
+except Exception:
+    pass
 
 _ingestion_started = False
 
@@ -748,69 +864,41 @@ async def ingest_data(request: IngestRequest):
 
     def progress_callback(rows_fetched, total_rows):
         """Callback to track ingestion progress."""
-        manual_ingest_state[game_key] = {
+        set_manual_ingest_state(game_key, {
             "status": "ingesting",
             "rows_fetched": rows_fetched,
             "total_rows": total_rows,
             "progress": (rows_fetched / total_rows * 100) if total_rows > 0 else 0
-        }
+        })
     
-    try:
-        print(f"📥 Manual ingestion started for {game_key}")
-        manual_ingest_state[game_key] = {
-            "status": "ingesting",
+    # Enqueue the manual ingest request so ingests run serially.
+    with manual_ingest_queue_lock:
+        # mark as queued in state so frontend can show progress
+        set_manual_ingest_state(game_key, {
+            "status": "queued",
             "rows_fetched": 0,
             "total_rows": 0,
-            "progress": 0
-        }
-        
-        result = ingest_service.fetch_and_sync(
-            game_key,
-            progress_callback=progress_callback,
-            force=request.force,
-        )
-        
-        manual_ingest_state[game_key] = {
-            "status": "completed",
-            "rows_fetched": result.get("total", 0),
-            "total_rows": result.get("total", 0),
-            "progress": 100,
-            "added": result.get("added", 0)
-        }
-        print(f"✅ Manual ingestion completed for {game_key}")
-        skipped_existing = bool(result.get("skipped_existing", False))
-        incremental_mode = bool(result.get("incremental", False))
-        added_count = int(result.get("added", 0) or 0)
-        if skipped_existing:
-            response_message = f"Skipped ingest for {game_key}: records already exist"
-        elif incremental_mode and added_count == 0:
-            response_message = f"No missing draws found for {game_key}; data is already up to date"
-        elif incremental_mode:
-            response_message = f"Incrementally updated {game_key} with {added_count} missing draws"
-        else:
-            response_message = f"Successfully ingested {game_key}"
-        return {
-            "status": "completed",
-            "game": game_key,
-            "added": result.get("added", 0),
-            "total": result.get("total", 0),
-            "processed": result.get("processed", 0),
-            "skipped_existing": skipped_existing,
-            "incremental": incremental_mode,
-            "added_in_run": result.get("added_in_run", result.get("added", 0)),
-            "message": response_message,
-        }
-    except Exception as e:
-        manual_ingest_state[game_key] = {
-            "status": "error",
-            "error": str(e)
-        }
-        print(f"❌ Manual ingestion failed for {game_key}: {str(e)}")
-        return {
-            "status": "error",
-            "game": game_key,
-            "message": str(e)
-        }
+            "progress": 0,
+            "queued": True,
+        })
+        # assign monotonic job id to avoid duplicate 'position=1' when the
+        # worker consumes jobs between concurrent enqueues
+        global manual_ingest_seq
+        manual_ingest_seq += 1
+        job_id = manual_ingest_seq
+        manual_ingest_queue.append({"game": game_key, "force": bool(request.force), "job_id": job_id})
+        position = len(manual_ingest_queue)
+
+    # ensure the background worker is running
+    _start_manual_ingest_worker_if_needed()
+
+    return {
+        "status": "queued",
+        "game": game_key,
+        "position": position,
+        "job_id": job_id,
+        "message": f"Enqueued {game_key} for serial ingestion (position={position}, job_id={job_id})",
+    }
 
 @app.get("/api/ingest_progress")
 async def get_ingest_progress(game: str = None):
@@ -823,6 +911,33 @@ async def get_ingest_progress(game: str = None):
         game_key = resolve_game_key(game) or game
         return manual_ingest_state.get(game_key, {"status": "idle"})
     return manual_ingest_state
+
+
+@app.get("/api/ingest_stream")
+async def ingest_stream(game: str = None):
+    """
+    Server-Sent Events stream for ingestion progress.
+    Streams either a single game's progress object (if `game` provided) or
+    the full `manual_ingest_state` map.
+    """
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    if game:
+                        game_key = resolve_game_key(game) or game
+                        payload = manual_ingest_state.get(game_key, {"status": "idle"})
+                    else:
+                        payload = manual_ingest_state
+                    yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                except Exception as e:
+                    # Send minimal error payload to clients
+                    yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            return
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.post("/api/train")
 async def train_model(request: TrainRequest):
@@ -873,6 +988,18 @@ async def train_model(request: TrainRequest):
             f"Samples={result.get('samples', 0)}"
         )
 
+        # Collect all relevant training parameters for experiment record
+        parameters = {
+            "feature_len": result.get("feature_len"),
+            "output_len": result.get("output_len"),
+            "samples": result.get("samples"),
+            "target_accuracy": result.get("target_accuracy"),
+            "attempts": result.get("attempts"),
+            "train_size": result.get("train_size"),
+            "validation_size": result.get("validation_size"),
+            "model_strategy": result.get("model_strategy"),
+            "blend_weight": result.get("blend_weight"),
+        }
         exp_store.save_experiment({
             "experiment_id": f"train-{game_key}-{int(timestamp)}",
             "game": game_key,
@@ -881,6 +1008,7 @@ async def train_model(request: TrainRequest):
             "status": "COMPLETED",
             "type": "training",
             "description": success_description,
+            "parameters": parameters,
         })
 
         return {
@@ -924,6 +1052,30 @@ async def predict(request: PredictRequest):
         timestamp = time.time()
 
         result = predictor_service.predict_next_draw(game_key, request.recent_k)
+
+        # Compute next scheduled draw date after prediction
+        from services.predictor import GAME_PREDICTION_SCHEDULES
+        from datetime import datetime, timedelta
+        import pytz
+        tz = pytz.timezone(result.get("prediction_timezone", "America/New_York"))
+        pred_date = result.get("prediction_date")
+        if pred_date:
+            dt = datetime.strptime(pred_date, "%Y-%m-%d").replace(tzinfo=tz)
+        else:
+            dt = datetime.now(tz)
+        schedule = GAME_PREDICTION_SCHEDULES.get(game_key, {})
+        # Find next draw date (simple: next day with >0 draws)
+        next_draw_date = None
+        for offset in range(1, 8):
+            candidate = dt + timedelta(days=offset)
+            weekday = candidate.weekday()
+            daily = int(schedule.get("daily_draws", 0) or 0)
+            weekday_draws = schedule.get("weekday_draws", {})
+            draws = int(weekday_draws.get(weekday, daily) or 0)
+            if draws > 0:
+                next_draw_date = candidate.date().isoformat()
+                break
+
         exp_store.save_experiment({
             "experiment_id": f"predict-{game_key}-{int(timestamp)}",
             "game": game_key,
@@ -931,12 +1083,14 @@ async def predict(request: PredictRequest):
             "status": "COMPLETED",
             "type": "prediction",
             "recent_k": request.recent_k,
-            "prediction": result
+            "prediction": result,
+            "next_draw_date": next_draw_date,
         })
         return {
             **result,
             "status": "COMPLETED",
             "game": game_key,
+            "next_draw_date": next_draw_date,
         }
     except Exception as e:
         return {

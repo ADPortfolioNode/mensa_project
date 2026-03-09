@@ -285,6 +285,10 @@ class TrainerService:
         candidate_mae = float(train_result["mae"])
         candidate_accuracy = float(train_result["accuracy"])
 
+        # Validate accuracy against all remaining records in dataset
+        full_dataset_predictions = candidate_model.predict(X)
+        full_dataset_mae, full_dataset_accuracy = self._score_predictions(y, full_dataset_predictions, y)
+
         model_path = os.path.join(self.models_dir, f"{game}_model.joblib")
         previous_artifact = None
         previous_model = None
@@ -372,6 +376,8 @@ class TrainerService:
                 "used_previous_training": used_previous_training,
                 "model_strategy": selected_strategy,
                 "blend_weight": selected_blend_weight,
+                "full_dataset_accuracy": full_dataset_accuracy,
+                "full_dataset_mae": full_dataset_mae,
             },
         }
 

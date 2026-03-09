@@ -19,10 +19,10 @@ const StartupProgress = ({ onComplete }) => {
             : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_status`;
 
         try {
-            return await axios.get(primaryUrl, { timeout: 10000 });
+            return await axios.get(primaryUrl, { timeout: 30000 });
         } catch (primaryError) {
             if (!fallbackUrl) throw primaryError;
-            return axios.get(fallbackUrl, { timeout: 10000 });
+            return axios.get(fallbackUrl, { timeout: 30000 });
         }
     };
 
@@ -34,10 +34,10 @@ const StartupProgress = ({ onComplete }) => {
             : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_init`;
 
         try {
-            return await axios.post(primaryUrl, null, { timeout: 10000 });
+            return await axios.post(primaryUrl, null, { timeout: 30000 });
         } catch (primaryError) {
             if (!fallbackUrl) throw primaryError;
-            return axios.post(fallbackUrl, null, { timeout: 10000 });
+            return axios.post(fallbackUrl, null, { timeout: 30000 });
         }
     };
 

@@ -51,17 +51,62 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    if (
-      ingestStatus !== 'in progress' ||
-      selectedGame !== ALL_GAMES_VALUE ||
-      !ingestingGame
-    ) {
+    if (ingestStatus !== 'in progress' || selectedGame !== ALL_GAMES_VALUE) {
       return;
     }
 
+    let eventSource;
     let cancelled = false;
 
+    const tryStartSSE = () => {
+      try {
+        const url = `${API_BASE}/api/ingest_stream`;
+        eventSource = new EventSource(url);
+        eventSource.onmessage = (e) => {
+          try {
+            const payload = JSON.parse(e.data) || {};
+            // payload is a map of game -> state
+            if (!payload || typeof payload !== 'object') return;
+            for (const [gameName, gameState] of Object.entries(payload)) {
+              const rowsFetched = Number(gameState.rows_fetched || 0);
+              const totalRows = Number(gameState.total_rows || 0);
+              const backendStatus = String(gameState.status || '').toLowerCase();
+              const mappedStatus = backendStatus === 'completed'
+                ? 'completed'
+                : backendStatus === 'error'
+                  ? 'error'
+                  : backendStatus === 'ingesting'
+                    ? 'active'
+                    : 'pending';
+
+              setAllGamesProgress(prev => ({
+                ...prev,
+                [gameName]: {
+                  ...(prev[gameName] || {}),
+                  status: mappedStatus,
+                  rowsFetched,
+                  totalRows,
+                }
+              }));
+            }
+          } catch (err) {
+            // ignore parse errors
+          }
+        };
+        eventSource.onerror = (err) => {
+          try { eventSource.close(); } catch (e) {}
+          eventSource = null;
+        };
+      } catch (err) {
+        eventSource = null;
+      }
+    };
+
+    tryStartSSE();
+
+    // Fallback: if SSE not available, poll the current ingestingGame periodically
     const pollCurrentGameProgress = async () => {
+      if (!ingestingGame) return;
       try {
         const response = await axios.get(`${API_BASE}/api/ingest_progress?game=${ingestingGame}`);
         if (cancelled || !response?.data) return;
@@ -87,18 +132,23 @@ export default function Dashboard() {
           },
         }));
       } catch {
-        // keep existing progress state; transient poll failures are expected
+        // transient failures ignored
       }
     };
 
+    const interval = setInterval(() => {
+      if (!eventSource) pollCurrentGameProgress();
+    }, 2000);
+
+    // Initial poll to seed state while SSE connects
     pollCurrentGameProgress();
-    const interval = setInterval(pollCurrentGameProgress, 1000);
 
     return () => {
       cancelled = true;
+      try { if (eventSource) eventSource.close(); } catch (e) {}
       clearInterval(interval);
     };
-  }, [ingestStatus, selectedGame, ingestingGame, API_BASE]);
+  }, [ingestStatus, selectedGame, ingestingGame, API_BASE, games]);
   
   // Training parameters
   const [trainParams, setTrainParams] = useState({
@@ -251,7 +301,7 @@ export default function Dashboard() {
             }
           };
 
-          const pollInterval = setInterval(pollCurrentGameProgress, 1000);
+          const pollInterval = setInterval(pollCurrentGameProgress, 2000);
           await pollCurrentGameProgress();
 
           try {
@@ -333,15 +383,16 @@ export default function Dashboard() {
           }
         })());
 
-        const results = await Promise.allSettled(gameTasks);
-        const resolvedResults = results.map((result, index) => {
-          if (result.status === 'fulfilled') return result.value;
-          return {
-            game: games[index],
-            status: 'error',
-            message: result.reason?.message || 'Ingestion task failed.',
-          };
-        });
+        // Run ingestions sequentially to avoid excessive concurrent requests
+        const resolvedResults = [];
+        for (const promise of gameTasks) {
+          try {
+            const val = await promise;
+            resolvedResults.push(val);
+          } catch (err) {
+            resolvedResults.push({ game: undefined, status: 'error', message: err?.message || 'Ingestion task failed.' });
+          }
+        }
 
         const failures = resolvedResults.filter((item) => item.status === 'error');
         setIngestingGame(null);

@@ -1,0 +1,442 @@
+*** Begin Patch
+*** Update File: backend/main.py
+@@
+ from typing import Any, Dict, Optional
+ import requests
++import hashlib
+@@
+ def _latest_game_snapshot(game: str, sample_size: int = 200) -> Optional[dict]:
+@@
+         return {
+             "game": game,
+             "draw_count": 0,
+             "latest_draw_date": None,
+             "latest_numbers": None,
+         }
++
++
++def _compute_dataset_snapshot(game: str) -> dict:
++    """
++    Return a small dataset snapshot for a game including a lightweight
++    reproducibility hash, record count, and latest draw date/numbers.
++    """
++    try:
++        snap = _latest_game_snapshot(game)
++        count = int(snap.get("draw_count", 0) or 0)
++        latest_date = snap.get("latest_draw_date")
++        latest_numbers = str(snap.get("latest_numbers") or "")
++        digest_input = f"{game}|{count}|{latest_numbers}"
++        digest = hashlib.md5(digest_input.encode("utf-8")).hexdigest()
++        return {
++            "dataset_hash": digest,
++            "record_count": count,
++            "latest_draw_date": latest_date,
++            "latest_numbers": latest_numbers,
++        }
++    except Exception:
++        return {
++            "dataset_hash": None,
++            "record_count": 0,
++            "latest_draw_date": None,
++            "latest_numbers": None,
++        }
+*** End Patch
+*** Begin Patch
+*** Update File: backend/main.py
+@@
+     except Exception as e:
+         print(f"❌ Training failed for {request.game}: {str(e)}")
+         return {
+             "status": "error",
+             "game": request.game,
+             "message": str(e)
+         }
++
++
++@app.get("/api/train_settings")
++async def get_train_settings(game: str = None):
++    """
++    Returns recommended trainer knobs and (optionally) a dataset snapshot.
++    - If `game` query param provided, returns defaults + dataset snapshot for that game.
++    - Without `game`, returns defaults and a per-game summary map.
++    """
++    try:
++        from services.trainer import trainer_service
++
++        defaults = {
++            "target_accuracy": float(getattr(trainer_service, "target_accuracy", 0.98)),
++            "max_train_attempts": int(getattr(trainer_service, "max_train_attempts", 12)),
++            "blend_step": float(getattr(trainer_service, "blend_step", 0.1)),
++            # Sampling / model knobs (mirror Trainer defaults or sensible fallbacks)
++            "train_size": 0.33,
++            "validation_size": 0.67,
++            "random_state": 42,
++            "n_estimators": 100,
++            "max_depth": 12,
++        }
++
++        if game:
++            game_key = _require_game_key(game)
++            dataset = _compute_dataset_snapshot(game_key)
++            return {"game": game_key, "defaults": defaults, "dataset": dataset}
++
++        per_game = {}
++        for g in GAME_CONFIGS.keys():
++            per_game[g] = _compute_dataset_snapshot(g)
++
++        return {"game": None, "defaults": defaults, "per_game": per_game}
++    except Exception as e:
++        return {"status": "error", "message": str(e)}
++
++
++@app.get("/api/train_settings/{game}")
++async def get_train_settings_by_path(game: str):
++    """Path-style alias for train settings."""
++    return await get_train_settings(game=game)
+*** End Patch
+*** Begin Patch
+*** Update File: frontend/src/components/Dashboard.js
+@@
+   const [trainParams, setTrainParams] = useState({
+     testSize: 0.33,
+     randomState: 42,
+     nEstimators: 100,
+     maxDepth: 10
+   });
++  const [trainDefaultsForGame, setTrainDefaultsForGame] = useState(null);
+@@
+-  // Fetch recommended training settings when user selects a game to train.
+-  useEffect(() => {
+-    if (!selectedTrainGame) return;
+-    let cancelled = false;
+-    const fetchSettings = async () => {
+-      try {
+-        const url = `${API_BASE}/api/train_settings?game=${selectedTrainGame}`;
+-        const r = await axios.get(url);
+-        if (cancelled || !r?.data) return;
+-        const defaults = r.data.defaults || {};
+-        setTrainParams((prev) => ({
+-          ...prev,
+-          testSize: defaults.train_size ?? prev.testSize,
+-          randomState: defaults.random_state ?? prev.randomState,
+-          nEstimators: defaults.n_estimators ?? prev.nEstimators,
+-          maxDepth: defaults.max_depth ?? prev.maxDepth,
+-          // expose target_accuracy for display/use if desired
+-          targetAccuracy: defaults.target_accuracy ?? prev.targetAccuracy,
+-        }));
+-      } catch (err) {
+-        // ignore transient failures — keep existing params
+-      }
+-    };
+-    fetchSettings();
+-    return () => { cancelled = true; };
+-  }, [selectedTrainGame, API_BASE]);
++  // Fetch recommended training settings when user selects a game to train.
++  // Preserve user edits: only overwrite if current params still match the
++  // previously loaded defaults (or no defaults were loaded yet).
++  useEffect(() => {
++    if (!selectedTrainGame) return;
++    let cancelled = false;
++
++    const mappedDefaultsFrom = (defaults, prev) => ({
++      testSize: defaults.train_size ?? (prev?.testSize ?? 0.33),
++      randomState: defaults.random_state ?? (prev?.randomState ?? 42),
++      nEstimators: defaults.n_estimators ?? (prev?.nEstimators ?? 100),
++      maxDepth: defaults.max_depth ?? (prev?.maxDepth ?? 10),
++      targetAccuracy: defaults.target_accuracy ?? (prev?.targetAccuracy),
++    });
++
++    const shallowEqual = (a, b, keys) => {
++      if (!a || !b) return false;
++      for (const k of keys) {
++        if ((a[k] ?? null) !== (b[k] ?? null)) return false;
++      }
++      return true;
++    };
++
++    const fetchSettings = async () => {
++      try {
++        const url = `${API_BASE}/api/train_settings?game=${selectedTrainGame}`;
++        const r = await axios.get(url);
++        if (cancelled || !r?.data) return;
++        const defaults = r.data.defaults || {};
++        const mapped = mappedDefaultsFrom(defaults, trainParams);
++        const keys = ['testSize', 'randomState', 'nEstimators', 'maxDepth'];
++
++        const baseline = trainDefaultsForGame;
++        const current = trainParams;
++
++        // Overwrite only if user hasn't modified params (current equals baseline)
++        const shouldOverwrite = baseline === null || shallowEqual(current, baseline, keys);
++
++        if (shouldOverwrite) {
++          setTrainParams((prev) => ({ ...prev, ...mapped }));
++        }
++
++        // Update baseline to latest defaults for future comparisons
++        setTrainDefaultsForGame(mapped);
++      } catch (err) {
++        // ignore transient failures — keep existing params
++      }
++    };
++
++    fetchSettings();
++    return () => { cancelled = true; };
++  }, [selectedTrainGame, API_BASE, trainDefaultsForGame, trainParams]);
+*** End Patch
+*** Begin Patch
+*** Update File: backend/services/trainer.py
+@@
+     def _train_recursive(self, X_train, y_train, X_val, y_val, y_full, attempt: int = 1, best_result: dict | None = None):
+@@
+         return self._train_recursive(
+             X_train,
+             y_train,
+             X_val,
+             y_val,
+             y_full,
+             attempt=attempt + 1,
+             best_result=best_result,
+         )
++    def _train_iterative_collect(self, X_train, y_train, X_val, y_val, y_full):
++        """
++        Iteratively train up to `max_train_attempts`, collect candidate models,
++        and return the list of candidate dicts with keys: model, mae, accuracy, attempt, predictions.
++        """
++        candidates = []
++        for attempt in range(1, max(1, int(self.max_train_attempts)) + 1):
++            try:
++                model, mae, accuracy, predictions = self._fit_and_score_model(
++                    X_train, y_train, X_val, y_val, y_full, attempt
++                )
++                candidates.append({
++                    "model": model,
++                    "mae": float(mae),
++                    "accuracy": float(accuracy),
++                    "attempt": int(attempt),
++                    "predictions": np.asarray(predictions, dtype=float),
++                })
++            except Exception:
++                # ignore single-attempt failures but continue attempts
++                continue
++        return candidates
+@@
+-        train_result = self._train_recursive(X_train, y_train, X_val, y_val, y)
+-        candidate_model = train_result["model"]
+-        candidate_predictions = np.asarray(train_result.get("predictions"), dtype=float)
+-        candidate_mae = float(train_result["mae"])
+-        candidate_accuracy = float(train_result["accuracy"])
+-
+-        # Validate accuracy against all remaining records in dataset
+-        full_dataset_predictions = candidate_model.predict(X)
+-        full_dataset_mae, full_dataset_accuracy = self._score_predictions(y, full_dataset_predictions, y)
++        # Iteratively attempt training and collect candidate models
++        candidates = self._train_iterative_collect(X_train, y_train, X_val, y_val, y)
++
++        if not candidates:
++            return {"status": "error", "message": "No successful training attempts were completed."}
++
++        # Optionally include previous model artifact in candidate pool (learn from prior)
++        if os.path.exists(model_path):
++            try:
++                existing_artifact = joblib.load(model_path)
++                prev_model = (existing_artifact or {}).get("model")
++                if prev_model is not None:
++                    try:
++                        prev_preds = np.asarray(prev_model.predict(X_val), dtype=float)
++                        prev_mae, prev_acc = self._score_predictions(y_val, prev_preds, y)
++                        candidates.append({
++                            "model": prev_model,
++                            "mae": float(prev_mae),
++                            "accuracy": float(prev_acc),
++                            "attempt": 0,
++                            "predictions": prev_preds,
++                        })
++                        previous_artifact = existing_artifact
++                    except Exception:
++                        # skip integrating previous model if prediction fails
++                        pass
++            except Exception:
++                pass
++
++        # Sort candidates by validation accuracy descending and pick top 3
++        candidates_sorted = sorted(candidates, key=lambda c: float(c.get("accuracy", 0.0)), reverse=True)
++        top_k = candidates_sorted[:3]
++
++        # Compute ensemble of top_k on validation set using accuracy-proportional weights
++        if len(top_k) > 1:
++            accs = np.array([max(0.0, float(c.get("accuracy", 0.0))) for c in top_k], dtype=float)
++            # avoid division by zero
++            if accs.sum() <= 0:
++                weights = np.ones_like(accs) / len(accs)
++            else:
++                weights = accs / accs.sum()
++            # weighted average of predictions
++            stacked_preds = np.stack([c["predictions"] for c in top_k], axis=0)
++            ensemble_preds = np.tensordot(weights, stacked_preds, axes=(0, 0))
++            ensemble_mae, ensemble_accuracy = self._score_predictions(y_val, ensemble_preds, y)
++        else:
++            ensemble_mae = None
++            ensemble_accuracy = None
++
++        # Choose best strategy: either best single or ensemble if ensemble improves.
++        best_single = top_k[0]
++        selected_strategy = "single"
++        selected_model = best_single["model"]
++        selected_mae = float(best_single["mae"])
++        selected_accuracy = float(best_single["accuracy"])
++        selected_secondary_model = None
++        selected_blend_weight = None
++
++        if ensemble_accuracy is not None and float(ensemble_accuracy) > float(selected_accuracy):
++            selected_strategy = "ensemble_top3"
++            # We'll store the ensemble as a top-model set; pick primary model as the top_k[0]
++            selected_model = best_single["model"]
++            selected_secondary_model = top_k[1]["model"] if len(top_k) > 1 else None
++            selected_blend_weight = None
++            selected_accuracy = float(ensemble_accuracy)
++            selected_mae = float(ensemble_mae)
++
++        # Validate on full dataset (using selected single model predictions)
++        try:
++            if selected_strategy == "ensemble_top3" and len(top_k) > 1:
++                # compute ensemble preds on full X using individual models
++                full_preds_stack = []
++                for c in top_k:
++                    try:
++                        full_preds_stack.append(np.asarray(c["model"].predict(X), dtype=float))
++                    except Exception:
++                        # fallback: predict with selected_model if others fail on full X
++                        full_preds_stack.append(np.asarray(selected_model.predict(X), dtype=float))
++                full_stack = np.stack(full_preds_stack, axis=0)
++                full_ensemble_preds = np.tensordot(weights, full_stack, axes=(0, 0))
++                full_dataset_mae, full_dataset_accuracy = self._score_predictions(y, full_ensemble_preds, y)
++            else:
++                full_dataset_predictions = selected_model.predict(X)
++                full_dataset_mae, full_dataset_accuracy = self._score_predictions(y, full_dataset_predictions, y)
++        except Exception:
++            full_dataset_mae = None
++            full_dataset_accuracy = None
+@@
+-        previous_artifact = None
+-        previous_model = None
+-        previous_accuracy = None
+-        previous_mae = None
+-        previous_predictions = None
+-        if os.path.exists(model_path):
+-            try:
+-                existing_artifact = joblib.load(model_path)
+-                if isinstance(existing_artifact, dict):
+-                    previous_artifact = existing_artifact
+-                    previous_model = existing_artifact.get("model")
+-                    if previous_model is not None:
+-                        try:
+-                            previous_predictions = self._predict_with_artifact(existing_artifact, X_val)
+-                            previous_mae, previous_accuracy = self._score_predictions(y_val, previous_predictions, y)
+-                        except Exception:
+-                            previous_predictions = None
+-                            previous_mae = None
+-                            previous_accuracy = None
+-            except Exception:
+-                previous_artifact = None
+-                previous_model = None
+-                previous_accuracy = None
+-                previous_mae = None
+-                previous_predictions = None
+-
+-        selected_strategy = "single"
+-        selected_model = candidate_model
+-        selected_secondary_model = None
+-        selected_blend_weight = None
+-        selected_accuracy = candidate_accuracy
+-        selected_mae = candidate_mae
+-        retained_previous_model = False
+-        used_previous_training = previous_predictions is not None
+-
+-        if previous_accuracy is not None and previous_accuracy > selected_accuracy:
+-            selected_strategy = str((previous_artifact or {}).get("model_strategy", "single"))
+-            selected_model = (previous_artifact or {}).get("model")
+-            selected_secondary_model = (previous_artifact or {}).get("secondary_model")
+-            selected_blend_weight = (previous_artifact or {}).get("blend_weight")
+-            selected_accuracy = float(previous_accuracy)
+-            selected_mae = float(previous_mae) if previous_mae is not None else selected_mae
+-            retained_previous_model = True
+-
+-        blend_candidate = None
+-        if previous_predictions is not None and previous_model is not None:
+-            blend_candidate = self._find_best_blend(candidate_predictions, previous_predictions, y_val, y)
+-
+-        if (
+-            blend_candidate is not None
+-            and previous_model is not None
+-            and blend_candidate["accuracy"] > selected_accuracy
+-        ):
+-            selected_strategy = "ensemble"
+-            selected_model = candidate_model
+-            selected_secondary_model = previous_model
+-            selected_blend_weight = float(blend_candidate["weight"])
+-            selected_accuracy = float(blend_candidate["accuracy"])
+-            selected_mae = float(blend_candidate["mae"])
+-            retained_previous_model = False
++        retained_previous_model = False
++        used_previous_training = bool(previous_artifact)
+@@
+-        artifact = {
+-            "model": selected_model,
+-            "secondary_model": selected_secondary_model,
+-            "blend_weight": selected_blend_weight,
+-            "model_strategy": selected_strategy,
+-            "feature_len": feature_len,
+-            "output_len": output_len,
+-            "game": game,
+-            "rules": self._get_rules(game),
+-            "version": 2,
+-            "metrics": {
+-                "accuracy": selected_accuracy,
+-                "mae": selected_mae,
+-                "attempts": int(train_result.get("attempts", 1)),
+-                "reached_target": bool(train_result.get("reached_target", False)),
+-                "target_accuracy": self.target_accuracy,
+-                "train_size": train_size,
+-                "validation_size": val_size,
+-                "candidate_accuracy": candidate_accuracy,
+-                "candidate_mae": candidate_mae,
+-                "previous_accuracy": previous_accuracy,
+-                "previous_mae": previous_mae,
+-                "used_previous_training": used_previous_training,
+-                "model_strategy": selected_strategy,
+-                "blend_weight": selected_blend_weight,
+-                "full_dataset_accuracy": full_dataset_accuracy,
+-                "full_dataset_mae": full_dataset_mae,
+-            },
+-        }
++        top_models_serializable = [c["model"] for c in top_k]
++        ensemble_weights = (weights.tolist() if len(top_k) > 1 else None)
++
++        artifact = {
++            "model": selected_model,
++            "secondary_model": selected_secondary_model,
++            "blend_weight": selected_blend_weight,
++            "model_strategy": selected_strategy,
++            "feature_len": feature_len,
++            "output_len": output_len,
++            "game": game,
++            "rules": self._get_rules(game),
++            "version": 3,
++            "top_models": top_models_serializable,     # store only top-3 models
++            "ensemble_weights": ensemble_weights,
++            "metrics": {
++                "accuracy": selected_accuracy,
++                "mae": selected_mae,
++                "attempts": len(candidates),
++                "target_accuracy": self.target_accuracy,
++                "train_size": train_size,
++                "validation_size": val_size,
++                "used_previous_training": used_previous_training,
++                "model_strategy": selected_strategy,
++                "full_dataset_accuracy": full_dataset_accuracy,
++                "full_dataset_mae": full_dataset_mae,
++                "top_k_accuracies": [float(c.get("accuracy", 0.0)) for c in top_k],
++            },
++        }
+*** End Patch
