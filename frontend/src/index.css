@@ -1,5 +1,7 @@
 body {
   margin: 0;
+  /* Ensure consistent base font size across browsers */
+  font-size: 1em;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;

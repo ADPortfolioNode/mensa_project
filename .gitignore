@@ -91,3 +91,6 @@ Using/
 docker-compose.override.yml
 .dockerignore
 Dockerfile.bak
+
+.vercel
+.env*.local
