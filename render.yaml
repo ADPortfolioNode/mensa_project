@@ -1,0 +1,25 @@
+# Render service manifest for the mensa backend
+services:
+  - type: web
+    name: mensa-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    plan: starter
+    regions:
+      - oregon
+    autoDeploy: true
+    envVars:
+      - key: DATA_DIR
+        value: "/data"
+      - key: CHROMA_HOST
+        value: "mensa_chroma"
+      - key: CHROMA_PORT
+        value: "8000"
+
+persistent_disks:
+  - name: mensa-data
+    size_gb: 20
+    mountPath: /data
+
+# NOTE: Add sensitive keys (GEMINI_API_KEY, OPENAI_API_KEY, etc.) in the Render dashboard
+# under the service's Environment settings rather than storing secrets in this file.

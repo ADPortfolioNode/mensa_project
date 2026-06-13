@@ -1,5 +1,5 @@
-﻿# Single-stage build to avoid cross-stage copy failures on large dependency trees
-FROM python:3.11-slim
+﻿# Multi-stage build for smaller final image
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -26,9 +26,27 @@ except Exception as warmup_error:
     print(f"WARNING: chroma embedding warmup skipped: {warmup_error}")
 PY
 
+# Final stage with minimal runtime
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Copy Python dependencies from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
 # Copy application code
 ARG CACHE_BUSTER=1
-COPY . .
+COPY --chown=appuser:appuser . .
+
+# Create data directory and set permissions
+RUN mkdir -p /data && chown -R appuser:appuser /data /app
+
+# Switch to non-root user
+USER appuser
 
 # Add health check: verify API port is accepting connections
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \

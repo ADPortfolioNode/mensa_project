@@ -1,0 +1,29 @@
+app = "mensa-backend"
+primary_region = "iad"
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[env]
+  DATA_DIR = "/data"
+  CHROMA_HOST = "mensa_chroma"
+  CHROMA_PORT = "8000"
+
+[[services]]
+  internal_port = 5000
+  protocol = "tcp"
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 100
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+[[mounts]]
+  source = "mensa_data"
+  destination = "/data"
+
+# Instructions:
+# 1) Create volume: `fly volumes create mensa_data --size 20 --region iad`
+# 2) Set secrets: `fly secrets set GEMINI_API_KEY=... OPENAI_API_KEY=...`
+# 3) Deploy: `fly deploy --config fly.toml`
