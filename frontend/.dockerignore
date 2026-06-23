@@ -21,8 +21,45 @@ yarn-error.log*
 *.user
 Thumbs.db
 
-# Ignore local env files
+# Ignore local env files - CRITICAL: Never include secrets in Docker images
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Secrets and credentials
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+*.secret
+*secret*
+
+# API keys and tokens (pattern matching)
+*api_key*
+*apikey*
+*api-key*
+*token*
+*secret*
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Logs with potential sensitive data
+*.log
+logs/
+diag_*.log
+startup_*.log
+*_output.log
+*_exit.log
+
+# Database files with potential sensitive data
+*.db
+*.sqlite
+*.sqlite3

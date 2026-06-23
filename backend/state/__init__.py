@@ -1,0 +1,1 @@
+# State management for Mensa Project backend

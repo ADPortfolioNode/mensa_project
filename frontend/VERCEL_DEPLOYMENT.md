@@ -37,3 +37,7 @@ Troubleshooting
 Next steps (optional)
 - Add a lightweight `api/` proxy (Vercel Serverless) only if you must transform requests; otherwise use direct backend URL.
 - Add a CI/CD Git branch preview configuration in Vercel to deploy PR branches.
+
+
+
+prj_r10egJAgn6hpUFmfOUtMpAKPMqlP

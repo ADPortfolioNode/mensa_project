@@ -54,7 +54,7 @@ class ChromaClient:
             print(f"Error counting documents for {collection_name}: {e}")
             return 0
 
-    def get_collections_snapshot(self, collection_names: list[str], timeout_seconds: float = 2.5) -> list[dict]:
+    def get_collections_snapshot(self, collection_names: list[str], timeout_seconds: float = 10.0) -> list[dict]:
         def query_collection(name: str, record_index: int) -> dict:
             snapshot = {
                 "name": name,

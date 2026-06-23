@@ -307,6 +307,18 @@ export default function Dashboard() {
           try {
             const response = await axios.post(`${API_BASE}/api/ingest`, { game, force: forceReingest });
             const normalizedIngestStatus = String(response?.data?.status || '').toLowerCase();
+            
+            // Handle queued status - ingestion is processed in background, wait for progress polling
+            if (normalizedIngestStatus === 'queued') {
+              // Don't mark as error, let progress polling handle the final status
+              // Keep status as 'active' since progress polling will update it
+              return {
+                game,
+                status: 'pending',
+                message: response?.data?.message || 'Ingestion queued.',
+              };
+            }
+
             const isIngestSuccess = normalizedIngestStatus === 'completed' || normalizedIngestStatus === 'success';
 
             if (!isIngestSuccess) {

@@ -1,0 +1,88 @@
+"""
+Background ingestion worker for automatic startup ingestion.
+"""
+import threading
+import time
+from state.ingest_state import (
+    startup_state, 
+    update_startup_progress, 
+    set_game_status,
+    get_startup_state
+)
+from services.ingest import ingest_service
+
+
+def start_background_ingestion():
+    """Start non-blocking background ingestion in a daemon thread."""
+    def ingest_all():
+        global _ingestion_started
+        from config import GAME_CONFIGS
+        
+        startup_state["started_at"] = time.time()
+        startup_state["status"] = "ingesting"
+        update_startup_state(startup_state, status="ingesting", started_at=time.time())
+
+        for i, game in enumerate(GAME_CONFIGS.keys(), 1):
+            try:
+                update_startup_state(
+                    startup_state,
+                    current_game=game,
+                    current_task="fetching",
+                    progress=float(i - 1),
+                    current_game_rows_fetched=0,
+                    current_game_rows_total=0
+                )
+                set_game_status(game, "ingesting")
+
+                def update_game_progress(rows_fetched, total_rows):
+                    update_startup_state(
+                        startup_state,
+                        current_game_rows_fetched=rows_fetched,
+                        current_game_rows_total=total_rows,
+                        progress=calculate_progress(i, rows_fetched, total_rows, len(GAME_CONFIGS))
+                    )
+
+                result = ingest_service.fetch_and_sync(
+                    game,
+                    progress_callback=update_game_progress,
+                    force=False,
+                )
+
+                set_game_status(game, "completed")
+                update_startup_state(
+                    startup_state,
+                    progress=float(i),
+                    current_game_rows_fetched=result.get("total", 0),
+                    current_game_rows_total=result.get("total", 0)
+                )
+
+            except Exception as exc:
+                set_game_status(game, "error", error=str(exc))
+                print(f"Failed to ingest {game}: {exc}")
+
+        startup_state["status"] = "completed"
+        startup_state["completed_at"] = time.time()
+        update_startup_state(startup_state, status="completed", completed_at=time.time())
+
+    thread = threading.Thread(target=ingest_all, daemon=True, name="BackgroundIngestion")
+    thread.start()
+
+
+def update_startup_state(state_dict, **kwargs):
+    """Helper to update startup state dictionary."""
+    for key, value in kwargs.items():
+        state_dict[key] = value
+
+
+def calculate_progress(index, rows_fetched, total_rows, total_games):
+    """Calculate progress fraction based on current game and fetch progress."""
+    if total_rows and total_rows > 0:
+        fraction = rows_fetched / max(total_rows, 1)
+        fraction = max(0.0, min(1.0, fraction))
+        return float(index - 1) + fraction
+    else:
+        return float(index - 1)
+
+
+# Global flag for ingestion status
+_ingestion_started = False

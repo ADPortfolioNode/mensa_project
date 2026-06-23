@@ -89,6 +89,21 @@ try {
     Write-Host "    ✗ Error: $($_.Exception.Message)" -ForegroundColor Red
 }
 
+# Test 7: Verify Data Volume Writable
+Write-Host "`n[7] Checking data volume permissions..." -ForegroundColor Yellow
+try {
+    # This assumes the 'mensa_backend' container has access to /data
+    $testCmd = "touch /data/experiments/permission_test.tmp && rm /data/experiments/permission_test.tmp"
+    $dockerCheck = docker exec mensa_backend sh -c "$testCmd" 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "    ✓ /data/experiments is writable" -ForegroundColor Green
+    } else {
+        Write-Host "    ✗ Permission Denied: Cannot write to /data/experiments" -ForegroundColor Red
+    }
+} catch {
+    Write-Host "    ⚠️  Could not verify permissions: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 Write-Host "`n=== VERIFICATION COMPLETE ===" -ForegroundColor Cyan
 Write-Host "Open browser to: http://localhost:3000" -ForegroundColor Green
 Write-Host "Test workflows:" -ForegroundColor Green

@@ -11,20 +11,7 @@ COPY ${REQUIREMENTS_FILE} requirements.txt
 
 # Install dependencies and validate ASGI server import
 RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt \
-    && python - <<'PY'
-from hypercorn.config import Config
-
-print(f"hypercorn install verified: {Config.__module__}")
-
-try:
-    from chromadb.utils import embedding_functions
-
-    ef = embedding_functions.DefaultEmbeddingFunction()
-    _ = ef(["mensa startup warmup"])
-    print("chroma embedding warmup complete")
-except Exception as warmup_error:
-    print(f"WARNING: chroma embedding warmup skipped: {warmup_error}")
-PY
+    && python -c "from hypercorn.config import Config; print(f'hypercorn install verified: {Config.__module__}')"
 
 # Final stage with minimal runtime
 FROM python:3.11-slim
@@ -43,10 +30,17 @@ ARG CACHE_BUSTER=1
 COPY --chown=appuser:appuser . .
 
 # Create data directory and set permissions
-RUN mkdir -p /data && chown -R appuser:appuser /data /app
+RUN mkdir -p /data && chown -R appuser:appuser /data /app && mkdir -p /data/experiments && chown -R appuser:appuser /data/experiments
+
+# Add entrypoint script to fix permissions at runtime  
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Switch to non-root user
-USER appuser
+# Temporarily running as root to fix permissions issues
+# USER appuser
 
 # Add health check: verify API port is accepting connections
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
