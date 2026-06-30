@@ -2,6 +2,7 @@
 Model utilities for loading and managing ML models.
 """
 import joblib
+import json
 from pathlib import Path
 import os
 from typing import Dict, Any
@@ -20,7 +21,7 @@ def _load_model_metadata(game_key: str) -> dict:
     
     try:
         with open(metadata_path, 'r') as f:
-            return joblib.load(f)
+            return json.load(f)
     except Exception as e:
         print(f"Failed to load model metadata for {game_key}: {e}")
         return {}

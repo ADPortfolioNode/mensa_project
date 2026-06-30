@@ -434,9 +434,19 @@ echo "Stopping and removing any old containers..."
 kill_stale_cleanup_jobs
 if is_windows_shell; then
     echo "Windows shell detected; skipping compose down/cleanup to avoid CLI hang."
-elif ! run_compose_with_timeout 60 compose_cmd down --remove-orphans --timeout 25; then
-    echo "WARNING: compose down timed out/failed; running one-time forced cleanup." >&2
-    force_cleanup_mensa_runtime_once
+else
+    if [ "${PRUNE}" = true ]; then
+        echo "Purge volumes requested: adding -v flag to compose down."
+        if ! run_compose_with_timeout 60 compose_cmd down -v --remove-orphans --timeout 25; then
+            echo "WARNING: compose down timed out/failed; running one-time forced cleanup." >&2
+            force_cleanup_mensa_runtime_once
+        fi
+    else
+        if ! run_compose_with_timeout 60 compose_cmd down --remove-orphans --timeout 25; then
+            echo "WARNING: compose down timed out/failed; running one-time forced cleanup." >&2
+            force_cleanup_mensa_runtime_once
+        fi
+    fi
 fi
 echo ""
 

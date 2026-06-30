@@ -1,7 +1,8 @@
 #!/usr/bin/env powershell
 param(
     [switch]$Build,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$Purge
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,7 +20,12 @@ function Write-Info {
 Set-Location $PSScriptRoot
 
 Write-Step "Stopping compose services and removing orphans"
-docker compose down --remove-orphans | Out-Null
+if ($Purge) {
+    Write-Host "Purging volumes (-v)..." -ForegroundColor Yellow
+    docker compose down -v --remove-orphans | Out-Null
+} else {
+    docker compose down --remove-orphans | Out-Null
+}
 
 Write-Step "Removing stale conflicting Mensa containers (if any)"
 $stale = docker ps -a --format "{{.ID}}|{{.Names}}" |

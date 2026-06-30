@@ -381,6 +381,35 @@ class TrainerService:
             },
         }
 
+        import json
+        metadata_to_save = {
+            "game": game,
+            "accuracy": float(selected_accuracy) if selected_accuracy is not None else None,
+            "mae": float(selected_mae) if selected_mae is not None else None,
+            "feature_len": int(feature_len),
+            "output_len": int(output_len),
+            "samples": int(len(X)),
+            "target_accuracy": float(self.target_accuracy),
+            "attempts": int(train_result.get("attempts", 1)),
+            "reached_target": bool(train_result.get("reached_target", False)) or bool(selected_accuracy >= self.target_accuracy),
+            "retained_previous_model": bool(retained_previous_model),
+            "used_previous_training": bool(used_previous_training),
+            "model_strategy": str(selected_strategy),
+            "blend_weight": float(selected_blend_weight) if selected_blend_weight is not None else None,
+            "candidate_accuracy": float(candidate_accuracy) if candidate_accuracy is not None else None,
+            "previous_accuracy": float(previous_accuracy) if previous_accuracy is not None else None,
+            "train_size": float(train_size),
+            "validation_size": float(val_size)
+        }
+        try:
+            experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
+            os.makedirs(experiments_dir, exist_ok=True)
+            metadata_path = os.path.join(experiments_dir, f"{game}_model_metadata.json")
+            with open(metadata_path, "w") as f:
+                json.dump(metadata_to_save, f, indent=2)
+        except Exception as exc:
+            print(f"WARNING: Failed to save model metadata JSON for {game}: {exc}")
+
         if retained_previous_model:
             return {
                 "status": "success",

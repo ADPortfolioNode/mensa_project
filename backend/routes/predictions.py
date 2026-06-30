@@ -12,7 +12,7 @@ from config import GAME_PREDICTION_SCHEDULES
 
 
 router = APIRouter()
-exp_store = ExperimentStore()
+exp_store = ExperimentStore("/data/experiments/experiments.json")
 
 
 class PredictionRequest(BaseModel):

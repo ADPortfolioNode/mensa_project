@@ -38,6 +38,8 @@ services:
     depends_on:
       chroma:
         condition: service_healthy
+    volumes:
+      - backend_data:/data
     networks:
       - mensa-net
     deploy:

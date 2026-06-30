@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 router = APIRouter()
-exp_store = ExperimentStore()
+exp_store = ExperimentStore("/data/experiments/experiments.json")
 
 
 class TrainingRequest(BaseModel):

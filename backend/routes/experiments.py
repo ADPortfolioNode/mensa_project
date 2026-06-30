@@ -6,7 +6,7 @@ from experiments.store import ExperimentStore
 
 
 router = APIRouter()
-exp_store = ExperimentStore()
+exp_store = ExperimentStore("/data/experiments/experiments.json")
 
 
 @router.get("/api/experiments")
