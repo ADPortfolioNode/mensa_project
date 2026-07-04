@@ -1,0 +1,13 @@
+---
+pid: 12064
+cwd: "E:\2024 RESET\mensa_project"
+command: "python -c \"import json,urllib.request; BASE='http://127.0.0.1:5001';
+def req(m,p,b=None,t=60):
+ d=json.dumps(b).encode() if b else None
+ r=urllib.request.Request(BASE+p,data=d,method=m,headers={'Content-Type':'application/json'} if d else {})
+ with urllib.request.urlopen(r,timeout=t) as resp: return resp.status,json.loads(resp.read())
+print('startup:', req('GET','/api/startup_status')[1].get('status'), req('GET','/api/startup_status')[1].get('progress'))
+print('pick3 ingest:', req('POST','/api/ingest',{'game':'pick3','force':False})[1])\""
+started_at: 2026-07-04T07:57:50.486Z
+running_for_ms: 110014   
+---
