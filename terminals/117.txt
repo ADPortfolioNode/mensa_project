@@ -1,0 +1,7 @@
+---
+pid: 2648
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker info 2>&1 | Select-Object -First 3; docker ps --filter name=mensa"
+started_at: 2026-07-02T14:58:48.355Z
+running_for_ms: 1870007  
+---

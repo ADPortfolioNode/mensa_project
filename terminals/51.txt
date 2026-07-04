@@ -1,0 +1,11 @@
+---
+pid: 13972
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker info 2>&1 | Select-Object -First 1; if ($LASTEXITCODE -ne 0) { Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\"; Start-Sleep -Seconds 45 }; docker ps --filter \"name=mensa\" --format \"{{.Names}} {{.Status}}\""
+started_at: 2026-07-01T13:35:17.841Z
+running_for_ms: 23620023 
+---
+Client:
+mensa_frontend Up 10 seconds (healthy)
+mensa_backend Up 10 seconds (health: starting)
+mensa_chroma Up 10 seconds (health: starting)

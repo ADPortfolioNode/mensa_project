@@ -1,0 +1,7 @@
+---
+pid: 4508
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" up -d --build backend"
+started_at: 2026-07-03T19:21:09.773Z
+running_for_ms: 12320006 
+---

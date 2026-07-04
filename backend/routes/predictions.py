@@ -1,6 +1,8 @@
 """
 Predictions API routes.
 """
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -65,8 +67,22 @@ async def make_prediction(request: PredictionRequest):
         game_key = _require_game_key(request.game)
         timestamp = datetime.now().timestamp()
         
-        result = predictor_service.predict(game_key, request.recent_k)
-        
+        def _run_prediction():
+            if hasattr(predictor_service, "predict_next_draw"):
+                return predictor_service.predict_next_draw(game_key, request.recent_k)
+            if hasattr(predictor_service, "predict"):
+                return predictor_service.predict(game_key, request.recent_k)
+            raise RuntimeError("PredictorService is missing predict_next_draw/predict methods")
+
+        result = await asyncio.to_thread(_run_prediction)
+
+        if result.get("status") == "error":
+            return {
+                "status": "error",
+                "game": game_key,
+                "message": result.get("message", "Suggestion failed."),
+            }
+
         # Calculate next draw date
         tz = None  # Use local timezone
         dt = datetime.now(tz) if tz else datetime.now()

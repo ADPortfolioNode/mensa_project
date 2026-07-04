@@ -1,0 +1,36 @@
+---
+description: Mensa project scope — correct the user if they mix in Concierge or other repos
+alwaysApply: true
+---
+
+# Mensa (this workspace)
+
+**Repo:** `E:\2024 RESET\mensa_project`  
+**Product:** Lottery suggestion & training — FastAPI backend, React dashboard, ChromaDB, ML training.
+
+## In scope here
+
+- `backend/` (FastAPI, `routes/training.py`, trainer service)
+- `frontend/` (React dashboard, training UI)
+- Docker: `docker compose up` → backend ~`http://localhost:5001`, frontend ~`http://localhost:3000`
+- Tests/scripts under this repo only
+
+## NOT this project — correct the user
+
+If the user mentions any of these **without clearly switching to Concierge**, pause and clarify:
+
+| Signal | Actually means |
+|--------|----------------|
+| Concierge API, `concierge_api`, sacred timeline, step assistant | **Concierge** (`E:\2024 RESET\concierge`) |
+| Playwright in `artifacts/concierge`, image prompt workflow, TaskAgent | **Concierge** |
+| Port **8002**, `docker compose --profile full`, Redis/Celery worker | **Concierge** |
+| `prepare image prompt` / `placeholder-embedded` image bug | **Concierge** |
+
+**Correction template:**  
+"This workspace is **Mensa** (`E:\2024 RESET\mensa_project`). What you described sounds like **Concierge** (`E:\2024 RESET\concierge`). Should I work in Concierge instead, or stay in Mensa?"
+
+## Rules
+
+- Do not edit files under `E:\2024 RESET\concierge` unless the user explicitly asks to switch projects.
+- Do not run Concierge Playwright or `localhost:8002` stacks as part of Mensa tasks unless asked.
+- "Mensa Concierge" in this UI is **this project's chat assistant**, not the separate Concierge monorepo.

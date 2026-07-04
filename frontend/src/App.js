@@ -2,11 +2,17 @@ import React, { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import StartupProgress from './components/StartupProgress';
 import Header from './components/Header';
+import { useStartupStatusPoll } from './hooks/useStartupStatusPoll';
 import './styles/modern.css';
 import './App.css';
 
 export default function App() {
   const [startupComplete, setStartupComplete] = useState(false);
+  const { startupStatus, errorMessage: startupErrorMessage } = useStartupStatusPoll({
+    enabled: startupComplete,
+    intervalMs: 10000,
+    stopWhenCompleted: true,
+  });
 
   const handleStartupComplete = () => {
     setStartupComplete(true);
@@ -18,8 +24,8 @@ export default function App() {
         <StartupProgress onComplete={handleStartupComplete} />
       ) : (
         <div className="container py-2 py-md-3">
-          <Header />
-          <Dashboard />
+          <Header startupStatus={startupStatus} />
+          <Dashboard startupStatus={startupStatus} startupErrorMessage={startupErrorMessage} />
         </div>
       )}
     </div>

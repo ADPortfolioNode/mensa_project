@@ -22,7 +22,8 @@ async def rate_limit_middleware(request: Request, call_next):
         "/api/startup_status",
         "/api/experiments",
         "/api/ingest_stream",
-        "/api/games"
+        "/api/games",
+        "/api/games/summaries",
     ]
     # Also skip paths that start with certain prefixes
     skip_prefixes = ["/api/games/"]

@@ -1,0 +1,33 @@
+---
+pid: 4624
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 40; docker exec mensa_backend python -c \"
+import json, urllib.request, urllib.error
+req = urllib.request.Request(
+    'http://127.0.0.1:5000/api/train',
+    data=json.dumps({'game': 'pick3'}).encode(),
+    method='POST',
+    headers={'Content-Type': 'application/json'},
+)
+try:
+    with urllib.request.urlopen(req, timeout=300) as r:
+        body = r.read().decode()
+        print(body[:400])
+        if \\\"no attribute 'train'\\\" in body:
+            print('RESULT: STILL BROKEN')
+        elif '\\\"status\\\": \\\"error\\\"' in body and 'train' in body.lower():
+            print('RESULT: ERROR (other)')
+        else:
+            print('RESULT: OK')
+except urllib.error.HTTPError as e:
+    print('HTTP', e.code, e.read().decode()[:300])
+except Exception as e:
+    print(type(e).__name__, e)
+\""
+started_at: 2026-07-01T09:34:09.337Z
+running_for_ms: 11725005 
+---
+  File "<string>", line 13
+    if " no attribute train \
+       ^
+SyntaxError: unterminated string literal (detected at line 13)

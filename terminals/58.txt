@@ -1,0 +1,7 @@
+---
+pid: 10616
+cwd: "E:\2024 RESET\mensa_project"
+command: "curl.exe -s -X POST http://localhost:3000/api/train -H \"Content-Type: application/json\" -d '{\\\"game\\\":\\\"pick3\\\"}' --max-time 120"
+started_at: 2026-07-01T13:49:35.152Z
+running_for_ms: 22765070 
+---

@@ -1,0 +1,16 @@
+---
+pid: 10460
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"
+import urllib.request
+for path in ['/api/experiments','/api/chroma/status','/api/chroma/collections','/api/games/pick3/summary','/api/ingest_progress?game=pick3','/api/models/metadata','/api/predictions/all']:
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:5000'+path, timeout=25) as r:
+            body=r.read(120).decode('utf-8','replace')
+            print('OK', path, r.status, body[:80])
+    except Exception as e:
+        print('FAIL', path, e)
+\""
+started_at: 2026-07-01T08:18:02.471Z
+running_for_ms: 16290003 
+---

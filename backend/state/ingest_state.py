@@ -40,6 +40,10 @@ manual_ingest_seq = 0
 
 # Persistent ingest state file (inside DATA_DIR)
 _ingest_state_file = Path(os.environ.get('DATA_DIR', '/data')) / 'ingest_state.json'
+_save_interval_s = float(os.environ.get('INGEST_STATE_SAVE_INTERVAL_S', '2'))
+_save_lock = threading.Lock()
+_save_timer: threading.Timer | None = None
+_save_dirty = False
 
 
 def _load_manual_ingest_state():
@@ -70,10 +74,51 @@ def _save_manual_ingest_state():
         print(f"⚠ Failed to persist manual ingest state to {_ingest_state_file}: {e}")
 
 
+def _flush_manual_ingest_state():
+    """Write pending manual ingest state to disk."""
+    global _save_dirty, _save_timer
+    with _save_lock:
+        if not _save_dirty:
+            _save_timer = None
+            return
+        _save_dirty = False
+        if _save_timer is not None:
+            _save_timer.cancel()
+            _save_timer = None
+    _save_manual_ingest_state()
+
+
+def _schedule_manual_ingest_state_save(*, force: bool = False):
+    """Debounce disk writes during active ingestion; flush immediately on terminal states."""
+    global _save_dirty, _save_timer
+    with _save_lock:
+        _save_dirty = True
+        if force:
+            if _save_timer is not None:
+                _save_timer.cancel()
+                _save_timer = None
+
+    if force:
+        _flush_manual_ingest_state()
+        return
+
+    with _save_lock:
+        if _save_timer is not None:
+            return
+
+        def _timer_callback():
+            _flush_manual_ingest_state()
+
+        _save_timer = threading.Timer(_save_interval_s, _timer_callback)
+        _save_timer.daemon = True
+        _save_timer.start()
+
+
 def set_manual_ingest_state(game_key: str, state: dict):
     """Update manual ingest state for a specific game."""
     manual_ingest_state[game_key] = state
-    _save_manual_ingest_state()
+    terminal = str(state.get("status", "")).lower() in {"completed", "error", "failed"}
+    _schedule_manual_ingest_state_save(force=terminal)
 
 
 def get_manual_ingest_state(game_key: str) -> Dict[str, Any]:

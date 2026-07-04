@@ -192,7 +192,22 @@ class PredictorService:
         model_strategy = str((artifact or {}).get("model_strategy", "single"))
         primary_model = (artifact or {}).get("model")
         if primary_model is None:
-            raise ValueError("Model artifact for prediction is invalid.")
+            raise ValueError("Model artifact for suggestion is invalid.")
+
+        if model_strategy == "ensemble_top3":
+            top_models = (artifact or {}).get("top_models") or []
+            ensemble_weights = (artifact or {}).get("ensemble_weights") or []
+            usable_models = [model for model in top_models if model is not None]
+            if len(usable_models) >= 2:
+                weight_arr = np.asarray(ensemble_weights[: len(usable_models)], dtype=float)
+                if weight_arr.sum() <= 0:
+                    weight_arr = np.ones(len(usable_models), dtype=float)
+                weight_arr = weight_arr / weight_arr.sum()
+                stacked = np.stack(
+                    [np.asarray(model.predict(X), dtype=float) for model in usable_models],
+                    axis=0,
+                )
+                return np.tensordot(weight_arr, stacked, axes=(0, 0))
 
         if model_strategy == "ensemble":
             secondary_model = (artifact or {}).get("secondary_model")
@@ -257,27 +272,32 @@ class PredictorService:
             artifact = joblib.load(model_path)
         except Exception as exc:
             return {"status": "error", "message": f"Unable to load model for game '{game}': {str(exc)}"}
+        from services.trainer import TrainerService
+
         model = artifact.get("model")
         model_strategy = str(artifact.get("model_strategy", "single"))
         blend_weight = artifact.get("blend_weight")
         feature_len = int(artifact.get("feature_len", 10))
         output_len = int(artifact.get("output_len", 6))
+        window_size = int(artifact.get("window_size", 1))
         rules = artifact.get("rules") or self._get_rules(game)
         if model is None:
             return {"status": "error", "message": f"Model artifact for game '{game}' is invalid."}
 
         # Fetch recent draws from ChromaDB for prediction input
         collection = chroma_client.client.get_collection(game)
-        data = collection.get(limit=recent_k, include=["metadatas"])  # Get recent entries
-        
-        if not data or not data['metadatas']:
-             return {"status": "error", "message": "Not enough data to make a prediction."}
-        
-        sequences = [self._extract_sequence(meta) for meta in data['metadatas']]
+        fetch_k = max(int(recent_k), window_size + 2)
+        data = collection.get(limit=fetch_k, include=["metadatas"])
+
+        if not data or not data["metadatas"]:
+            return {"status": "error", "message": "Not enough data to make a suggestion."}
+
+        metadatas = TrainerService()._sort_metadatas_chronologically(data["metadatas"])
+        sequences = [self._extract_sequence(meta) for meta in metadatas]
         sequences = [seq for seq in sequences if seq]
-        
-        if not sequences:
-            return {"status": "error", "message": "No valid sequences found."}
+
+        if len(sequences) < window_size:
+            return {"status": "error", "message": "Not enough historical draws for model window."}
         
         prediction_dt = self._current_prediction_datetime()
         session_draw_count = self._get_session_draw_count(game, prediction_dt)
@@ -298,14 +318,16 @@ class PredictorService:
         bonus_count = int(rules.get("bonus_count", 0) or 0)
         include_bonus = bonus_count > 0 and output_len >= (primary_count + bonus_count)
 
-        seq = sequences[0]
-        seq = seq + [0] * (feature_len - len(seq)) if len(seq) < feature_len else seq[:feature_len]
-
         session_predictions = []
-        current_seq = list(seq)
+        rolling_sequences = sequences[-window_size:]
 
         for draw_index in range(session_draw_count):
-            X = np.array([current_seq])
+            feature_vector = TrainerService.build_feature_vector(
+                rolling_sequences,
+                window_size,
+                feature_len,
+            )
+            X = np.array([feature_vector])
             prediction = self._predict_from_artifact(artifact, X)
             prediction = np.array(prediction).reshape(-1)[:output_len]
 
@@ -328,8 +350,7 @@ class PredictorService:
                 "predicted_bonus_numbers": bonus_numbers,
             })
 
-            next_seq = list(normalized_flat)
-            current_seq = next_seq + [0] * (feature_len - len(next_seq)) if len(next_seq) < feature_len else next_seq[:feature_len]
+            rolling_sequences = (rolling_sequences + [list(normalized_flat)])[-window_size:]
 
         return {
             "status": "success",
@@ -351,6 +372,10 @@ class PredictorService:
             except Exception as exc:
                 results[game] = {"error": str(exc)}
         return results
+
+    def predict(self, game: str, recent_k: int = 10):
+        """Backward-compatible alias used by API routes and tooling."""
+        return self.predict_next_draw(game, recent_k)
 
 # Export a module-level instance expected by main_rag and other modules
 predictor_service = PredictorService()

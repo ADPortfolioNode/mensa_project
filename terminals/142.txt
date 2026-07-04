@@ -1,0 +1,7 @@
+---
+pid: 11420
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker inspect mensa_backend --format \"{{.State.Status}} {{.Config.Image}}\" 2>&1"
+started_at: 2026-07-03T19:19:59.397Z
+running_for_ms: 12390007 
+---

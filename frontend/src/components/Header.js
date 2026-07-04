@@ -1,47 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { getApiBase } from '../utils/apiBase';
 
-const Header = () => {
-  const [startupStatus, setStartupStatus] = useState(null);
+const Header = ({ startupStatus }) => {
   const [showProgress, setShowProgress] = useState(true);
 
-  const fetchStartupStatus = async () => {
-    const apiBase = getApiBase();
-    const primaryUrl = `${apiBase}/api/startup_status`;
-    const fallbackUrl = apiBase
-      ? null
-      : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_status`;
-
-    try {
-      return await axios.get(primaryUrl, { timeout: 10000 });
-    } catch (primaryError) {
-      if (!fallbackUrl) throw primaryError;
-      return axios.get(fallbackUrl, { timeout: 10000 });
-    }
-  };
-
   useEffect(() => {
-    const pollStartupStatus = async () => {
-      try {
-        const response = await fetchStartupStatus();
-        setStartupStatus(response.data);
-        
-        // Hide progress bar after completion
-        if (response.data.status === 'completed') {
-          setTimeout(() => setShowProgress(false), 500);
-        }
-      } catch (error) {
-        // Silent fail - continue polling
-      }
-    };
-
-    const interval = setInterval(pollStartupStatus, 2000);
-    pollStartupStatus();
-
-    return () => clearInterval(interval);
-  }, []);
+    if (startupStatus?.status === 'completed') {
+      const timer = setTimeout(() => setShowProgress(false), 500);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [startupStatus?.status]);
 
   const getProgressPercentage = () => {
     if (!startupStatus) return 0;
@@ -56,7 +25,6 @@ const Header = () => {
 
   return (
     <div>
-      {/* Startup Progress Bar */}
       {showProgress && startupStatus && (
         <div className="header-startup-strip py-2 mb-3">
           <div className="container">
@@ -65,7 +33,7 @@ const Header = () => {
               {startupStatus.current_game && (
                 <span className="ms-2">
                   • {startupStatus.current_game.toUpperCase()}
-                  {startupStatus.progress && (
+                  {startupStatus.progress > 0 && (
                     <span> ({startupStatus.progress.toFixed(1)}/{startupStatus.total})</span>
                   )}
                 </span>
@@ -83,13 +51,12 @@ const Header = () => {
         </div>
       )}
 
-      {/* Main Header */}
       <div className="container py-4">
         <div className="alert alert-info">
-          <h4>Welcome to Mensa Predictive Dashboard</h4>
-          <p>Use this app to predict lottery numbers. Follow the workflow: 1. Ingest data, 2. Train the model, 3. Make predictions.</p>
+          <h4>Welcome to Mensa Suggestion Dashboard</h4>
+          <p>Use this app to suggest lottery numbers. Follow the workflow: 1. Ingest data, 2. Train the model, 3. Make suggestions.</p>
         </div>
-        <h2>Mensa Predictive Dashboard</h2>
+        <h2>Mensa Suggestion Dashboard</h2>
       </div>
     </div>
   );

@@ -5,7 +5,14 @@ import React, { useState } from 'react';
  * Provides a card that can expand to full width (2 columns) when active
  * Shows metadata and details when expanded
  */
-export default function ExpandableCard({ 
+function formatMetadataValue(value) {
+  if (value === 0) return '0';
+  if (value == null) return '—';
+  const text = String(value).trim();
+  return text || '—';
+}
+
+export default function ExpandableCard({
   title, 
   children, 
   metadata = {},
@@ -70,7 +77,9 @@ export default function ExpandableCard({
               {Object.entries(metadata).map(([key, value]) => (
                 <div key={key} className="expandable-metadata-row">
                   <span className="expandable-metadata-key">{key}:</span>
-                  <span className="expandable-metadata-value">{value}</span>
+                  <span className="expandable-metadata-value">
+                    {formatMetadataValue(value)}
+                  </span>
                 </div>
               ))}
             </div>

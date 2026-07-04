@@ -1,0 +1,15 @@
+---
+pid: 11304
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"import asyncio; from routes.games import get_all_game_summaries; print(asyncio.run(get_all_game_summaries()))\""
+started_at: 2026-07-01T14:18:14.540Z
+running_for_ms: 21045031 
+---
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given

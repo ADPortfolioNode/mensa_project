@@ -19,7 +19,7 @@ export default function WorkflowSummary() {
           The UI shows the training progress and status.
         </li>
         <li>
-          <strong>Make Predictions:</strong> After the model is trained, the user can input numeric features to get a prediction.
+          <strong>Make Suggestions:</strong> After the model is trained, the user can input numeric features to get a suggestion.
         </li>
         <li>
           <strong>Chat with Agent:</strong> A chat panel is available for the user to interact with a conversational agent.

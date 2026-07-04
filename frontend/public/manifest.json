@@ -1,6 +1,6 @@
 {
   "short_name": "Mensa",
-  "name": "Mensa Predictive Dashboard",
+  "name": "Mensa Suggestion Dashboard",
   "icons": [],
   "start_url": "/",
   "display": "standalone",

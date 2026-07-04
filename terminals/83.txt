@@ -1,0 +1,129 @@
+---
+pid: 4420
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\"; for ($i=1; $i -le 30; $i++) { Start-Sleep 5; docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"ready\"; docker compose build backend; docker compose up -d --force-recreate backend; for ($j=1; $j -le 15; $j++) { $h = curl.exe -s http://localhost:5000/api/health; if ($h -match 'healthy') { Write-Host \"api ready\"; break }; Start-Sleep 5 }; Get-Content \"E:\\2024 RESET\\mensa_project\\test_all_workflows.py\" | docker exec -i mensa_backend python -; break } }"
+started_at: 2026-07-01T14:55:57.340Z
+running_for_ms: 18780007 
+---
+ready
+ Image mensa_project-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 603B 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 2.00kB 0.2s done
+#2 DONE 0.5s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 ...
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 6.0s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 33B
+#5 transferring context: 762B 0.3s done
+#5 DONE 0.7s
+
+#6 [builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#6 ...
+
+#7 [internal] load build context
+#7 DONE 0.0s
+
+#6 [builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#6 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#6 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 0.9s done
+#6 DONE 1.0s
+
+#6 [builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#6 DONE 1.0s
+
+#7 [internal] load build context
+#7 transferring context: 7.20kB 0.3s done
+#7 DONE 0.8s
+
+#8 [builder 3/4] COPY requirements.txt requirements.txt
+#8 CACHED
+
+#9 [builder 4/4] RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt     && python -c "from hypercorn.config import Config; print(f'hypercorn install verified: {Config.__module__}')"
+#9 CACHED
+
+#10 [stage-1 4/9] COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+#10 CACHED
+
+#11 [builder 2/4] WORKDIR /app
+#11 CACHED
+
+#12 [stage-1 3/9] RUN groupadd -r appuser && useradd -r -g appuser appuser
+#12 CACHED
+
+#13 [stage-1 5/9] COPY --from=builder /usr/local/bin /usr/local/bin
+#13 CACHED
+
+#14 [stage-1 6/9] COPY --chown=appuser:appuser . .
+#14 DONE 1.7s
+
+#15 [stage-1 7/9] RUN mkdir -p /data && chown -R appuser:appuser /data /app && mkdir -p /data/experiments && chown -R appuser:appuser /data/experiments
+#15 DONE 8.0s
+
+#16 [stage-1 8/9] COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+#16 DONE 1.8s
+
+#17 [stage-1 9/9] RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+#17 DONE 3.8s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 4.2s done
+#18 exporting manifest sha256:99a7103ab96b90ee2622612bd1e0d2c45ff428dd3dbaf2e02916e1477286a67b
+#18 exporting manifest sha256:99a7103ab96b90ee2622612bd1e0d2c45ff428dd3dbaf2e02916e1477286a67b 0.2s done
+#18 exporting config sha256:f1b4a3722ba94d2f43d3fa5eb4ff68ede4b0fd314c580ccad2f53aed89c190d9
+#18 exporting config sha256:f1b4a3722ba94d2f43d3fa5eb4ff68ede4b0fd314c580ccad2f53aed89c190d9 0.3s done
+#18 exporting attestation manifest sha256:fa5efd248b8ffcc4bb2d185196592725b1715d653fe85a86078cb0cc5a1f70dd
+#18 exporting attestation manifest sha256:fa5efd248b8ffcc4bb2d185196592725b1715d653fe85a86078cb0cc5a1f70dd 0.6s done
+#18 exporting manifest list sha256:c9102bc91b7f11490fdca2dd9192acc7d4bea7512a031692cf7f5907c864e768
+#18 exporting manifest list sha256:c9102bc91b7f11490fdca2dd9192acc7d4bea7512a031692cf7f5907c864e768 0.4s done
+#18 naming to docker.io/library/mensa_project-backend:latest 0.1s done
+#18 unpacking to docker.io/library/mensa_project-backend:latest
+#18 unpacking to docker.io/library/mensa_project-backend:latest 2.3s done
+#18 DONE 8.7s
+
+#19 resolving provenance for metadata file
+#19 DONE 0.5s
+ Image mensa_project-backend Built 
+ Container mensa_chroma Running 
+ Container mensa_backend Recreate 
+ Container mensa_backend Recreated 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 
+api ready
+============================================================
+MENSA PROJECT - ALL WORKFLOWS TEST
+============================================================
+[PASS] 1. Health: backend healthy
+[PASS] 2. Startup Status: status=ready
+[WARN] 3. Startup Init: {'status': 'ingesting', 'message': 'Initialization started', 'available_games': ['take5', 'pick3', 'powerball', 'megamil
+[PASS] 4. List Games: 8 games
+[FAIL] 5. Game Summary: {'error': 'timed out'}
+[PASS] 6. Ingest Queue: Ingestion queued for pick3
+[WARN] 7. Ingest Progress: still queued after polling
+[PASS] 8. Train Model: accuracy=0.8599463309783281
+[PASS] 9. Predict: numbers=[4, 6, 7]
+[PASS] 10. Experiments: count=100
+[PASS] 11. Chroma Status: connected
+[PASS] 12. Chroma Collections: 8 collections
+[PASS] 13. Models Metadata: keys=['status', 'models']
+[PASS] 14. Game Model Metadata: game=pick3
+[PASS] 15. Predictions All: games=8
+[WARN] 16. Chat: {'detail': '2 validation errors for ChatResponse\ntool_name\n  Input should be a valid string [type=string_type, input_v
+============================================================
+SUMMARY: 12 PASS, 3 WARN, 1 FAIL / 16 total
+============================================================

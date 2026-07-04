@@ -1,0 +1,8 @@
+---
+pid: 3180
+cwd: "E:\2024 RESET\mensa_project"
+command: "curl.exe -s -o NUL -w \"health:%{http_code}n\" --max-time 10 http://localhost:3000/api/health; curl.exe -s -o NUL -w \"games:%{http_code}n\" --max-time 10 http://localhost:3000/api/games; curl.exe -s -o NUL -w \"startup:%{http_code}n\" --max-time 10 http://localhost:3000/api/startup_status; curl.exe -s -o NUL -w \"experiments:%{http_code}n\" --max-time 10 http://localhost:3000/api/experiments; curl.exe -s -o NUL -w \"stream-all:%{http_code}n\" --max-time 8 http://localhost:3000/api/ingest_stream; curl.exe -s -o NUL -w \"stream-pick3:%{http_code}n\" --max-time 8 \"http://localhost:3000/api/ingest_stream?game=pick3\"; curl.exe -s -o NUL -w \"ui:%{http_code}n\" --max-time 8 http://localhost:3000/; docker exec mensa_backend python -c \"from services.trainer import trainer_service; print('train_ok', hasattr(trainer_service,'train_model'), hasattr(trainer_service,'train'))\""
+started_at: 2026-07-01T13:38:37.395Z
+running_for_ms: 23420005 
+---
+health:504ngames:000nstartup:000nexperiments:000nstream-all:000nstream-pick3:000nui:200ntrain_ok True True

@@ -1,0 +1,10 @@
+---
+pid: 7576
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; $maxWait = 120; $elapsed = 0; while ($elapsed -lt $maxWait) { docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"Docker ready after ${elapsed}s\"; break }; Start-Sleep -Seconds 5; $elapsed += 5; Write-Host \"Waiting for Docker... ${elapsed}s\" }; if ($LASTEXITCODE -ne 0) { docker info 2>&1 }"
+started_at: 2026-07-01T13:44:44.718Z
+running_for_ms: 23055006 
+---
+Waiting for Docker... 5s
+Waiting for Docker... 10s
+Docker ready after 10s

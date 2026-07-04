@@ -1,0 +1,44 @@
+---
+pid: 6084
+cwd: "E:\2024 RESET\mensa_project"
+command: "python -u \"E:\\2024 RESET\\mensa_project\\verify_all_games_training.py\""
+started_at: 2026-07-01T19:10:05.266Z
+running_for_ms: 3535008  
+---
+=== All-Games Training Accuracy Verification ===
+Request target=0.8, max_iterations=8
+
+
+--- Training take5 ---
+[PASS] take5: pre=89.67% -> highest=89.67%, target=89.67%, retained, candidate=86.25%
+
+--- Training pick3 ---
+[PASS] pick3: pre=85.99% -> highest=85.99%, target=85.99%, retained, candidate=84.39%
+
+--- Training powerball ---
+[FAIL] powerball: highest 0.8770 < baseline_accuracy 0.9040; regression: highest 0.8770 < baseline 0.9040; not retained but accuracy regressed
+
+--- Training megamillions ---
+[PASS] megamillions: pre=92.54% -> highest=92.54%, target=92.54%, retained, candidate=87.73%
+
+--- Training pick10 ---
+[PASS] pick10: pre=95.22% -> highest=95.22%, target=95.22%, retained, candidate=93.87%
+
+--- Training cash4life ---
+[PASS] cash4life: pre=91.05% -> highest=91.05%, target=91.05%, retained, candidate=88.49%
+
+--- Training quickdraw ---
+[PASS] quickdraw: pre=none -> highest=93.91%, target=80.00%, new/held, candidate=93.91%
+
+--- Training nylotto ---
+[PASS] nylotto: pre=91.69% -> highest=91.69%, target=91.69%, retained, candidate=86.01%
+
+=== SUMMARY: 7 PASS, 1 FAIL / 8 games ===
+  take5: PASS — pre=89.67% -> highest=89.67%, target=89.67%, retained, candidate=86.25%
+  pick3: PASS — pre=85.99% -> highest=85.99%, target=85.99%, retained, candidate=84.39%
+  powerball: FAIL — highest 0.8770 < baseline_accuracy 0.9040; regression: highest 0.8770 < baseline 0.9040; not retained but accuracy regressed
+  megamillions: PASS — pre=92.54% -> highest=92.54%, target=92.54%, retained, candidate=87.73%
+  pick10: PASS — pre=95.22% -> highest=95.22%, target=95.22%, retained, candidate=93.87%
+  cash4life: PASS — pre=91.05% -> highest=91.05%, target=91.05%, retained, candidate=88.49%
+  quickdraw: PASS — pre=none -> highest=93.91%, target=80.00%, new/held, candidate=93.91%
+  nylotto: PASS — pre=91.69% -> highest=91.69%, target=91.69%, retained, candidate=86.01%

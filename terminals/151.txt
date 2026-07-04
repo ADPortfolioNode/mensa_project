@@ -1,0 +1,7 @@
+---
+pid: 5692
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" build frontend 2>&1 | Select-Object -Last 15"
+started_at: 2026-07-03T19:42:09.237Z
+running_for_ms: 11060005 
+---

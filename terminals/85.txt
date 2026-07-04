@@ -1,0 +1,13 @@
+---
+pid: 948
+cwd: "E:\2024 RESET\mensa_project"
+command: "for ($i=1; $i -le 12; $i++) { $h = curl.exe -s http://localhost:5000/api/health; if ($h -match 'healthy') { break }; Start-Sleep 5 }; Measure-Command { curl.exe -s -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@E:\\2024 RESET\\mensa_project\\agent-tools\\train_body.json\" --max-time 120 } | Select-Object TotalSeconds; curl.exe -s http://localhost:5000/api/health"
+started_at: 2026-07-01T15:04:09.396Z
+running_for_ms: 18289925 
+---
+
+TotalSeconds
+------------
+ 105.5636394
+
+

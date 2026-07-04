@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import getApiBase from '../utils/apiBase';
+import { startPolling } from '../utils/polling';
 import ProgressiveProgressBar from './ProgressiveProgressBar';
 
 /**
@@ -48,8 +49,8 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
         if (typeof EventSource !== 'undefined') {
             try {
                 eventSource = new EventSource(streamUrl);
-            setStreamMode('stream');
-                eventSource.onmessage = (e) => {
+                setStreamMode('stream');
+                const onStreamEvent = (e) => {
                     try {
                         const parsed = JSON.parse(e.data);
                         handleStreamData(parsed);
@@ -57,6 +58,9 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
                         console.error('Failed to parse SSE payload', err);
                     }
                 };
+                eventSource.onmessage = onStreamEvent;
+                eventSource.addEventListener('progress', onStreamEvent);
+                eventSource.addEventListener('complete', onStreamEvent);
                 eventSource.onerror = (err) => {
                     console.error('SSE error', err);
                     setError('Stream error');
@@ -75,7 +79,7 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
                         }
                     };
                     pollProgress();
-                    pollInterval = setInterval(pollProgress, 2000);
+                    pollInterval = startPolling({ intervalMs: 5000, tick: pollProgress });
                 };
             } catch (e) {
                 // If EventSource construction fails, fallback to polling
@@ -96,12 +100,12 @@ export default function IngestionProgressPanel({ game, isActive, onComplete }) {
                 }
             };
             pollProgress();
-            pollInterval = setInterval(pollProgress, 2000);
+            pollInterval = startPolling({ intervalMs: 5000, tick: pollProgress });
         }
 
         return () => {
             try { if (eventSource) eventSource.close(); } catch (e) {}
-            try { if (pollInterval) clearInterval(pollInterval); } catch (e) {}
+            try { if (pollInterval) pollInterval(); } catch (e) {}
         };
     }, [isActive, game, apiBase, onComplete, startTime]);
 

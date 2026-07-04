@@ -1,0 +1,10 @@
+---
+pid: 10596
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker exec mensa_backend python -c \"import inspect; from routes import training, predictions, ingestion, chat; print('train:', hasattr(__import__('services.trainer').services.trainer.Trainer(), 'train_model')); print('predict:', 'predict_next_draw' in dir(__import__('services.predictor').services.predictor.Predictor())); import routes.ingestion as ing; sig=str(inspect.signature(ing.get_ingest_stream)); print('ingest_stream:', sig)\""
+started_at: 2026-07-01T17:38:08.919Z
+running_for_ms: 9049995  
+---
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+AttributeError: module 'services' has no attribute 'services'

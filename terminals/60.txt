@@ -1,0 +1,11 @@
+---
+pid: 13468
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; for ($i=1; $i -le 24; $i++) { Start-Sleep 5; docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"Docker ready attempt $i\"; docker ps --filter \"name=mensa\" --format \"{{.Names}} {{.Status}}\"; break } else { Write-Host \"waiting $i\" } }"
+started_at: 2026-07-01T13:54:24.152Z
+running_for_ms: 22475009 
+---
+Docker ready attempt 1
+mensa_frontend Up 9 seconds (healthy)
+mensa_backend Up 9 seconds (health: starting)
+mensa_chroma Up 10 seconds (health: starting)

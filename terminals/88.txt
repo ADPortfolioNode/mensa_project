@@ -1,0 +1,23 @@
+---
+pid: 14608
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker start mensa_chroma 2>&1; Start-Sleep 15; docker ps -a --filter \"name=mensa_chroma\" --format \"{{.Names}} {{.Status}}\"; docker logs mensa_chroma --tail 20 2>&1"
+started_at: 2026-07-01T15:13:37.949Z
+running_for_ms: 17720035 
+---
+mensa_chroma
+mensa_chroma Up 16 seconds (health: starting)
+Starting 'uvicorn chromadb.app:app' with args: --workers 1 --host 0.0.0.0 --port 8000 --proxy-headers --log-config chromadb/log_config.yml --timeout-keep-alive 30
+WARNING:  [01-07-2026 15:13:51] chroma_server_nofile is set to 65535, but this is less than current soft limit of 1048576. chroma_server_nofile will not be set.
+DEBUG:    [01-07-2026 15:13:52] Starting component System
+DEBUG:    [01-07-2026 15:13:52] Starting component OpenTelemetryClient
+DEBUG:    [01-07-2026 15:13:52] Starting component SqliteDB
+DEBUG:    [01-07-2026 15:13:52] Starting component QuotaEnforcer
+DEBUG:    [01-07-2026 15:13:52] Starting component Posthog
+DEBUG:    [01-07-2026 15:13:52] Starting component LocalSegmentManager
+DEBUG:    [01-07-2026 15:13:52] Starting component SegmentAPI
+INFO:     [01-07-2026 15:13:52] Started server process [1]
+INFO:     [01-07-2026 15:13:52] Waiting for application startup.
+INFO:     [01-07-2026 15:13:52] Application startup complete.
+INFO:     [01-07-2026 15:13:52] Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     [01-07-2026 15:13:56] 127.0.0.1:58572 - "GET /api/v1/heartbeat HTTP/1.1" 200

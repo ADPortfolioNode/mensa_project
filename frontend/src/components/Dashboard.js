@@ -12,11 +12,26 @@ import IngestionProgressPanel from './IngestionProgressPanel';
 import ExpandableCard from './ExpandableCard';
 import ProgressiveProgressBar from './ProgressiveProgressBar';
 import chromaStateManager from '../utils/chromaStateManager';
+import { startPolling } from '../utils/polling';
+import { formatApiError } from '../utils/errorUtils';
+import {
+  BASE_MODEL_TYPE,
+  buildTrainRequestBody,
+  formatModelTypeLabel,
+  formatTrainSizePercent,
+  normalizeTrainSizeFraction,
+  normalizeNEstimators,
+  normalizeMaxDepth,
+  normalizeMaxIterations,
+  formatTrainingSuccessMessage,
+  isTrainSuccessStatus,
+  formatTrainingErrorMessage,
+} from '../utils/trainingUtils';
 
 const ALL_GAMES_VALUE = '__all_games__';
 const GAME_COLOR_SCHEMES = ['primary', 'success', 'warning', 'info', 'danger', 'secondary', 'dark'];
 
-export default function Dashboard() {
+export default function Dashboard({ startupStatus = { status: 'unknown', progress: 0, total: 0, elapsed_s: 0 }, startupErrorMessage = '' }) {
   const API_BASE = getApiBase();
   // Use runtime-computed API base
   // eslint-disable-next-line no-console
@@ -42,13 +57,7 @@ export default function Dashboard() {
   const [expandedCard, setExpandedCard] = useState(null);
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
   const [allGamesProgress, setAllGamesProgress] = useState({});
-  const [startupErrorMessage, setStartupErrorMessage] = useState('');
-  const [startupStatus, setStartupStatus] = useState({
-    status: 'unknown',
-    progress: 0,
-    total: 0,
-    elapsed_s: 0,
-  });
+
 
   useEffect(() => {
     if (ingestStatus !== 'in progress' || selectedGame !== ALL_GAMES_VALUE) {
@@ -58,121 +67,170 @@ export default function Dashboard() {
     let eventSource;
     let cancelled = false;
 
+    const mapIngestStatus = (backendStatus) => (
+      backendStatus === 'completed'
+        ? 'completed'
+        : backendStatus === 'error'
+          ? 'error'
+          : backendStatus === 'ingesting'
+            ? 'active'
+            : 'pending'
+    );
+
+    const applyGameProgress = (gameName, progressData) => {
+      const rowsFetched = Number(progressData.rows_fetched || 0);
+      const totalRows = Number(progressData.total_rows || 0);
+      const mappedStatus = mapIngestStatus(String(progressData.status || '').toLowerCase());
+      setAllGamesProgress((prev) => ({
+        ...prev,
+        [gameName]: {
+          ...(prev[gameName] || {}),
+          status: mappedStatus,
+          rowsFetched,
+          totalRows,
+        },
+      }));
+    };
+
+    const handleStreamPayload = (payload) => {
+      if (!payload || typeof payload !== 'object') return;
+      for (const [gameName, gameState] of Object.entries(payload)) {
+        if (gameState && typeof gameState === 'object') {
+          applyGameProgress(gameName, gameState);
+        }
+      }
+    };
+
+    const pollAllGamesProgress = async () => {
+      if (cancelled || !games.length) return;
+      await Promise.all(games.map(async (gameName) => {
+        try {
+          const response = await axios.get(`${API_BASE}/api/ingest_progress?game=${gameName}`);
+          if (!cancelled && response?.data) {
+            applyGameProgress(gameName, response.data);
+          }
+        } catch {
+          // transient failures ignored
+        }
+      }));
+    };
+
     const tryStartSSE = () => {
       try {
         const url = `${API_BASE}/api/ingest_stream`;
         eventSource = new EventSource(url);
         eventSource.onmessage = (e) => {
           try {
-            const payload = JSON.parse(e.data) || {};
-            // payload is a map of game -> state
-            if (!payload || typeof payload !== 'object') return;
-            for (const [gameName, gameState] of Object.entries(payload)) {
-              const rowsFetched = Number(gameState.rows_fetched || 0);
-              const totalRows = Number(gameState.total_rows || 0);
-              const backendStatus = String(gameState.status || '').toLowerCase();
-              const mappedStatus = backendStatus === 'completed'
-                ? 'completed'
-                : backendStatus === 'error'
-                  ? 'error'
-                  : backendStatus === 'ingesting'
-                    ? 'active'
-                    : 'pending';
-
-              setAllGamesProgress(prev => ({
-                ...prev,
-                [gameName]: {
-                  ...(prev[gameName] || {}),
-                  status: mappedStatus,
-                  rowsFetched,
-                  totalRows,
-                }
-              }));
-            }
-          } catch (err) {
+            handleStreamPayload(JSON.parse(e.data) || {});
+          } catch {
             // ignore parse errors
           }
         };
-        eventSource.onerror = (err) => {
+        eventSource.onerror = () => {
           try { eventSource.close(); } catch (e) {}
           eventSource = null;
         };
-      } catch (err) {
+      } catch {
         eventSource = null;
       }
     };
 
     tryStartSSE();
+    pollAllGamesProgress();
 
-    // Fallback: if SSE not available, poll the current ingestingGame periodically
-    const pollCurrentGameProgress = async () => {
-      if (!ingestingGame) return;
-      try {
-        const response = await axios.get(`${API_BASE}/api/ingest_progress?game=${ingestingGame}`);
-        if (cancelled || !response?.data) return;
-
-        const rowsFetched = Number(response.data.rows_fetched || 0);
-        const totalRows = Number(response.data.total_rows || 0);
-        const backendStatus = String(response.data.status || '').toLowerCase();
-        const mappedStatus = backendStatus === 'completed'
-          ? 'completed'
-          : backendStatus === 'error'
-            ? 'error'
-            : backendStatus === 'ingesting'
-              ? 'active'
-              : 'pending';
-
-        setAllGamesProgress((prev) => ({
-          ...prev,
-          [ingestingGame]: {
-            ...(prev[ingestingGame] || {}),
-            status: mappedStatus,
-            rowsFetched,
-            totalRows,
-          },
-        }));
-      } catch {
-        // transient failures ignored
-      }
-    };
-
-    const interval = setInterval(() => {
-      if (!eventSource) pollCurrentGameProgress();
-    }, 2000);
-
-    // Initial poll to seed state while SSE connects
-    pollCurrentGameProgress();
+    const stopPolling = startPolling({
+      intervalMs: 5000,
+      tick: async () => {
+        if (!eventSource) {
+          await pollAllGamesProgress();
+        }
+      },
+    });
 
     return () => {
       cancelled = true;
       try { if (eventSource) eventSource.close(); } catch (e) {}
-      clearInterval(interval);
+      stopPolling();
     };
   }, [ingestStatus, selectedGame, ingestingGame, API_BASE, games]);
+
+  useEffect(() => {
+    if (!selectedTrainGame) return;
+    let cancelled = false;
+
+    const mapDefaults = (defaults, prev) => ({
+      testSize: normalizeTrainSizeFraction(
+        defaults.train_size ?? prev?.testSize ?? 0.25,
+        0.25,
+      ),
+      randomState: defaults.random_state ?? prev?.randomState ?? 42,
+      nEstimators: normalizeNEstimators(defaults.n_estimators ?? prev?.nEstimators ?? 250),
+      maxDepth: normalizeMaxDepth(defaults.max_depth ?? prev?.maxDepth ?? 18),
+      maxIterations: normalizeMaxIterations(defaults.max_iterations ?? prev?.maxIterations ?? 40),
+      targetAccuracy: defaults.target_accuracy ?? prev?.targetAccuracy ?? 0.90,
+      windowSize: defaults.window_size ?? prev?.windowSize ?? 3,
+      autoTune: defaults.auto_tune ?? prev?.autoTune ?? true,
+      blendStep: defaults.blend_step ?? prev?.blendStep ?? 0.05,
+    });
+
+    const shallowEqual = (a, b, keys) => {
+      if (!a || !b) return false;
+      return keys.every((key) => (a[key] ?? null) === (b[key] ?? null));
+    };
+
+    const fetchSettings = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
+        if (cancelled || !response?.data) return;
+        const mapped = mapDefaults(response.data.defaults || {}, trainParams);
+        const keys = ['testSize', 'randomState', 'nEstimators', 'maxDepth', 'maxIterations', 'targetAccuracy', 'windowSize', 'autoTune', 'blendStep'];
+        const shouldOverwrite = trainDefaultsForGame === null || shallowEqual(trainParams, trainDefaultsForGame, keys);
+        if (shouldOverwrite) {
+          setTrainParams((prev) => ({ ...prev, ...mapped }));
+        }
+        setTrainDefaultsForGame(mapped);
+        setTrainIncremental(response.data.incremental || null);
+      } catch (_) {
+        // Keep current params when settings endpoint is unavailable.
+      }
+    };
+
+    fetchSettings();
+    return () => { cancelled = true; };
+  }, [selectedTrainGame, API_BASE]);
   
   // Training parameters
   const [trainParams, setTrainParams] = useState({
-    testSize: 0.33,
+    testSize: 0.25,
     randomState: 42,
-    nEstimators: 100,
-    maxDepth: 10
+    nEstimators: 250,
+    maxDepth: 18,
+    maxIterations: 40,
+    targetAccuracy: 0.90,
+    windowSize: 3,
+    autoTune: true,
+    blendStep: 0.05,
   });
+  const [trainDefaultsForGame, setTrainDefaultsForGame] = useState(null);
+  const [trainIncremental, setTrainIncremental] = useState(null);
 
   useEffect(() => {
     async function fetchGamesAndContents() {
       try {
-        const r = await axios.get(`${API_BASE}/api/games`);
+        const r = await axios.get(`${API_BASE}/api/games`, { timeout: 15000 });
         setGameContentsErrorMessage('');
         const gameList = r.data.games || [];
         setGames(gameList);
         setSelectedTrainGame((prev) => prev || gameList[0] || '');
-        // Fetch draw counts for each game
         const contents = {};
-        for (const game of gameList) {
-          try {
-            const res = await axios.get(`${API_BASE}/api/games/${game}/summary`);
-            contents[game] = res.data.draw_count;
-          } catch {
+        try {
+          const summaryRes = await axios.get(`${API_BASE}/api/games/summaries`, { timeout: 20000 });
+          const summaries = summaryRes.data?.summaries || {};
+          for (const game of gameList) {
+            contents[game] = Number(summaries[game]?.draw_count || 0);
+          }
+        } catch {
+          for (const game of gameList) {
             contents[game] = 0;
           }
         }
@@ -193,54 +251,27 @@ export default function Dashboard() {
     fetchGamesAndContents();
   }, [API_BASE]);
 
-  // Polling for experiments
   useEffect(() => {
-    async function fetchExperiments() {
-      try {
-        const r = await axios.get(`${API_BASE}/api/experiments`);
-        const experimentsPayload = Array.isArray(r.data)
-          ? r.data
-          : (Array.isArray(r.data?.experiments) ? r.data.experiments : []);
-        setExperiments(experimentsPayload);
-        setExperimentsErrorMessage('');
-      } catch (e) {
-        setExperimentsErrorMessage(e?.response?.data?.detail || e.message || 'Failed to fetch experiments.');
-      }
-    }
-    fetchExperiments(); // Fetch immediately on mount
-
-    const experimentPollInterval = setInterval(fetchExperiments, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(experimentPollInterval); // Clear interval on unmount
-  }, [API_BASE]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchStartupStatus = async () => {
-      try {
-        const response = await axios.get(`${API_BASE}/api/startup_status`);
-        setStartupErrorMessage('');
-        if (!cancelled && response?.data) {
-          setStartupStatus({
-            status: String(response.data.status || 'unknown').toLowerCase(),
-            progress: Number(response.data.progress || 0),
-            total: Number(response.data.total || 0),
-            elapsed_s: Number(response.data.elapsed_s || 0),
-          });
+    return startPolling({
+      intervalMs: 30000,
+      maxBackoffMs: 120000,
+      tick: async () => {
+        try {
+          const r = await axios.get(`${API_BASE}/api/experiments?limit=100`, { timeout: 15000 });
+          const experimentsPayload = Array.isArray(r.data)
+            ? r.data
+            : (Array.isArray(r.data?.experiments) ? r.data.experiments : []);
+          setExperiments(experimentsPayload);
+          setExperimentsErrorMessage('');
+        } catch (e) {
+          if (e?.response) {
+            setExperimentsErrorMessage(e?.response?.data?.detail || e.message || 'Failed to fetch experiments.');
+            return;
+          }
+          throw e;
         }
-      } catch {
-        setStartupErrorMessage('Failed to refresh startup status.');
-      }
-    };
-
-    fetchStartupStatus();
-    const interval = setInterval(fetchStartupStatus, 5000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+      },
+    });
   }, [API_BASE]);
 
   const startIngest = useCallback(async () => {
@@ -301,7 +332,10 @@ export default function Dashboard() {
             }
           };
 
-          const pollInterval = setInterval(pollCurrentGameProgress, 2000);
+          const stopPoll = startPolling({
+            intervalMs: 5000,
+            tick: pollCurrentGameProgress,
+          });
           await pollCurrentGameProgress();
 
           try {
@@ -370,7 +404,7 @@ export default function Dashboard() {
             };
           } finally {
             pollCancelled = true;
-            clearInterval(pollInterval);
+            stopPoll();
 
             try {
               const res = await axios.get(`${API_BASE}/api/games/${game}/summary`);
@@ -579,16 +613,14 @@ export default function Dashboard() {
     
     const interval = setInterval(() => setTrainProgress(p => Math.min(p + 5, 95)), 2000);
     try {
-      const response = await axios.post(`${API_BASE}/api/train`, { 
-        game: selectedTrainGame,
-        ...trainParams // Include training parameters
-      });
+      const response = await axios.post(
+        `${API_BASE}/api/train`,
+        buildTrainRequestBody(selectedTrainGame, trainParams),
+        { timeout: 600000 },
+      );
       clearInterval(interval); // Clear interval regardless of outcome
       setTrainProgress(100);
-      const normalizedTrainStatus = String(response?.data?.status || '').toLowerCase();
-      const isTrainSuccess = normalizedTrainStatus === 'completed' || normalizedTrainStatus === 'success';
-
-      if (isTrainSuccess) {
+      if (isTrainSuccessStatus(response?.data?.status)) {
         setTrainStatus('completed');
         setTrainErrorMessage('');
         // Refresh experiments
@@ -598,7 +630,13 @@ export default function Dashboard() {
           : (Array.isArray(r.data?.experiments) ? r.data.experiments : []);
         setExperiments(experimentsPayload);
         setExperimentsErrorMessage('');
-        alert(`Training completed successfully for ${selectedTrainGame.toUpperCase()}! Experiment ID: ${response.data.experiment_id}, Score: ${response.data.score}`);
+        try {
+          const settingsRes = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
+          setTrainIncremental(settingsRes.data?.incremental || null);
+        } catch (_) {
+          // ignore refresh errors
+        }
+        alert(formatTrainingSuccessMessage(selectedTrainGame, response.data));
         setTimeout(() => setExpandedCard(null), 2000);
       } else {
         setTrainStatus('error');
@@ -609,10 +647,31 @@ export default function Dashboard() {
       clearInterval(interval);
       setTrainStatus('error');
       setTrainProgress(0);
-      setTrainErrorMessage(e?.response?.data?.detail || e.message || 'Training request failed.');
-      alert(`Training failed due to an error: ${e.response?.data?.detail || e.message}`);
+      const errText = formatTrainingErrorMessage(e, formatApiError);
+      setTrainErrorMessage(errText);
+      alert(`Training failed due to an error: ${errText}`);
     }
   }, [effectiveIngestStatus, selectedTrainGame, selectedTrainGameStoredDraws, trainParams, API_BASE]);
+
+  const effectiveTrainingTarget = useMemo(() => {
+    const requested = Number(trainParams.targetAccuracy ?? 0.9);
+    const prior = trainIncremental?.highest_accuracy ?? trainIncremental?.baseline_accuracy;
+    const safeRequested = Number.isFinite(requested) ? Math.min(0.99, Math.max(0.5, requested)) : 0.9;
+    if (prior == null || !Number.isFinite(Number(prior))) return safeRequested;
+    return Math.max(safeRequested, Number(prior));
+  }, [trainParams.targetAccuracy, trainIncremental]);
+
+  const trainingModelTypeLabel = useMemo(() => {
+    const strategy =
+      selectedTrainingExperiment?.model_strategy
+      ?? trainIncremental?.model_strategy
+      ?? null;
+    const blendWeight =
+      selectedTrainingExperiment?.blend_weight
+      ?? trainIncremental?.blend_weight
+      ?? null;
+    return formatModelTypeLabel({ strategy, blendWeight }) || BASE_MODEL_TYPE;
+  }, [selectedTrainingExperiment, trainIncremental]);
 
   const isTrained = completedTrainingExperiments.length > 0;
 
@@ -744,7 +803,7 @@ export default function Dashboard() {
             current={isTrained ? 1 : 0}
             total={1}
             status={isTrained ? 'completed' : 'idle'}
-            label="3. Make Predictions"
+            label="3. Make Suggestions"
             showMetadata={false}
           />
         </div>
@@ -871,10 +930,16 @@ export default function Dashboard() {
             neonBorder={true}
             isActive={trainStatus === 'in progress'}
             metadata={{
-              'Model Type': 'Random Forest Classifier',
-              'Test Size': `${(trainParams.testSize * 100).toFixed(0)}%`,
-              'N Estimators': trainParams.nEstimators,
-              'Max Depth': trainParams.maxDepth,
+              'Model Type': trainingModelTypeLabel || BASE_MODEL_TYPE,
+              'Test Size': formatTrainSizePercent(trainParams.testSize),
+              'N Estimators': normalizeNEstimators(trainParams.nEstimators),
+              'Max Depth': normalizeMaxDepth(trainParams.maxDepth),
+              'Max Iterations': normalizeMaxIterations(trainParams.maxIterations),
+              'Target Accuracy': `${((trainParams.targetAccuracy ?? 0.90) * 100).toFixed(0)}%`,
+              'Effective Target': `${(effectiveTrainingTarget * 100).toFixed(1)}%`,
+              ...(trainIncremental?.highest_accuracy != null
+                ? { 'Prior Highest': `${(Number(trainIncremental.highest_accuracy) * 100).toFixed(2)}%` }
+                : {}),
               'Random State': trainParams.randomState,
               'Ready Games': trainingReadyGames.length,
               ...(selectedTrainingExperiment ? { 'Selected Experiment': selectedTrainingExperiment.experiment_id } : {}),
@@ -888,7 +953,21 @@ export default function Dashboard() {
             }
             onToggle={(expanded) => setExpandedCard(expanded ? 'train' : null)}
           >
-            <p>Train machine learning model on lottery draw history.</p>
+            <p>Train machine learning model on lottery draw history. Each run builds incrementally on the saved model and highest known accuracy.</p>
+            <p className="small text-neon mb-3">
+              <strong>Model Type:</strong> {trainingModelTypeLabel || BASE_MODEL_TYPE}
+            </p>
+
+            {trainIncremental?.incremental_learning && trainIncremental?.highest_accuracy != null && (
+              <div className="alert alert-secondary mb-3">
+                <strong>Incremental learning:</strong>{' '}
+                prior highest {(Number(trainIncremental.highest_accuracy) * 100).toFixed(2)}% — effective training target{' '}
+                {(effectiveTrainingTarget * 100).toFixed(2)}% (max of your target and prior best). New models are only saved if they beat the prior floor; otherwise the previous model is retained or ensemble-blended.
+                {Array.isArray(trainIncremental.accuracy_history) && trainIncremental.accuracy_history.length > 0 && (
+                  <span>{' '}Top accuracies stored: {trainIncremental.accuracy_history.map((v) => `${(Number(v) * 100).toFixed(2)}%`).join(', ')}.</span>
+                )}
+              </div>
+            )}
 
             <div className="mb-3">
               <label htmlFor="trainGameSelect" className="form-label text-neon">Game for Training</label>
@@ -934,7 +1013,7 @@ export default function Dashboard() {
                 <option value="">Select experiment</option>
                 {experimentsForReadyGame.map((exp) => (
                   <option key={exp.experiment_id} value={exp.experiment_id}>
-                    {`${exp.experiment_id} | Score: ${Number(exp.score || 0).toFixed(4)} | ${new Date(exp.timestamp).toLocaleString()}`}
+                    {`${exp.experiment_id} | Accuracy: ${(Number(exp.score ?? exp.final_accuracy ?? exp.accuracy ?? 0) * 100).toFixed(2)}% | ${new Date(exp.timestamp).toLocaleString()}`}
                   </option>
                 ))}
               </select>
@@ -952,12 +1031,15 @@ export default function Dashboard() {
               <h6 className="mb-2">Training Parameters</h6>
               <div className="row g-2">
                 <div className="col-md-6">
-                  <label className="form-label small">Test Size (%)</label>
+                  <label className="form-label small" title="Fraction of draws used for training (10–50%)">Train Split (%)</label>
                   <input 
                     type="number" 
                     className="form-control form-control-sm"
-                    value={trainParams.testSize * 100}
-                    onChange={(e) => setTrainParams({...trainParams, testSize: parseFloat(e.target.value) / 100})}
+                    value={Math.round(normalizeTrainSizeFraction(trainParams.testSize) * 100)}
+                    onChange={(e) => setTrainParams({
+                      ...trainParams,
+                      testSize: normalizeTrainSizeFraction(parseFloat(e.target.value), 0.25),
+                    })}
                     min="10"
                     max="50"
                     step="5"
@@ -969,10 +1051,13 @@ export default function Dashboard() {
                   <input 
                     type="number" 
                     className="form-control form-control-sm"
-                    value={trainParams.nEstimators}
-                    onChange={(e) => setTrainParams({...trainParams, nEstimators: parseInt(e.target.value)})}
+                    value={normalizeNEstimators(trainParams.nEstimators)}
+                    onChange={(e) => setTrainParams({
+                      ...trainParams,
+                      nEstimators: normalizeNEstimators(parseInt(e.target.value, 10)),
+                    })}
                     min="50"
-                    max="500"
+                    max="600"
                     step="50"
                     disabled={trainStatus === 'in progress'}
                   />
@@ -982,11 +1067,43 @@ export default function Dashboard() {
                   <input 
                     type="number" 
                     className="form-control form-control-sm"
-                    value={trainParams.maxDepth}
-                    onChange={(e) => setTrainParams({...trainParams, maxDepth: parseInt(e.target.value)})}
-                    min="5"
-                    max="50"
+                    value={normalizeMaxDepth(trainParams.maxDepth)}
+                    onChange={(e) => setTrainParams({
+                      ...trainParams,
+                      maxDepth: normalizeMaxDepth(parseInt(e.target.value, 10)),
+                    })}
+                    min="4"
+                    max="32"
+                    step="1"
+                    disabled={trainStatus === 'in progress'}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small">Max Iterations</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm"
+                    value={normalizeMaxIterations(trainParams.maxIterations)}
+                    onChange={(e) => setTrainParams({
+                      ...trainParams,
+                      maxIterations: normalizeMaxIterations(parseInt(e.target.value, 10)),
+                    })}
+                    min="10"
+                    max="100"
                     step="5"
+                    disabled={trainStatus === 'in progress'}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small">Target Accuracy (%)</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm"
+                    value={(trainParams.targetAccuracy ?? 0.90) * 100}
+                    onChange={(e) => setTrainParams({...trainParams, targetAccuracy: parseFloat(e.target.value) / 100})}
+                    min="50"
+                    max="99"
+                    step="1"
                     disabled={trainStatus === 'in progress'}
                   />
                 </div>
@@ -999,6 +1116,45 @@ export default function Dashboard() {
                     onChange={(e) => setTrainParams({...trainParams, randomState: parseInt(e.target.value)})}
                     disabled={trainStatus === 'in progress'}
                   />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small">Window Size (draws)</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm"
+                    value={trainParams.windowSize}
+                    onChange={(e) => setTrainParams({ ...trainParams, windowSize: parseInt(e.target.value, 10) })}
+                    min="1"
+                    max="8"
+                    step="1"
+                    disabled={trainStatus === 'in progress'}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small">Blend Step (prior mix)</label>
+                  <input
+                    type="number"
+                    className="form-control form-control-sm"
+                    value={trainParams.blendStep}
+                    onChange={(e) => setTrainParams({ ...trainParams, blendStep: parseFloat(e.target.value) })}
+                    min="0.01"
+                    max="0.5"
+                    step="0.01"
+                    disabled={trainStatus === 'in progress'}
+                  />
+                </div>
+                <div className="col-md-6 d-flex align-items-end">
+                  <div className="form-check mb-2">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="autoTuneCheck"
+                      checked={Boolean(trainParams.autoTune)}
+                      onChange={(e) => setTrainParams({ ...trainParams, autoTune: e.target.checked })}
+                      disabled={trainStatus === 'in progress'}
+                    />
+                    <label className="form-check-label small" htmlFor="autoTuneCheck">Auto-tune train split</label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1027,10 +1183,10 @@ export default function Dashboard() {
           </ExpandableCard>
         </div>
 
-        {/* Prediction Panel */}
+        {/* Suggestion Panel */}
         <div className="col-12 col-md-6">
           <ExpandableCard
-            title="Predictions"
+            title="Suggestions"
             neonBorder={true}
             metadata={{
               'Status': isTrained ? 'Model Ready' : 'Awaiting Training',

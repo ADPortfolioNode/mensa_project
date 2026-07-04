@@ -14,7 +14,7 @@ export default function ExperimentsPanel({ experiments }) {
                 <th>ID</th>
                 <th>Game</th>
                 <th>Status</th>
-                <th>Score</th>
+                <th>Accuracy</th>
                 <th>Description</th>
                 <th>Timestamp</th>
               </tr>
@@ -25,7 +25,7 @@ export default function ExperimentsPanel({ experiments }) {
                   <td title={exp.experiment_id}>{exp.experiment_id.slice(0, 8)}...</td>
                   <td>{exp.game}</td>
                   <td>{exp.status || 'N/A'}</td>
-                  <td>{exp.score?.toFixed(4) || 'N/A'}</td>
+                  <td>{((exp.score ?? exp.final_accuracy ?? exp.accuracy) != null ? `${(Number(exp.score ?? exp.final_accuracy ?? exp.accuracy) * 100).toFixed(2)}%` : 'N/A')}</td>
                   <td>{exp.description || exp.message || exp.error || 'N/A'}</td>
                   <td>{new Date(exp.timestamp).toLocaleString()}</td>
                 </tr>

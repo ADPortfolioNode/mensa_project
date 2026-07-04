@@ -1,0 +1,12 @@
+---
+pid: 35776
+cwd: "E:\2024 RESET\mensa_project"
+command: "powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\2024 RESET\\mensa_project\\scripts\\run_full_diag.ps1\""
+started_at: 2026-07-03T22:42:20.422Z
+running_for_ms: 249967   
+---
+[2026-07-03 18:42:25] 
+[2026-07-03 18:42:25] --- PowerShell Full Diagnostic Run ---
+[2026-07-03 18:42:25] Compose: docker compose
+[2026-07-03 18:42:25] Ports: backend=5001 frontend=3000 chroma=8001
+[2026-07-03 18:42:25] Waiting for Docker daemon (max 120s)...

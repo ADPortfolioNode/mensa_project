@@ -1,0 +1,17 @@
+---
+pid: 14836
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker compose config 2>&1 | Select-String -Pattern \"published|mode\""
+started_at: 2026-07-03T01:45:46.640Z
+running_for_ms: 20780017 
+---
+
+      GROK_MODEL: grok-3-mini-beta
+      - mode: ingress
+        published: "5001"
+      - mode: ingress
+        published: "8001"
+      - mode: ingress
+        published: "3000"
+
+

@@ -1,0 +1,254 @@
+---
+pid: 4068
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose build backend frontend"
+started_at: 2026-07-01T14:13:45.716Z
+running_for_ms: 21314968 
+---
+ Image mensa_project-frontend Building 
+ Image mensa_project-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.13kB 0.1s done
+#1 DONE 0.1s
+
+#2 [backend internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 2.00kB 0.1s done
+#2 DONE 0.6s
+
+#3 [frontend internal] load build definition from Dockerfile
+#3 transferring dockerfile: 1.23kB 0.1s done
+#3 DONE 1.2s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 ...
+
+#5 [auth] library/nginx:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [auth] library/node:pull token for registry-1.docker.io
+#6 DONE 0.0s
+
+#7 [auth] library/python:pull token for registry-1.docker.io
+#7 DONE 0.0s
+
+#8 [frontend internal] load metadata for docker.io/library/nginx:alpine
+#8 ...
+
+#9 [frontend internal] load metadata for docker.io/library/node:22.13.1-slim
+#9 DONE 2.8s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 ...
+
+#8 [frontend internal] load metadata for docker.io/library/nginx:alpine
+#8 DONE 3.0s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 DONE 3.8s
+
+#10 [frontend internal] load .dockerignore
+#10 transferring context:
+#10 ...
+
+#11 [backend internal] load .dockerignore
+#11 transferring context: 762B 0.2s done
+#11 DONE 0.7s
+
+#10 [frontend internal] load .dockerignore
+#10 transferring context: 891B 0.1s done
+#10 DONE 1.3s
+
+#12 [backend internal] load build context
+#12 DONE 0.0s
+
+#13 [backend builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#13 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#13 ...
+
+#14 [frontend internal] load build context
+#14 DONE 0.0s
+
+#15 [frontend stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#15 resolve docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#15 ...
+
+#13 [backend builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#13 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 1.6s done
+#13 DONE 1.7s
+
+#12 [backend internal] load build context
+#12 ...
+
+#16 [frontend builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#16 resolve docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc 1.4s done
+#16 DONE 1.6s
+
+#12 [backend internal] load build context
+#12 ...
+
+#15 [frontend stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#15 resolve docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa 1.6s done
+#15 DONE 1.7s
+
+#14 [frontend internal] load build context
+#14 ...
+
+#12 [backend internal] load build context
+#12 transferring context: 8.84kB 0.7s done
+#12 DONE 1.1s
+
+#14 [frontend internal] load build context
+#14 ...
+
+#17 [backend builder 2/4] WORKDIR /app
+#17 CACHED
+
+#18 [backend builder 3/4] COPY requirements.txt requirements.txt
+#18 CACHED
+
+#19 [backend builder 4/4] RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt     && python -c "from hypercorn.config import Config; print(f'hypercorn install verified: {Config.__module__}')"
+#19 CACHED
+
+#20 [backend stage-1 4/9] COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+#20 CACHED
+
+#21 [backend stage-1 3/9] RUN groupadd -r appuser && useradd -r -g appuser appuser
+#21 CACHED
+
+#22 [backend stage-1 5/9] COPY --from=builder /usr/local/bin /usr/local/bin
+#22 CACHED
+
+#14 [frontend internal] load build context
+#14 transferring context: 1.08MB 1.3s done
+#14 DONE 3.3s
+
+#23 [backend stage-1 6/9] COPY --chown=appuser:appuser . .
+#23 ...
+
+#24 [frontend builder 3/6] COPY package*.json ./
+#24 CACHED
+
+#25 [frontend builder 2/6] WORKDIR /app
+#25 CACHED
+
+#26 [frontend builder 4/6] RUN npm ci --legacy-peer-deps || npm ci
+#26 CACHED
+
+#27 [frontend builder 5/6] COPY . .
+#27 DONE 1.4s
+
+#23 [backend stage-1 6/9] COPY --chown=appuser:appuser . .
+#23 DONE 3.8s
+
+#28 [frontend builder 6/6] RUN npm run build && test -f /app/build/index.html
+#28 ...
+
+#29 [backend stage-1 7/9] RUN mkdir -p /data && chown -R appuser:appuser /data /app && mkdir -p /data/experiments && chown -R appuser:appuser /data/experiments
+#29 DONE 9.2s
+
+#28 [frontend builder 6/6] RUN npm run build && test -f /app/build/index.html
+#28 ...
+
+#30 [backend stage-1 8/9] COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+#30 DONE 1.1s
+
+#28 [frontend builder 6/6] RUN npm run build && test -f /app/build/index.html
+#28 ...
+
+#31 [backend stage-1 9/9] RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+#31 DONE 3.3s
+
+#28 [frontend builder 6/6] RUN npm run build && test -f /app/build/index.html
+#28 ...
+
+#32 [backend] exporting to image
+#32 exporting layers
+#32 exporting layers 4.2s done
+#32 exporting manifest sha256:e8fd0a5e20757a10a4deabbc90e838b527a754f3a69ce45d37ca166888ab102a
+#32 exporting manifest sha256:e8fd0a5e20757a10a4deabbc90e838b527a754f3a69ce45d37ca166888ab102a 0.3s done
+#32 exporting config sha256:05255e7998651a6b097fe17a705e9c43881f5ee8ce9a5f5e2f35312fa60e574b
+#32 exporting config sha256:05255e7998651a6b097fe17a705e9c43881f5ee8ce9a5f5e2f35312fa60e574b 0.5s done
+#32 exporting attestation manifest sha256:2167c515a0aeb2f2f7826207a2064bc8d066990eac965462ea428721a3f17fc8
+#32 exporting attestation manifest sha256:2167c515a0aeb2f2f7826207a2064bc8d066990eac965462ea428721a3f17fc8 0.4s done
+#32 exporting manifest list sha256:1641fda9d2a4ef20bd4846315dc0fa9b2145ab77c5d3dcd128d9c8b01209878a
+#32 exporting manifest list sha256:1641fda9d2a4ef20bd4846315dc0fa9b2145ab77c5d3dcd128d9c8b01209878a 0.3s done
+#32 naming to docker.io/library/mensa_project-backend:latest
+#32 naming to docker.io/library/mensa_project-backend:latest 0.0s done
+#32 unpacking to docker.io/library/mensa_project-backend:latest
+#32 unpacking to docker.io/library/mensa_project-backend:latest 1.6s done
+#32 DONE 8.1s
+
+#28 [frontend builder 6/6] RUN npm run build && test -f /app/build/index.html
+#28 16.80 
+#28 16.80 > mensa-frontend@1.0.0 build
+#28 16.80 > react-scripts build
+#28 16.80 
+#28 ...
+
+#33 [backend] resolving provenance for metadata file
+#33 DONE 0.5s
+
+#28 [frontend builder 6/6] RUN npm run build && test -f /app/build/index.html
+#28 38.41 Creating an optimized production build...
+#28 39.43 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#28 39.43   npx update-browserslist-db@latest
+#28 39.43   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#28 84.93 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#28 84.93   npx update-browserslist-db@latest
+#28 84.93   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#28 92.01 Compiled successfully.
+#28 92.01 
+#28 92.01 File sizes after gzip:
+#28 92.01 
+#28 92.05   101.16 kB  build/static/js/main.195c3cb6.js
+#28 92.05   38.41 kB   build/static/css/main.82489a38.css
+#28 92.05 
+#28 92.05 The project was built assuming it is hosted at /.
+#28 92.05 You can control this with the homepage field in your package.json.
+#28 92.05 
+#28 92.06 The build folder is ready to be deployed.
+#28 92.06 You may serve it with a static server:
+#28 92.06 
+#28 92.06   npm install -g serve
+#28 92.06   serve -s build
+#28 92.06 
+#28 92.06 Find out more about deployment here:
+#28 92.06 
+#28 92.06   https://cra.link/deployment
+#28 92.06 
+#28 DONE 92.9s
+
+#34 [frontend stage-1 2/5] RUN rm -rf /usr/share/nginx/html/*
+#34 CACHED
+
+#35 [frontend stage-1 3/5] COPY --from=builder /app/build/ /usr/share/nginx/html/
+#35 DONE 0.6s
+
+#36 [frontend stage-1 4/5] COPY nginx.conf /etc/nginx/nginx.conf
+#36 DONE 1.0s
+
+#37 [frontend stage-1 5/5] RUN mkdir -p /var/run/nginx /var/cache/nginx /var/log/nginx &&     chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/nginx.conf /var/cache/nginx /var/run/nginx /var/log/nginx &&     chmod -R 755 /usr/share/nginx/html
+#37 DONE 2.2s
+
+#38 [frontend] exporting to image
+#38 exporting layers
+#38 exporting layers 2.8s done
+#38 exporting manifest sha256:1c269f051dbcfd5f3dcac48b49740ad567f86ecd58cd93e53fef59114d352585
+#38 exporting manifest sha256:1c269f051dbcfd5f3dcac48b49740ad567f86ecd58cd93e53fef59114d352585 0.3s done
+#38 exporting config sha256:b46746d595093ae49c9ae83297b49b074174d88075fda52269a10c6b8e39d6bf
+#38 exporting config sha256:b46746d595093ae49c9ae83297b49b074174d88075fda52269a10c6b8e39d6bf 0.3s done
+#38 exporting attestation manifest sha256:ef5f5aac3fb0202b2838cee8aac495d3f2807f28584e067c39fde92c4080f5a8
+#38 exporting attestation manifest sha256:ef5f5aac3fb0202b2838cee8aac495d3f2807f28584e067c39fde92c4080f5a8 0.8s done
+#38 exporting manifest list sha256:5ee98b2c1962bb075f03f33ebb2e62df9c62518528b75455eb3134c8382bc64a
+#38 exporting manifest list sha256:5ee98b2c1962bb075f03f33ebb2e62df9c62518528b75455eb3134c8382bc64a 0.4s done
+#38 naming to docker.io/library/mensa_project-frontend:latest
+#38 naming to docker.io/library/mensa_project-frontend:latest 0.1s done
+#38 unpacking to docker.io/library/mensa_project-frontend:latest
+#38 unpacking to docker.io/library/mensa_project-frontend:latest 1.3s done
+#38 DONE 6.5s
+
+#39 [frontend] resolving provenance for metadata file
+ Image mensa_project-frontend Built 
+#39 DONE 0.1s
+ Image mensa_project-backend Built 

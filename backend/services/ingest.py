@@ -45,6 +45,10 @@ class IngestService:
         self.enable_catalog_fallback = os.getenv("INGEST_ENABLE_CATALOG_FALLBACK", "1") == "1"
         self.fallback_on_empty = os.getenv("INGEST_FALLBACK_ON_EMPTY", "1") == "1"
         self.max_catalog_candidates = int(os.getenv("INGEST_MAX_CATALOG_CANDIDATES", "3"))
+        self.max_id_preload = int(os.getenv("INGEST_MAX_ID_PRELOAD", "15000"))
+        self.skip_fetch_threshold = int(os.getenv("INGEST_SKIP_FETCH_THRESHOLD", "50000"))
+        self.batch_max_retries = int(os.getenv("INGEST_BATCH_MAX_RETRIES", "2"))
+        self.progress_interval_s = float(os.getenv("INGEST_PROGRESS_INTERVAL_S", "0.5"))
         self.socrata_catalog_url = os.getenv("SOCRATA_CATALOG_URL", "https://api.us.socrata.com/api/catalog/v1")
         self.socrata_domain = os.getenv("SOCRATA_DOMAIN", "data.ny.gov")
         self.game_search_hints = {
@@ -196,6 +200,19 @@ class IngestService:
         rows_added = 0
         discovered_total_rows = 0
         existing_ids = existing_ids or set()
+        last_progress_at = 0.0
+
+        def _emit_progress(rows_fetched: int, total_rows: int):
+            nonlocal last_progress_at
+            if not progress_callback:
+                return
+            now = time.time()
+            if (
+                rows_fetched >= total_rows
+                or now - last_progress_at >= self.progress_interval_s
+            ):
+                progress_callback(rows_fetched, total_rows)
+                last_progress_at = now
 
         for endpoint_idx, endpoint in enumerate(endpoints):
             success = False
@@ -241,36 +258,43 @@ class IngestService:
                     for j in range(0, len(fetched_rows), batch_size):
                         batch = fetched_rows[j:j + batch_size]
 
-                        try:
-                            metadatas = []
-                            ids = []
-                            for row_idx, row in enumerate(batch):
-                                if isinstance(row, dict):
-                                    metadata_item = {
-                                        key: (str(value) if value is not None else "")
-                                        for key, value in row.items()
-                                    }
-                                elif isinstance(row, list):
-                                    metadata_item = (
-                                        {col_name: (str(value) if value is not None else "") for col_name, value in zip(column_names, row)}
-                                        if column_names else
-                                        {f"col_{idx}": (str(val) if val is not None else "") for idx, val in enumerate(row)}
-                                    )
-                                else:
-                                    print(f"  ⚠ Skipping row {j + row_idx}: unsupported row type {type(row)}")
-                                    continue
-                                row_id = hashlib.md5(str(row).encode()).hexdigest()
-                                total_rows_processed += 1
+                        metadatas = []
+                        ids = []
+                        for row_idx, row in enumerate(batch):
+                            if isinstance(row, dict):
+                                metadata_item = {
+                                    key: (str(value) if value is not None else "")
+                                    for key, value in row.items()
+                                }
+                            elif isinstance(row, list):
+                                metadata_item = (
+                                    {col_name: (str(value) if value is not None else "") for col_name, value in zip(column_names, row)}
+                                    if column_names else
+                                    {f"col_{idx}": (str(val) if val is not None else "") for idx, val in enumerate(row)}
+                                )
+                            else:
+                                print(f"  ⚠ Skipping row {j + row_idx}: unsupported row type {type(row)}")
+                                continue
+                            row_id = hashlib.md5(str(row).encode()).hexdigest()
+                            total_rows_processed += 1
 
-                                if row_id in existing_ids:
-                                    continue
+                            if row_id in existing_ids:
+                                continue
 
-                                metadatas.append(metadata_item)
-                                ids.append(row_id)
+                            metadatas.append(metadata_item)
+                            ids.append(row_id)
 
-                            documents = [str(item) for item in metadatas]
+                        total_for_progress = max(discovered_total_rows, total_rows_processed - rows_before, 1)
+                        if not ids:
+                            _emit_progress(total_rows_processed, rows_before + total_for_progress)
+                            continue
 
-                            if ids:
+                        documents = [str(item) for item in metadatas]
+                        batch_stored = False
+                        last_batch_error = None
+
+                        for batch_attempt in range(self.batch_max_retries):
+                            try:
                                 if self.use_upsert and hasattr(collection, "upsert"):
                                     collection.upsert(
                                         documents=documents,
@@ -285,13 +309,28 @@ class IngestService:
                                     )
                                 existing_ids.update(ids)
                                 rows_added += len(ids)
+                                batch_stored = True
+                                break
+                            except Exception as batch_error:
+                                last_batch_error = batch_error
+                                if batch_attempt < self.batch_max_retries - 1:
+                                    delay = 0.5 * (2 ** batch_attempt)
+                                    print(
+                                        f"  ⚠ Batch {j}-{j + len(batch)} failed "
+                                        f"(attempt {batch_attempt + 1}/{self.batch_max_retries}): "
+                                        f"{batch_error}; retrying in {delay:.1f}s"
+                                    )
+                                    time.sleep(delay)
 
-                            if progress_callback:
-                                total_for_progress = max(discovered_total_rows, total_rows_processed - rows_before, 1)
-                                progress_callback(total_rows_processed, rows_before + total_for_progress)
-                        except Exception as batch_error:
-                            print(f"  ⚠ Error processing batch {j}-{j+len(batch)}: {str(batch_error)}")
+                        if not batch_stored:
+                            if last_batch_error is not None:
+                                print(
+                                    f"  ⚠ Error processing batch {j}-{j + len(batch)} "
+                                    f"after {self.batch_max_retries} attempts: {last_batch_error}"
+                                )
                             continue
+
+                        _emit_progress(total_rows_processed, rows_before + total_for_progress)
 
                     print(f"  ✓ Processed and stored {len(fetched_rows)} rows from endpoint.")
                     success = True
@@ -309,6 +348,9 @@ class IngestService:
                     if hasattr(req_error, 'response') and req_error.response is not None:
                         print(f"  Response status: {req_error.response.status_code}")
                         print(f"  Response preview: {req_error.response.text[:200]}")
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay * (2 ** attempt))
+                        continue
                     break
                 except Exception as unexpected_error:
                     last_error = f"Unexpected error: {str(unexpected_error)}"
@@ -322,7 +364,29 @@ class IngestService:
                 continue
 
         return total_rows_processed - rows_before, rows_added, column_names
-    
+
+    def _build_success_result(
+        self,
+        *,
+        existing_count: int,
+        total_rows_processed: int,
+        total_rows_added: int,
+        final_total: int,
+        force: bool,
+        skipped_fetch: bool = False,
+    ) -> dict:
+        net_added = max(final_total - existing_count, 0)
+        return {
+            "status": "success",
+            "added": net_added,
+            "total": final_total,
+            "processed": total_rows_processed,
+            "skipped_existing": skipped_fetch,
+            "incremental": bool(existing_count > 0 and not force),
+            "added_in_run": total_rows_added,
+            "skipped_fetch": skipped_fetch,
+        }
+
     def fetch_and_sync(self, game: str, progress_callback=None, force: bool = False):
         """
         Fetch game data and sync to ChromaDB in batches.
@@ -366,13 +430,41 @@ class IngestService:
         existing_ids: set[str] = set()
 
         if existing_count > 0 and not force:
-            print(f"↻ [{game_key.upper()}] Existing records detected ({existing_count}). Incremental sync: only missing draws will be added.")
-            try:
-                existing_payload = collection.get(include=[])
-                existing_ids = set(existing_payload.get("ids") or [])
-                print(f"  ✓ Loaded {len(existing_ids)} existing IDs for dedupe")
-            except Exception as existing_error:
-                print(f"  ⚠ Could not pre-load existing IDs ({existing_error}); falling back to upsert-only sync")
+            if existing_count >= self.skip_fetch_threshold:
+                print(
+                    f"⏭ [{game_key.upper()}] Fast-path skip: {existing_count} rows already stored "
+                    f"(>= {self.skip_fetch_threshold}). Use force=true to reingest."
+                )
+                if progress_callback:
+                    progress_callback(existing_count, existing_count)
+                return self._build_success_result(
+                    existing_count=existing_count,
+                    total_rows_processed=0,
+                    total_rows_added=0,
+                    final_total=existing_count,
+                    force=force,
+                    skipped_fetch=True,
+                )
+
+            print(
+                f"↻ [{game_key.upper()}] Existing records detected ({existing_count}). "
+                "Incremental sync: only missing draws will be added."
+            )
+            if existing_count <= self.max_id_preload:
+                try:
+                    existing_payload = collection.get(include=[])
+                    existing_ids = set(existing_payload.get("ids") or [])
+                    print(f"  ✓ Loaded {len(existing_ids)} existing IDs for dedupe")
+                except Exception as existing_error:
+                    print(
+                        f"  ⚠ Could not pre-load existing IDs ({existing_error}); "
+                        "falling back to upsert-only sync"
+                    )
+            else:
+                print(
+                    f"  ↳ Skipping ID preload ({existing_count} > {self.max_id_preload}); "
+                    "upsert dedupe only"
+                )
 
         rows_processed, rows_added, column_names = self._process_endpoints(
             game=game_key,
@@ -408,24 +500,21 @@ class IngestService:
         if total_rows_processed == 0 and existing_count == 0:
             raise Exception(f"No data was successfully ingested for game '{game_key}'. Check backend logs for details.")
 
-        if progress_callback:
-            progress_callback(total_rows_processed, total_rows_processed)
-        
         final_total = collection.count()
-        net_added = max(final_total - existing_count, 0)
+        if progress_callback:
+            progress_callback(final_total, final_total)
 
+        net_added = max(final_total - existing_count, 0)
         print(
             f"✓ [{game_key.upper()}] Ingestion complete: processed={total_rows_processed}, "
             f"added_in_run={total_rows_added}, net_added={net_added}, total={final_total}"
         )
-        return {
-            "status": "success",
-            "added": net_added,
-            "total": final_total,
-            "processed": total_rows_processed,
-            "skipped_existing": False,
-            "incremental": bool(existing_count > 0 and not force),
-            "added_in_run": total_rows_added,
-        }
+        return self._build_success_result(
+            existing_count=existing_count,
+            total_rows_processed=total_rows_processed,
+            total_rows_added=total_rows_added,
+            final_total=final_total,
+            force=force,
+        )
 
 ingest_service = IngestService()

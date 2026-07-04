@@ -1,0 +1,44 @@
+---
+pid: 14756
+cwd: "E:\2024 RESET\mensa_project"
+command: "python \"E:\\2024 RESET\\mensa_project\\verify_all_games_training.py\""
+started_at: 2026-07-01T19:02:12.986Z
+running_for_ms: 4005010  
+---
+=== All-Games Training Accuracy Verification ===
+Request target=0.8, max_iterations=8
+
+
+--- Training take5 ---
+[PASS] take5: pre=89.67% -> highest=89.67%, target=89.67%, retained, candidate=86.25%
+
+--- Training pick3 ---
+[PASS] pick3: pre=85.99% -> highest=85.99%, target=85.99%, retained, candidate=84.39%
+
+--- Training powerball ---
+[FAIL] powerball: training_target 0.9040 != expected 0.8000
+
+--- Training megamillions ---
+[FAIL] megamillions: training_target 0.9254 != expected 0.8000
+
+--- Training pick10 ---
+[FAIL] pick10: training_target 0.9522 != expected 0.8000
+
+--- Training cash4life ---
+[FAIL] cash4life: training_target 0.9105 != expected 0.8000
+
+--- Training quickdraw ---
+[FAIL] quickdraw: train status=error: Not enough parsed winning-number sequences to train.
+
+--- Training nylotto ---
+[FAIL] nylotto: training_target 0.9169 != expected 0.8000
+
+=== SUMMARY: 2 PASS, 6 FAIL / 8 games ===
+  take5: PASS — pre=89.67% -> highest=89.67%, target=89.67%, retained, candidate=86.25%
+  pick3: PASS — pre=85.99% -> highest=85.99%, target=85.99%, retained, candidate=84.39%
+  powerball: FAIL — training_target 0.9040 != expected 0.8000
+  megamillions: FAIL — training_target 0.9254 != expected 0.8000
+  pick10: FAIL — training_target 0.9522 != expected 0.8000
+  cash4life: FAIL — training_target 0.9105 != expected 0.8000
+  quickdraw: FAIL — train status=error: Not enough parsed winning-number sequences to train.
+  nylotto: FAIL — training_target 0.9169 != expected 0.8000

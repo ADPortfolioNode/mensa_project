@@ -1,0 +1,7 @@
+---
+pid: 50108
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker info 2>&1 | Select-Object -First 8"
+started_at: 2026-07-03T22:39:02.597Z
+running_for_ms: 450006   
+---

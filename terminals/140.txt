@@ -1,0 +1,7 @@
+---
+pid: 13152
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\" 2>$null; if (-not $?) { echo \"docker not available\" }"
+started_at: 2026-07-03T19:18:36.242Z
+running_for_ms: 12474996 
+---

@@ -1,0 +1,17 @@
+---
+pid: 7764
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 45; docker exec mensa_backend python -c \"
+from services.predictor import predictor_service
+r = predictor_service.predict_next_draw('pick3', 5)
+print('status', r.get('status'))
+print('message', (r.get('message') or '')[:100])
+print('numbers', r.get('predicted_numbers'))
+\""
+started_at: 2026-07-01T08:52:17.496Z
+running_for_ms: 14235010 
+---
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+status success
+message 
+numbers [4, 6, 7]

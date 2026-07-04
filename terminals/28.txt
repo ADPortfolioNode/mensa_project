@@ -1,0 +1,16 @@
+---
+pid: 15200
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker inspect --format \"{{.State.Health.Status}}\" mensa_backend; docker exec mensa_frontend wget -qO- --timeout=12 http://127.0.0.1/api/health; docker exec mensa_frontend wget -qO- --timeout=15 http://127.0.0.1/api/chroma/collections 2>&1 | ForEach-Object { $_.Substring(0, [Math]::Min(100, $_.Length)) }"
+started_at: 2026-07-01T09:18:49.512Z
+running_for_ms: 12645001 
+---
+healthy
+{"status":"healthy"}Method invocation failed because [System.Management.Automation.ErrorRecord] does not contain a method named 
+'Substring'.
+At line:1 char:260
++ ... >&1 | ForEach-Object { $_.Substring(0, [Math]::Min(100, $_.Length)) }
++                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (:) [], RuntimeException
+    + FullyQualifiedErrorId : MethodNotFound
+ 

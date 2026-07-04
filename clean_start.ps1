@@ -64,4 +64,15 @@ if ($Build) {
 Write-Step "Current compose status"
 docker compose ps
 
-Write-Host "`nDone. Frontend: http://localhost:3000" -ForegroundColor Green
+$bindHost = "127.0.0.1"
+$frontendPort = 3000
+$envFile = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*DOCKER_BIND_HOST\s*=\s*(\S+)') { $bindHost = $Matches[1] }
+        if ($_ -match '^\s*FRONTEND_HOST_PORT\s*=\s*(\d+)') { $frontendPort = [int]$Matches[1] }
+    }
+}
+
+Write-Host "`nDone. Open: http://${bindHost}:${frontendPort}/" -ForegroundColor Green
+Write-Host "For reliable Windows startup next time, use: .\start-windows.ps1" -ForegroundColor Gray

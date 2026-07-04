@@ -1,0 +1,7 @@
+---
+pid: 21848
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker logs mensa_backend --tail 30 2>&1"
+started_at: 2026-07-03T19:38:21.560Z
+running_for_ms: 11289997 
+---

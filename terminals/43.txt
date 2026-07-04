@@ -1,0 +1,13 @@
+---
+pid: 14408
+cwd: "E:\2024 RESET\mensa_project"
+command: "foreach ($ep in @('/api/health','/api/games','/api/startup_status','/api/experiments','/api/ingest_stream','/api/ingest_stream?game=pick3')) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000$ep\" -UseBasicParsing -TimeoutSec 15 -Method GET; Write-Host \"PASS $ep $($r.StatusCode)\" } catch { $code = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 'ERR' }; Write-Host \"FAIL $ep $code $($_.Exception.Message)\" } }"
+started_at: 2026-07-01T13:24:16.539Z
+running_for_ms: 24280006 
+---
+FAIL /api/health ERR Unable to connect to the remote server
+FAIL /api/games ERR Unable to connect to the remote server
+FAIL /api/startup_status ERR Unable to connect to the remote server
+FAIL /api/experiments ERR Unable to connect to the remote server
+FAIL /api/ingest_stream ERR Unable to connect to the remote server
+FAIL /api/ingest_stream?game=pick3 ERR Unable to connect to the remote server

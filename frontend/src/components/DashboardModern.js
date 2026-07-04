@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { formatApiError } from '../utils/errorUtils';
+import {
+  buildTrainRequestBody,
+  formatTrainingErrorMessage,
+  formatTrainingSuccessMessage,
+  isTrainSuccessStatus,
+} from '../utils/trainingUtils';
+
+const DEFAULT_TRAIN_PARAMS = {
+  testSize: 0.25,
+  randomState: 42,
+  nEstimators: 250,
+  maxDepth: 18,
+  maxIterations: 40,
+  targetAccuracy: 0.90,
+  windowSize: 3,
+  autoTune: true,
+  blendStep: 0.05,
+};
 import getApiBase from '../utils/apiBase';
 import PredictionPanel from './PredictionPanel';
 import ChatPanel from './ChatPanel';
@@ -112,7 +131,7 @@ export default function Dashboard() {
     } catch (e) {
       console.error("Error starting ingestion:", e);
       setIngestStatus('error');
-      alert(`Ingestion failed: ${e.response?.data?.detail || e.message}`);
+      alert(`Ingestion failed: ${formatApiError(e)}`);
     }
   };
 
@@ -130,25 +149,27 @@ export default function Dashboard() {
     }, 2000);
 
     try {
-      const response = await axios.post(`${API_BASE}/api/train`, { 
-        game: selectedGame 
-      });
+      const response = await axios.post(
+        `${API_BASE}/api/train`,
+        buildTrainRequestBody(selectedGame, DEFAULT_TRAIN_PARAMS),
+        { timeout: 600000 },
+      );
       
       clearInterval(interval);
       setTrainProgress(100);
       
-      if (response.data.status === 'success') {
+      if (isTrainSuccessStatus(response.data.status)) {
         setTrainStatus('completed');
-        alert(`Training completed for ${selectedGame}`);
+        alert(formatTrainingSuccessMessage(selectedGame, response.data));
       } else {
         setTrainStatus('error');
-        alert(`Training failed: ${response.data.message}`);
+        alert(`Training failed: ${response.data.message || response.data.error}`);
       }
     } catch (e) {
       clearInterval(interval);
       console.error("Error starting training:", e);
       setTrainStatus('error');
-      alert(`Training failed: ${e.response?.data?.detail || e.message}`);
+      alert(`Training failed: ${formatTrainingErrorMessage(e, formatApiError)}`);
     }
   };
 
@@ -290,7 +311,7 @@ export default function Dashboard() {
       <div className={`dashboard-grid ${selectedGame ? 'grid-cols-2' : 'grid-cols-1'}`}>
         <div className="card">
           <div className="card-header">
-            <h3>Predictions</h3>
+            <h3>Suggestions</h3>
           </div>
           <div className="card-body">
             <PredictionPanel game={selectedGame} />

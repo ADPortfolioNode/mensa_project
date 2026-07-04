@@ -1,0 +1,18 @@
+---
+pid: 8612
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker ps --filter \"name=mensa\" --format \"table {{.Names}}\\t{{.Status}}\"; Write-Host \"---\"; foreach ($ep in @('/api/health','/api/games','/api/startup_status','/api/experiments','/api/ingest_stream','/api/ingest_stream?game=pick3')) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000$ep\" -UseBasicParsing -TimeoutSec 20 -Method GET; Write-Host \"PASS $ep $($r.StatusCode)\" } catch { $code = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 'ERR' }; Write-Host \"FAIL $ep $code\" } }"
+started_at: 2026-07-01T13:31:24.532Z
+running_for_ms: 23855011 
+---
+NAMES            STATUS
+mensa_frontend   Up About a minute (healthy)
+mensa_backend    Up About a minute (healthy)
+mensa_chroma     Up About a minute (healthy)
+---
+PASS /api/health 200
+PASS /api/games 200
+PASS /api/startup_status 200
+PASS /api/experiments 200
+FAIL /api/ingest_stream 422
+FAIL /api/ingest_stream?game=pick3 ERR

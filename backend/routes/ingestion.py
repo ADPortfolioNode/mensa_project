@@ -2,13 +2,15 @@
 Ingestion API routes.
 """
 import json
+import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from services.ingest import ingest_service
-from state.ingest_state import get_manual_ingest_state, enqueue_manual_ingest
+from state.ingest_state import get_manual_ingest_state, enqueue_manual_ingest, set_manual_ingest_state
 from state.manual_ingest_worker import _start_manual_ingest_worker_if_needed
 from utils.validation import _require_game_key
 from typing import Optional
+from config import GAME_CONFIGS
 
 
 router = APIRouter()
@@ -19,6 +21,36 @@ class IngestRequest(BaseModel):
     force: bool = False
 
 
+def _fast_complete_populated_game(game_key: str) -> dict | None:
+    """Return an immediate completed payload when data exists and force is off."""
+    if os.getenv("INGEST_FAST_COMPLETE_POPULATED", "1") == "0":
+        return None
+
+    from services.chroma_client import chroma_client
+
+    existing_draws = chroma_client.count_documents(game_key)
+    if existing_draws <= 0:
+        return None
+
+    completed_state = {
+        "status": "completed",
+        "rows_fetched": existing_draws,
+        "total_rows": existing_draws,
+        "progress": 100,
+        "added": 0,
+        "skipped_fetch": True,
+    }
+    set_manual_ingest_state(game_key, completed_state)
+    return {
+        "status": "completed",
+        "game": game_key,
+        "message": f"{game_key} already has {existing_draws} draws (skipped re-fetch; use force=true to reingest)",
+        "rows_fetched": existing_draws,
+        "total_rows": existing_draws,
+        "added": 0,
+    }
+
+
 @router.post("/api/ingest")
 async def trigger_ingestion(request: IngestRequest):
     """
@@ -26,7 +58,12 @@ async def trigger_ingestion(request: IngestRequest):
     """
     try:
         game_key = _require_game_key(request.game)
-        
+
+        if not request.force:
+            fast_result = _fast_complete_populated_game(game_key)
+            if fast_result:
+                return fast_result
+
         # Enqueue the ingestion job
         seq = enqueue_manual_ingest(game_key, request.force)
         
@@ -34,7 +71,6 @@ async def trigger_ingestion(request: IngestRequest):
         _start_manual_ingest_worker_if_needed()
         
         # Mark as queued in state
-        from state.ingest_state import set_manual_ingest_state
         set_manual_ingest_state(game_key, {
             "status": "queued",
             "queued": True,
@@ -86,44 +122,84 @@ async def get_ingest_progress(game: str):
         }
 
 
+def _build_all_games_progress() -> dict:
+    """Aggregate manual ingest progress for every configured game."""
+    payload = {}
+    for game_key in GAME_CONFIGS.keys():
+        progress = get_manual_ingest_state(game_key)
+        if progress:
+            payload[game_key] = progress
+        else:
+            payload[game_key] = {
+                "status": "not_started",
+                "rows_fetched": 0,
+                "total_rows": 0,
+            }
+    return payload
+
+
+def _is_active_ingest_status(status: str) -> bool:
+    return str(status or "").lower() in {"queued", "ingesting", "running", "active", "pending"}
+
+
 @router.get("/api/ingest_stream")
-async def get_ingest_stream(game: str):
+async def get_ingest_stream(game: Optional[str] = None):
     """
     Server-sent events stream for ingestion progress.
+    Without `game`, streams a map of all configured games (for all-games UI mode).
     """
     from fastapi.responses import StreamingResponse
     import asyncio
-    
+
     try:
-        game_key = _require_game_key(game)
-        
-        async def event_stream():
-            while True:
-                progress = get_manual_ingest_state(game_key)
-                
-                if progress:
-                    status = progress.get("status", "unknown")
-                    yield f"event: progress\ndata: {json.dumps(progress)}\n\n"
-                    
-                    if status in ["completed", "error"]:
-                        yield f"event: complete\ndata: {json.dumps(progress)}\n\n"
+        if game:
+            game_key = _require_game_key(game)
+
+            async def single_game_event_stream():
+                while True:
+                    progress = get_manual_ingest_state(game_key)
+
+                    if progress:
+                        status = progress.get("status", "unknown")
+                        serialized = json.dumps(progress)
+                        yield f"data: {serialized}\n\n"
+                        yield f"event: progress\ndata: {serialized}\n\n"
+
+                        if status in ["completed", "error"]:
+                            yield f"event: complete\ndata: {serialized}\n\n"
+                            break
+
+                    await asyncio.sleep(1)
+
+            stream_factory = single_game_event_stream
+        else:
+
+            async def all_games_event_stream():
+                while True:
+                    payload = _build_all_games_progress()
+                    yield f"data: {json.dumps(payload)}\n\n"
+
+                    statuses = [payload[g].get("status") for g in payload]
+                    if not any(_is_active_ingest_status(s) for s in statuses):
                         break
-                
-                await asyncio.sleep(1)
-        
+
+                    await asyncio.sleep(1)
+
+            stream_factory = all_games_event_stream
+
         return StreamingResponse(
-            event_stream(),
+            stream_factory(),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-            }
+            },
         )
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         return {
             "status": "error",
-            "message": str(e)
+            "message": str(e),
         }

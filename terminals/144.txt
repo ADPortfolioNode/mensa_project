@@ -1,0 +1,67 @@
+---
+pid: 25052
+cwd: "E:\2024 RESET\mensa_project"
+command: "python \"E:\\2024 RESET\\mensa_project\\verify_training_learning.py\""
+started_at: 2026-07-03T19:21:09.773Z
+running_for_ms: 12319967 
+---
+Traceback (most recent call last):
+  File "E:\2024 RESET\mensa_project\verify_training_learning.py", line 24, in <module>
+    from services.trainer import TrainerService  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\2024 RESET\mensa_project\backend\services\trainer.py", line 9, in <module>
+    from config import GAME_CONFIGS
+  File "E:\2024 RESET\mensa_project\backend\config.py", line 25, in <module>
+    settings = Settings()
+               ^^^^^^^^^^
+  File "C:\Users\deois\AppData\Roaming\Python\Python311\site-packages\pydantic_settings\main.py", line 247, in __init__
+    super().__init__(**__pydantic_self__.__class__._settings_build_values(sources, init_kwargs))
+  File "C:\Users\deois\AppData\Roaming\Python\Python311\site-packages\pydantic\main.py", line 263, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 15 validation errors for Settings
+data_dir
+  Extra inputs are not permitted [type=extra_forbidden, input_value='/data', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+backend_host_port
+  Extra inputs are not permitted [type=extra_forbidden, input_value='5001', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+chroma_host_port
+  Extra inputs are not permitted [type=extra_forbidden, input_value='8001', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+max_concurrent_clones
+  Extra inputs are not permitted [type=extra_forbidden, input_value='3', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+ingest_batch_size
+  Extra inputs are not permitted [type=extra_forbidden, input_value='4000', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+ingest_request_timeout
+  Extra inputs are not permitted [type=extra_forbidden, input_value='20', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+ingest_max_retries
+  Extra inputs are not permitted [type=extra_forbidden, input_value='2', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+ingest_retry_delay
+  Extra inputs are not permitted [type=extra_forbidden, input_value='1', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+ingest_enable_catalog_fallback
+  Extra inputs are not permitted [type=extra_forbidden, input_value='0', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+ingest_max_catalog_candidates
+  Extra inputs are not permitted [type=extra_forbidden, input_value='3', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+react_app_api_base
+  Extra inputs are not permitted [type=extra_forbidden, input_value='http://localhost:5000', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+chokidar_usepolling
+  Extra inputs are not permitted [type=extra_forbidden, input_value='true', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+disable_eslint_plugin
+  Extra inputs are not permitted [type=extra_forbidden, input_value='true', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+eslint_no_dev_errors
+  Extra inputs are not permitted [type=extra_forbidden, input_value='true', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden
+tsc_compile_on_error
+  Extra inputs are not permitted [type=extra_forbidden, input_value='true', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/extra_forbidden

@@ -1,0 +1,37 @@
+---
+pid: 8108
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker rm -f mensa_frontend mensa_backend mensa_chroma 2>&1; docker compose up -d --force-recreate 2>&1"
+started_at: 2026-07-03T05:11:42.358Z
+running_for_ms: 8425016  
+---
+docker : Error response from daemon: No such container: mensa_frontend
+At line:1 char:45
++ ... a_project"; docker rm -f mensa_frontend mensa_backend mensa_chroma 2> ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error response ... mensa_frontend:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+mensa_backend
+mensa_chroma
+docker :  Container mensa_chroma Creating 
+At line:1 char:106
++ ... backend mensa_chroma 2>&1; docker compose up -d --force-recreate 2>&1
++                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Container mensa_chroma Creating :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Container mensa_chroma Created 
+ Container mensa_backend Creating 
+ Container mensa_backend Created 
+ Container mensa_frontend Creating 
+ Container mensa_frontend Created 
+ Container mensa_chroma Starting 
+ Container mensa_chroma Started 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 
+ Container mensa_backend Waiting 
+ Container mensa_backend Error dependency backend failed to start
+dependency failed to start: container mensa_backend is unhealthy

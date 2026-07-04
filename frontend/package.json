@@ -30,12 +30,12 @@
       "last 1 safari version"
     ]
   },
-  "description": "Mansa Predictive Rag",
+  "description": "Mensa Suggestion RAG",
   "main": "index.js",
   "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "Mensa Predictive RAG"
+    "url": "Mensa Suggestion RAG"
   },
   "author": "deoism",
   "license": "ISC"

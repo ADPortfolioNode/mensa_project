@@ -1,0 +1,8 @@
+---
+pid: 124
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker cp backend/services/trainer.py mensa_backend:/app/services/trainer.py; docker cp backend/services/predictor.py mensa_backend:/app/services/predictor.py; docker cp backend/routes/training.py mensa_backend:/app/routes/training.py; docker exec mensa_backend python -m py_compile /app/services/trainer.py /app/services/predictor.py /app/routes/training.py 2>&1; docker restart mensa_backend 2>&1"
+started_at: 2026-07-03T07:14:11.017Z
+running_for_ms: 1075005  
+---
+mensa_backend

@@ -299,9 +299,10 @@ body {
 }
 
 .star-trek-app .expandable-metadata-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(9rem, 42%) minmax(0, 1fr);
   gap: 10px;
+  align-items: start;
   padding: 4px 0;
   border-bottom: 1px solid rgba(138, 215, 255, 0.18);
 }
@@ -312,8 +313,11 @@ body {
 }
 
 .star-trek-app .expandable-metadata-value {
-  color: var(--st-text);
+  color: #e9f2ff;
   text-align: right;
+  min-width: 0;
+  word-break: break-word;
+  font-weight: 500;
 }
 
 .star-trek-app hr {

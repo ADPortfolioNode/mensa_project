@@ -1,0 +1,7 @@
+---
+pid: 8480
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 45"
+started_at: 2026-07-01T13:31:06.355Z
+running_for_ms: 23869989 
+---

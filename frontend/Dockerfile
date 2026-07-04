@@ -3,11 +3,16 @@
 FROM node:${NODE_VERSION}-slim AS builder
 WORKDIR /app
 
+# Empty base = relative /api paths via nginx proxy (never hit :5000 from browser)
+ARG REACT_APP_API_BASE=
+ARG CACHE_BUSTER=1
+ENV REACT_APP_API_BASE=$REACT_APP_API_BASE
+
 # Install deps and build
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps || npm ci
 COPY . .
-RUN npm run build && test -f /app/build/index.html
+RUN echo "cache_buster=$CACHE_BUSTER" && npm run build && test -f /app/build/index.html
 
 FROM nginx:alpine
 # Remove default nginx page content, then copy React build output

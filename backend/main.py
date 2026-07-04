@@ -14,13 +14,8 @@ from middleware.rate_limit import rate_limit_middleware
 from state.ingestion_worker import start_background_ingestion
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan manager for startup/shutdown events."""
-    # Startup
-    print("🚀 Mensa Project backend starting up...")
-    
-    # Audit LM connections on startup
+async def _deferred_lm_audit():
+    """Run LM provider audit in background so API can serve health checks immediately."""
     try:
         from services.lm_router import lm_router
         snapshot = await lm_router.audit_connections(force=True)
@@ -28,6 +23,16 @@ async def lifespan(app: FastAPI):
         print(f"LM audit complete. Available providers (fastest first): {ordered}")
     except Exception as exc:
         print(f"LM audit failed at startup: {exc}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup/shutdown events."""
+    import asyncio
+
+    # Startup
+    print("🚀 Mensa Project backend starting up...")
+    asyncio.create_task(_deferred_lm_audit())
     
     yield
     

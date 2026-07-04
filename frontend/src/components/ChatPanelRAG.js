@@ -15,8 +15,8 @@ const API_ENDPOINTS = [
     { label: 'Manual Ingest', method: 'POST', path: '/api/ingest', description: 'Ingest data for a game.', sampleBody: '{\n  "game": "pick3",\n  "force": false\n}' },
     { label: 'Ingest Progress', method: 'GET', path: '/api/ingest_progress?game={game}', description: 'Get current ingest progress for a game.', sampleBody: '' },
     { label: 'Train Model', method: 'POST', path: '/api/train', description: 'Train model for a game.', sampleBody: '{\n  "game": "pick3"\n}' },
-    { label: 'List Experiments', method: 'GET', path: '/api/experiments', description: 'List saved training/prediction experiments.', sampleBody: '' },
-    { label: 'Predict Next Draw', method: 'POST', path: '/api/predict', description: 'Run prediction for a game.', sampleBody: '{\n  "game": "pick3",\n  "recent_k": 10\n}' },
+    { label: 'List Experiments', method: 'GET', path: '/api/experiments', description: 'List saved training/suggestion experiments.', sampleBody: '' },
+    { label: 'Suggest Next Draw', method: 'POST', path: '/api/predict', description: 'Run suggestion for a game.', sampleBody: '{\n  "game": "pick3",\n  "recent_k": 10\n}' },
     { label: 'Chroma Status', method: 'GET', path: '/api/chroma/status', description: 'Get ChromaDB health/status.', sampleBody: '' },
     { label: 'Health Check', method: 'GET', path: '/api/health', description: 'Backend health endpoint.', sampleBody: '' },
 ];

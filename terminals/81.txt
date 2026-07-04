@@ -1,0 +1,15 @@
+---
+pid: 11376
+cwd: "E:\2024 RESET\mensa_project"
+command: "Write-Host \"health:\"; curl.exe -s http://localhost:3000/api/health; Write-Host \"`ningest_stream:\"; curl.exe -s -o NUL -w \"all=%{http_code} \" --max-time 8 http://localhost:3000/api/ingest_stream; curl.exe -s -o NUL -w \"pick3=%{http_code}\" --max-time 8 \"http://localhost:3000/api/ingest_stream?game=pick3\"; Write-Host \"`nsummaries:\"; curl.exe -s -o NUL -w \"%{http_code}\" http://localhost:3000/api/games/summaries; Write-Host \"`nstartup:\"; curl.exe -s -o NUL -w \"%{http_code}\" http://localhost:3000/api/startup_status; Write-Host \"\""
+started_at: 2026-07-01T14:50:36.332Z
+running_for_ms: 19100013 
+---
+health:
+{"status":"healthy"}
+ingest_stream:
+all=200 pick3=200
+summaries:
+200
+startup:
+200

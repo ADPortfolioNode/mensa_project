@@ -1,0 +1,9 @@
+---
+pid: 14892
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; for ($i=1; $i -le 30; $i++) { Start-Sleep 5; docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"Docker up\"; break } }; for ($i=1; $i -le 15; $i++) { $h = curl.exe -s http://localhost:5000/api/health; if ($h -match 'healthy') { Write-Host \"API ready\"; break }; Start-Sleep 5 }"
+started_at: 2026-07-01T14:02:28.278Z
+running_for_ms: 21990230 
+---
+Docker up
+API ready

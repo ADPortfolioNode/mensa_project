@@ -11,31 +11,45 @@ export default function GameSummaryPanel({ games, refreshKey = 0, initialSummari
   const API_BASE = useMemo(() => getApiBase(), []);
 
   useEffect(() => {
-    let isMounted = true;
-    if (games && games.length > 0) {
-      fetchSummaries(isMounted);
-    } else {
-      setSummaries({});
-    }
-    return () => { isMounted = false; };
-  }, [games, API_BASE, refreshKey, initialSummaries]);
-
-  useEffect(() => {
     if (initialSummaries && Object.keys(initialSummaries).length > 0) {
       setSummaries((prev) => ({ ...initialSummaries, ...prev }));
     }
   }, [initialSummaries]);
 
-  const fetchGameSummaryWithRetry = async (game, maxAttempts = 3) => {
+  useEffect(() => {
+    let isMounted = true;
+    if (!games || games.length === 0) {
+      setSummaries({});
+      return () => { isMounted = false; };
+    }
+
+    const hasAllFromParent = refreshKey === 0
+      && games.every((game) => initialSummaries[game] !== undefined);
+
+    if (hasAllFromParent) {
+      setSummaries(initialSummaries);
+      return () => { isMounted = false; };
+    }
+
+    fetchSummaries(isMounted);
+    return () => { isMounted = false; };
+  }, [games, API_BASE, refreshKey]);
+
+  const fetchBatchSummaries = async (maxAttempts = 3) => {
     let lastError = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        const response = await axios.get(`${API_BASE}/api/games/${game}/summary`, { timeout: 12000 });
-        return response.data.draw_count;
+        const response = await axios.get(`${API_BASE}/api/games/summaries`, { timeout: 20000 });
+        const payload = response.data?.summaries || {};
+        const counts = {};
+        for (const game of games) {
+          counts[game] = Number(payload[game]?.draw_count || 0);
+        }
+        return counts;
       } catch (e) {
         lastError = e;
         if (attempt < maxAttempts) {
-          await sleep(attempt * 600);
+          await sleep(attempt * 800);
         }
       }
     }
@@ -47,33 +61,23 @@ export default function GameSummaryPanel({ games, refreshKey = 0, initialSummari
     setLoading(true);
     setError(null);
     const newSummaries = { ...initialSummaries };
-    let failedCount = 0;
 
-    for (const game of games) {
-      try {
-        const drawCount = await fetchGameSummaryWithRetry(game);
-        if (isMounted) {
-          newSummaries[game] = drawCount;
-        }
-      } catch (e) {
-        console.error(`Failed to fetch summary for ${game}:`, e);
-        failedCount += 1;
-        if (isMounted) {
-          if (newSummaries[game] === undefined) {
-            newSummaries[game] = 0;
-          }
-        }
+    try {
+      const counts = await fetchBatchSummaries();
+      if (isMounted) {
+        setSummaries({ ...newSummaries, ...counts });
+        setLoading(false);
       }
-    }
-
-    if (isMounted) {
-      setSummaries(newSummaries);
-      if (failedCount === games.length && games.length > 0) {
+    } catch {
+      if (isMounted) {
+        const fallback = { ...newSummaries };
+        for (const game of games) {
+          if (fallback[game] === undefined) fallback[game] = 0;
+        }
+        setSummaries(fallback);
         setError('Failed to fetch game summaries. Backend may still be warming up.');
-      } else if (failedCount > 0) {
-        setError('Some game summaries are delayed. Showing latest available values.');
+        setLoading(false);
       }
-      setLoading(false);
     }
   };
 

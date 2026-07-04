@@ -1,0 +1,15 @@
+---
+pid: 368
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" up -d --force-recreate backend; Start-Sleep -Seconds 45; curl.exe -s -o NUL -w \"health:%{http_code} \" --max-time 8 http://localhost:3000/api/health; curl.exe -s -o NUL -w \"games:%{http_code} \" --max-time 8 http://localhost:3000/api/games; curl.exe -s -o NUL -w \"startup:%{http_code} \" --max-time 8 http://localhost:3000/api/startup_status; curl.exe -s -o NUL -w \"stream-all:%{http_code} \" --max-time 8 http://localhost:3000/api/ingest_stream; curl.exe -s -o NUL -w \"stream-pick3:%{http_code} \" --max-time 8 \"http://localhost:3000/api/ingest_stream?game=pick3\"; curl.exe -s -o NUL -w \"frontend:%{http_code}\" --max-time 8 http://localhost:3000/"
+started_at: 2026-07-01T13:36:38.719Z
+running_for_ms: 23539985 
+---
+ Container mensa_chroma Running 
+ Container mensa_backend Recreate 
+ Container mensa_backend Recreated 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 
+health:504 games:000 startup:000 stream-all:000 stream-pick3:000 frontend:200

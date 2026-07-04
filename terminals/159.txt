@@ -1,0 +1,33 @@
+---
+pid: 49284
+cwd: "E:\2024 RESET\mensa_project"
+command: "powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\2024 RESET\\mensa_project\\scripts\\run_full_diag.ps1\""
+started_at: 2026-07-03T22:41:14.546Z
+running_for_ms: 315004   
+---
+[2026-07-03 18:41:18] 
+[2026-07-03 18:41:18] --- PowerShell Full Diagnostic Run ---
+Add-Content : Stream was not readable.
+At E:\2024 RESET\mensa_project\scripts\run_full_diag.ps1:9 char:5
++     Add-Content -Path $LogFile -Value $line
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (E:\2024 RESET\m...diag_output.log:String) [Add-Content], ArgumentExcep 
+   tion
+    + FullyQualifiedErrorId : GetContentWriterArgumentError,Microsoft.PowerShell.Commands.AddContentCommand
+ 
+[2026-07-03 18:41:19] Project: E:\2024 RESET\mensa_project
+[2026-07-03 18:41:19] Ports: backend=5001 frontend=3000 chroma=8001
+Exception of type 'System.OutOfMemoryException' was thrown.
+At E:\2024 RESET\mensa_project\scripts\run_full_diag.ps1:57 char:5
++ if (-not (Wait-DockerDaemon 180)) {
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (:) [], OutOfMemoryException
+    + FullyQualifiedErrorId : System.OutOfMemoryException
+ 
+[2026-07-03 18:41:21] docker compose ps (before):
+[2026-07-03 18:41:24] unknown shorthand flag: 'f' in -f
+[2026-07-03 18:41:24] System.Management.Automation.RemoteException
+[2026-07-03 18:41:24] Usage:  docker [OPTIONS] COMMAND [ARG...]
+[2026-07-03 18:41:24] System.Management.Automation.RemoteException
+[2026-07-03 18:41:24] Run 'docker --help' for more information
+[2026-07-03 18:41:24] Starting stack (compose up -d --force-recreate)...

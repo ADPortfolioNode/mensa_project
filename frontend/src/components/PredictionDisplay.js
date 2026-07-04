@@ -55,7 +55,7 @@ const PredictionDisplay = ({ prediction }) => {
     const meta = prediction.model_metadata || {};
     return (
       <div className="prediction-display">
-        <h6 className="prediction-header">Predicted Numbers ({session.length} Draws)</h6>
+        <h6 className="prediction-header">Suggested Numbers ({session.length} Draws)</h6>
         <div className="text-muted mb-2">
           {prediction.predicted_for_date && (
             <span>Session Date: {prediction.predicted_for_date}</span>
@@ -104,7 +104,7 @@ const PredictionDisplay = ({ prediction }) => {
   const meta = prediction.model_metadata || {};
   return (
     <div className="prediction-display">
-      <h6 className="prediction-header">Predicted Numbers</h6>
+      <h6 className="prediction-header">Suggested Numbers</h6>
       <div className="text-muted mb-2">
         {prediction.predicted_for_date && (
           <span>Date: {prediction.predicted_for_date}</span>

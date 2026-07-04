@@ -1,0 +1,9 @@
+---
+pid: 5556
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 40; docker inspect --format \"{{.State.Health.Status}}\" mensa_backend; docker exec mensa_backend python -c \"import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5).read())\""
+started_at: 2026-07-01T08:27:03.753Z
+running_for_ms: 15749996 
+---
+healthy
+b'{"status":"healthy"}'

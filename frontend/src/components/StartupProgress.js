@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getApiBase } from '../utils/apiBase';
 import { analyzeError, ErrorCategory } from '../utils/errorUtils';
+import { startPolling } from '../utils/polling';
 import ErrorMessage from './ErrorMessage';
 
 const StartupProgress = ({ onComplete }) => {
@@ -13,72 +14,52 @@ const StartupProgress = ({ onComplete }) => {
 
     const getStartupStatus = async () => {
         const apiBase = getApiBase();
-        const primaryUrl = `${apiBase}/api/startup_status`;
-        const fallbackUrl = apiBase
-            ? null
-            : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_status`;
-
-        try {
-            return await axios.get(primaryUrl, { timeout: 30000 });
-        } catch (primaryError) {
-            if (!fallbackUrl) throw primaryError;
-            return axios.get(fallbackUrl, { timeout: 30000 });
-        }
+        return axios.get(`${apiBase}/api/startup_status`, { timeout: 45000 });
     };
 
     const postStartupInit = async () => {
         const apiBase = getApiBase();
-        const primaryUrl = `${apiBase}/api/startup_init`;
-        const fallbackUrl = apiBase
-            ? null
-            : `${window.location.protocol}//${window.location.hostname}:5000/api/startup_init`;
-
-        try {
-            return await axios.post(primaryUrl, null, { timeout: 30000 });
-        } catch (primaryError) {
-            if (!fallbackUrl) throw primaryError;
-            return axios.post(fallbackUrl, null, { timeout: 30000 });
-        }
+        return axios.post(`${apiBase}/api/startup_init`, null, { timeout: 30000 });
     };
 
     useEffect(() => {
-        const fetchStatus = async () => {
-            try {
-                const response = await getStartupStatus();
-                transientErrorCountRef.current = 0;
-                setErrorReport(null);
-                setStatus(response.data);
-                setElapsedSeconds(response.data.elapsed_s || 0);
-                // Complete when backend is either fully initialized or in ready/manual mode.
-                if (response.data.status === 'completed' || response.data.status === 'ready') {
-                    onComplete();
-                }
-            } catch (error) {
-                const report = analyzeError(error);
-                const statusCode = error?.response?.status;
-                const isTransientGateway = statusCode === 502 || statusCode === 503 || statusCode === 504;
-                const isConnectionIssue = report.category === ErrorCategory.CONNECTION_ERROR;
-
-                if (isTransientGateway || isConnectionIssue) {
-                    transientErrorCountRef.current += 1;
-                    if (transientErrorCountRef.current >= 5) {
-                        setErrorReport(report);
-                    } else {
-                        setErrorReport(null);
+        const stop = startPolling({
+            intervalMs: 5000,
+            maxBackoffMs: 60000,
+            tick: async () => {
+                try {
+                    const response = await getStartupStatus();
+                    transientErrorCountRef.current = 0;
+                    setErrorReport(null);
+                    setStatus(response.data);
+                    setElapsedSeconds(response.data.elapsed_s || 0);
+                    if (response.data.status === 'completed') {
+                        onComplete();
                     }
-                    return;
+                    return response.data;
+                } catch (error) {
+                    const report = analyzeError(error);
+                    const statusCode = error?.response?.status;
+                    const isTransientGateway = statusCode === 502 || statusCode === 503 || statusCode === 504;
+                    const isConnectionIssue = report.category === ErrorCategory.CONNECTION_ERROR;
+                    const isAxiosTimeout = /timeout of \d+ms exceeded/i.test(error?.message || '');
+
+                    if (isTransientGateway || isConnectionIssue || isAxiosTimeout) {
+                        transientErrorCountRef.current += 1;
+                        if (transientErrorCountRef.current >= 8) {
+                            setErrorReport(report);
+                        }
+                        throw error;
+                    }
+
+                    setErrorReport(report);
+                    throw error;
                 }
+            },
+            shouldStop: (data) => data?.status === 'completed',
+        });
 
-                console.error("Error fetching startup status:", error);
-                setErrorReport(report);
-                clearInterval(interval);
-            }
-        };
-
-        const interval = setInterval(fetchStatus, 2000);
-        fetchStatus();
-
-        return () => clearInterval(interval);
+        return stop;
     }, [onComplete]);
 
     if (errorReport) {
@@ -168,8 +149,8 @@ const StartupProgress = ({ onComplete }) => {
     return (
         <div className="container py-4 startup-shell">
             <h2 className="mb-3">🎰 Lottery Data Initialization</h2>
-            {status.status === 'pending' && (
-                <div className="mb-3">
+            {(status.status === 'pending' || status.status === 'ready') && (
+                <div className="mb-3 d-flex flex-wrap gap-2">
                     <button
                         onClick={handleStartInitialization}
                         disabled={isStarting}
@@ -177,6 +158,14 @@ const StartupProgress = ({ onComplete }) => {
                     >
                         {isStarting ? 'Starting...' : 'Start Initialization'}
                     </button>
+                    {status.status === 'ready' && (
+                        <button
+                            onClick={onComplete}
+                            className="btn btn-outline-secondary"
+                        >
+                            Continue to Dashboard
+                        </button>
+                    )}
                 </div>
             )}
             

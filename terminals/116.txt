@@ -1,0 +1,7 @@
+---
+pid: 15504
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker build --build-arg ENTRYPOINT_REV=2 -t mensa_project-backend:latest -f backend/Dockerfile backend"
+started_at: 2026-07-02T14:48:23.032Z
+running_for_ms: 2495021  
+---

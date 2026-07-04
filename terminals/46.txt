@@ -1,0 +1,11 @@
+---
+pid: 12340
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 45; docker ps --filter \"name=mensa\" --format \"table {{.Names}}\\t{{.Status}}\""
+started_at: 2026-07-01T13:29:51.856Z
+running_for_ms: 23945034 
+---
+NAMES            STATUS
+mensa_frontend   Up 23 seconds (healthy)
+mensa_backend    Up 21 seconds (health: starting)
+mensa_chroma     Up 21 seconds (healthy)

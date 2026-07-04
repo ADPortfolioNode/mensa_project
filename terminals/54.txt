@@ -1,0 +1,17 @@
+---
+pid: 7928
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 10; curl.exe -s -w \"\\nhealth:%{http_code}\\n\" --max-time 10 http://localhost:3000/api/health; curl.exe -s -o NUL -w \"games:%{http_code} \" --max-time 10 http://localhost:3000/api/games; curl.exe -s -o NUL -w \"startup:%{http_code} \" --max-time 10 http://localhost:3000/api/startup_status; curl.exe -s -o NUL -w \"stream-all:%{http_code} \" --max-time 8 http://localhost:3000/api/ingest_stream; curl.exe -s -o NUL -w \"stream-pick3:%{http_code}\\n\" --max-time 8 \"http://localhost:3000/api/ingest_stream?game=pick3\""
+started_at: 2026-07-01T13:40:31.672Z
+running_for_ms: 23305002 
+---
+<html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+health:504
+games:000 startup:200 stream-all:000 stream-pick3:000

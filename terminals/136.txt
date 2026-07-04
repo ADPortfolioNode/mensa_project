@@ -1,0 +1,519 @@
+---
+pid: 15740
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker compose build frontend 2>&1"
+started_at: 2026-07-03T06:51:44.401Z
+running_for_ms: 2435006  
+---
+docker :  Image mensa_project-backend Building 
+At line:1 char:45
++ ... ion "E:\2024 RESET\mensa_project"; docker compose build frontend 2>&1
++                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Image mensa_project-backend Building :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Image mensa_project-frontend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.18kB 0.2s done
+#1 DONE 0.2s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 1.43kB 0.7s done
+#2 DONE 2.2s
+
+#3 [internal] load metadata for docker.io/library/nginx:alpine
+#3 ...
+
+#4 [auth] library/nginx:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [auth] library/node:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [internal] load metadata for docker.io/library/node:22.13.1-slim
+#6 DONE 5.1s
+
+#3 [internal] load metadata for docker.io/library/nginx:alpine
+#3 DONE 5.3s
+
+#7 [internal] load .dockerignore
+#7 transferring context:
+#7 transferring context: 891B 0.4s done
+#7 DONE 1.7s
+
+#8 [internal] load build context
+#8 DONE 0.0s
+
+#9 [builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 resolve docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 ...
+
+#10 [stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#10 resolve docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa 1.1s done
+#10 DONE 1.2s
+
+#9 [builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 resolve docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc 1.1s done
+#9 DONE 1.3s
+
+#8 [internal] load build context
+#8 transferring context: 106.73kB 0.5s
+#8 transferring context: 1.09MB 1.7s done
+#8 DONE 3.0s
+
+#11 [builder 2/6] WORKDIR /app
+#11 CACHED
+
+#12 [builder 3/6] COPY package*.json ./
+#12 CACHED
+
+#13 [builder 4/6] RUN npm ci --legacy-peer-deps || npm ci
+fatal error: runtime: cannot allocate memory
+runtime stack:
+runtime.throw({0x7ff788ab042a?, 0xfffffffffffff800?})
+/usr/local/go/src/runtime/panic.go:1094 +0x4d fp=0xa6b19ff738 sp=0xa6b19ff708 pc=0x7ff787bd9aed
+runtime.persistentalloc1(0x1200, 0x7ff7896b7600?, 0x7ff7896fc640)
+/usr/local/go/src/runtime/malloc.go:1969 +0x265 fp=0xa6b19ff790 sp=0xa6b19ff738 pc=0x7ff787b7b645
+runtime.persistentalloc.func1()
+/usr/local/go/src/runtime/malloc.go:1922 +0x28 fp=0xa6b19ff7c0 sp=0xa6b19ff790 pc=0x7ff787b7b3c8
+#13 86.57 npm warn deprecated whatwg-encoding@1.0.5: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+runtime.systemstack(0xc00039c000)
+/usr/local/go/src/runtime/asm_amd64.s:513 +0x49 fp=0xa6b19ff7d0 sp=0xa6b19ff7c0 pc=0x7ff787bdff29
+goroutine 3 gp=0xc000002c40 m=7 mp=0xc0000d3008 [running]:
+runtime.systemstack_switch()
+/usr/local/go/src/runtime/asm_amd64.s:478 +0x8 fp=0xc000071d30 sp=0xc000071d20 pc=0x7ff787bdfec8
+runtime.persistentalloc(0x800?, 0x40?, 0x7ff7896fc640?)
+/usr/local/go/src/runtime/malloc.go:1921 +0x45 fp=0xc000071d78 sp=0xc000071d30 pc=0x7ff787b7b365
+runtime.(*spanSetBlockAlloc).alloc(0x0?)
+/usr/local/go/src/runtime/mspanset.go:325 +0x7f fp=0xc000071da0 sp=0xc000071d78 pc=0x7ff787b9d77f
+runtime.(*spanSet).push(0x7ff7896cae60, 0x27668950aa8)
+/usr/local/go/src/runtime/mspanset.go:134 +0x11d fp=0xc000071e08 sp=0xc000071da0 pc=0x7ff787b9d3dd
+runtime.(*sweepLocked).sweep(0x7ff7896b7600?, 0x0)
+/usr/local/go/src/runtime/mgcsweep.go:794 +0x7b5 fp=0xc000071f30 sp=0xc000071e08 pc=0x7ff787b90875
+runtime.sweepone()
+/usr/local/go/src/runtime/mgcsweep.go:395 +0xdd fp=0xc000071f80 sp=0xc000071f30 pc=0x7ff787b8fddd
+runtime.bgsweep(0xc000042080)
+/usr/local/go/src/runtime/mgcsweep.go:300 +0x105 fp=0xc000071fc8 sp=0xc000071f80 pc=0x7ff787b8fbc5
+runtime.gcenable.gowrap1()
+/usr/local/go/src/runtime/mgc.go:212 +0x25 fp=0xc000071fe0 sp=0xc000071fc8 pc=0x7ff787b83b05
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000071fe8 sp=0xc000071fe0 pc=0x7ff787be1ee1
+#13 87.69 npm warn deprecated w3c-hr-time@1.0.2: Use your platform's native performance.now() and performance.timeOrigin.
+created by runtime.gcenable in goroutine 1
+/usr/local/go/src/runtime/mgc.go:212 +0x66
+goroutine 1 gp=0xc0000021c0 m=5 mp=0xc0000d2008 [syscall, 2 minutes]:
+runtime.cgocall(0x7ff787be3700, 0xc0000d2358)
+/usr/local/go/src/runtime/cgocall.go:167 +0x3e fp=0xc0004f5a60 sp=0xc0004f59f8 pc=0x7ff787bd6bde
+runtime.syscall_syscalln(0x7ff787cace0d?, 0xc00004c480?, {0xc0004f5aa8?, 0x0?, 0x0?})
+/usr/local/go/src/runtime/syscall_windows.go:521 +0x4e fp=0xc0004f5a80 sp=0xc0004f5a60 pc=0x7ff787bc4b6e
+syscall.Syscall(0x36?, 0x3?, 0x3?, 0x7ff787b8c9e5?, 0x7ff7896f74e0?)
+/usr/local/go/src/runtime/syscall_windows.go:457 +0x29 fp=0xc0004f5ad0 sp=0xc0004f5a80 pc=0x7ff787bdd9e9
+syscall.WaitForSingleObject(0x170, 0xffffffff)
+/usr/local/go/src/syscall/zsyscall_windows.go:1159 +0x5a fp=0xc0004f5b18 sp=0xc0004f5ad0 pc=0x7ff787c4151a
+os.(*Process).wait(0xc00055a080)
+/usr/local/go/src/os/exec_windows.go:28 +0x89 fp=0xc0004f5ba8 sp=0xc0004f5b18 pc=0x7ff787c756a9
+os.(*Process).Wait(...)
+/usr/local/go/src/os/exec.go:340
+os/exec.(*Cmd).Wait(0xc0001a2180)
+/usr/local/go/src/os/exec/exec.go:922 +0x45 fp=0xc0004f5c08 sp=0xc0004f5ba8 pc=0x7ff787cad7e5
+os/exec.(*Cmd).Run(0xc0001a2180)
+/usr/local/go/src/os/exec/exec.go:626 +0x2d fp=0xc0004f5c20 sp=0xc0004f5c08 pc=0x7ff787cac42d
+main.tryPluginRun({0x7ff788cacd60, 0xc00033c910}, {0x7ff788cbae30, 0xc000357040}, 0xc000394308?, {0xc00000a140?, 
+0x7?}, {0x0, 0x0, 0x0})
+/go/src/github.com/docker/cli/cmd/docker/docker.go:385 +0x385 fp=0xc0004f5d00 sp=0xc0004f5c20 pc=0x7ff788724ac5
+main.runDocker({0x7ff788cacd60, 0xc00033c910}, 0xc000357040)
+/go/src/github.com/docker/cli/cmd/docker/docker.go:478 +0x79b fp=0xc0004f5e78 sp=0xc0004f5d00 pc=0x7ff78872589b
+main.dockerMain({0x7ff788caca90?, 0x7ff7896f55a0?})
+/go/src/github.com/docker/cli/cmd/docker/docker.go:89 +0x147 fp=0xc0004f5ef8 sp=0xc0004f5e78 pc=0x7ff788722e87
+main.main()
+/go/src/github.com/docker/cli/cmd/docker/docker.go:39 +0x25 fp=0xc0004f5f50 sp=0xc0004f5ef8 pc=0x7ff788722965
+runtime.main()
+/usr/local/go/src/runtime/proc.go:285 +0x27d fp=0xc0004f5fe0 sp=0xc0004f5f50 pc=0x7ff787ba82bd
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0004f5fe8 sp=0xc0004f5fe0 pc=0x7ff787be1ee1
+goroutine 2 gp=0xc0000028c0 m=nil [force gc (idle), 2 minutes]:
+runtime.gopark(0x1b158fe89e90?, 0x0?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc00006ffa8 sp=0xc00006ff88 pc=0x7ff787bd9c0e
+runtime.goparkunlock(...)
+/usr/local/go/src/runtime/proc.go:466
+runtime.forcegchelper()
+/usr/local/go/src/runtime/proc.go:373 +0xb8 fp=0xc00006ffe0 sp=0xc00006ffa8 pc=0x7ff787ba85d8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc00006ffe8 sp=0xc00006ffe0 pc=0x7ff787be1ee1
+created by runtime.init.7 in goroutine 1
+/usr/local/go/src/runtime/proc.go:361 +0x1a
+goroutine 4 gp=0xc000002e00 m=nil [GC scavenge wait]:
+runtime.gopark(0x10000?, 0x7ff788c91090?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc000085f78 sp=0xc000085f58 pc=0x7ff787bd9c0e
+runtime.goparkunlock(...)
+/usr/local/go/src/runtime/proc.go:466
+runtime.(*scavengerState).park(0x7ff7896abe00)
+/usr/local/go/src/runtime/mgcscavenge.go:425 +0x49 fp=0xc000085fa8 sp=0xc000085f78 pc=0x7ff787b8d629
+runtime.bgscavenge(0xc000042080)
+/usr/local/go/src/runtime/mgcscavenge.go:658 +0x59 fp=0xc000085fc8 sp=0xc000085fa8 pc=0x7ff787b8dbd9
+runtime.gcenable.gowrap2()
+/usr/local/go/src/runtime/mgc.go:213 +0x25 fp=0xc000085fe0 sp=0xc000085fc8 pc=0x7ff787b83aa5
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000085fe8 sp=0xc000085fe0 pc=0x7ff787be1ee1
+created by runtime.gcenable in goroutine 1
+/usr/local/go/src/runtime/mgc.go:213 +0xa5
+goroutine 5 gp=0xc000003180 m=nil [finalizer wait, 2 minutes]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc000087e20 sp=0xc000087e00 pc=0x7ff787bd9c0e
+runtime.runFinalizers()
+/usr/local/go/src/runtime/mfinal.go:210 +0x107 fp=0xc000087fe0 sp=0xc000087e20 pc=0x7ff787b82a47
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000087fe8 sp=0xc000087fe0 pc=0x7ff787be1ee1
+created by runtime.createfing in goroutine 1
+/usr/local/go/src/runtime/mfinal.go:172 +0x3d
+goroutine 6 gp=0xc000003a40 m=nil [cleanup wait, 2 minutes]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc000081f68 sp=0xc000081f48 pc=0x7ff787bd9c0e
+runtime.goparkunlock(...)
+/usr/local/go/src/runtime/proc.go:466
+runtime.(*cleanupQueue).dequeue(0x7ff7896ad3a0)
+/usr/local/go/src/runtime/mcleanup.go:439 +0xc5 fp=0xc000081fa0 sp=0xc000081f68 pc=0x7ff787b7f905
+runtime.runCleanups()
+/usr/local/go/src/runtime/mcleanup.go:635 +0x45 fp=0xc000081fe0 sp=0xc000081fa0 pc=0x7ff787b7ffc5
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000081fe8 sp=0xc000081fe0 pc=0x7ff787be1ee1
+created by runtime.(*cleanupQueue).createGs in goroutine 1
+/usr/local/go/src/runtime/mcleanup.go:589 +0xa5
+goroutine 19 gp=0xc000003c00 m=3 mp=0xc000079008 [syscall, 2 minutes]:
+runtime.notetsleepg(0x7ff7896f6760, 0xffffffffffffffff)
+/usr/local/go/src/runtime/lock_sema.go:175 +0x31 fp=0xc000083fa0 sp=0xc000083f68 pc=0x7ff787b78411
+os/signal.signal_recv()
+/usr/local/go/src/runtime/sigqueue.go:152 +0x29 fp=0xc000083fc0 sp=0xc000083fa0 pc=0x7ff787bdb6a9
+os/signal.loop()
+/usr/local/go/src/os/signal/signal_unix.go:23 +0x13 fp=0xc000083fe0 sp=0xc000083fc0 pc=0x7ff78801bc13
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000083fe8 sp=0xc000083fe0 pc=0x7ff787be1ee1
+created by os/signal.Notify.func1.1 in goroutine 1
+/usr/local/go/src/os/signal/signal.go:152 +0x1f
+goroutine 20 gp=0xc00039c1c0 m=nil [select, 2 minutes]:
+runtime.gopark(0xc0003d1f90?, 0x2?, 0x0?, 0x0?, 0xc0003d1f7c?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0003d1e08 sp=0xc0003d1de8 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc0003d1f90, 0xc0003d1f78, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc0003d1f48 sp=0xc0003d1e08 pc=0x7ff787bba0a5
+main.notifyContext.func1()
+/go/src/github.com/docker/cli/cmd/docker/docker.go:59 +0x85 fp=0xc0003d1fe0 sp=0xc0003d1f48 pc=0x7ff788722cc5
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0003d1fe8 sp=0xc0003d1fe0 pc=0x7ff787be1ee1
+created by main.notifyContext in goroutine 1
+/go/src/github.com/docker/cli/cmd/docker/docker.go:58 +0xe5
+goroutine 21 gp=0xc00039c380 m=nil [GC worker (idle), 2 minutes]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0003d3f38 sp=0xc0003d3f18 pc=0x7ff787bd9c0e
+runtime.gcBgMarkWorker(0xc0003a0070)
+/usr/local/go/src/runtime/mgc.go:1463 +0xeb fp=0xc0003d3fc8 sp=0xc0003d3f38 pc=0x7ff787b8628b
+runtime.gcBgMarkStartWorkers.gowrap1()
+/usr/local/go/src/runtime/mgc.go:1373 +0x25 fp=0xc0003d3fe0 sp=0xc0003d3fc8 pc=0x7ff787b86165
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0003d3fe8 sp=0xc0003d3fe0 pc=0x7ff787be1ee1
+created by runtime.gcBgMarkStartWorkers in goroutine 1
+/usr/local/go/src/runtime/mgc.go:1373 +0x105
+goroutine 22 gp=0xc00039c540 m=nil [GC worker (idle), 2 minutes]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0003cdf38 sp=0xc0003cdf18 pc=0x7ff787bd9c0e
+runtime.gcBgMarkWorker(0xc0003a0070)
+/usr/local/go/src/runtime/mgc.go:1463 +0xeb fp=0xc0003cdfc8 sp=0xc0003cdf38 pc=0x7ff787b8628b
+runtime.gcBgMarkStartWorkers.gowrap1()
+/usr/local/go/src/runtime/mgc.go:1373 +0x25 fp=0xc0003cdfe0 sp=0xc0003cdfc8 pc=0x7ff787b86165
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0003cdfe8 sp=0xc0003cdfe0 pc=0x7ff787be1ee1
+created by runtime.gcBgMarkStartWorkers in goroutine 1
+/usr/local/go/src/runtime/mgc.go:1373 +0x105
+goroutine 23 gp=0xc00039c700 m=nil [GC worker (idle), 2 minutes]:
+runtime.gopark(0x1af990297fe4?, 0x0?, 0x0?, 0x0?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0003cff38 sp=0xc0003cff18 pc=0x7ff787bd9c0e
+runtime.gcBgMarkWorker(0xc0003a0070)
+/usr/local/go/src/runtime/mgc.go:1463 +0xeb fp=0xc0003cffc8 sp=0xc0003cff38 pc=0x7ff787b8628b
+runtime.gcBgMarkStartWorkers.gowrap1()
+/usr/local/go/src/runtime/mgc.go:1373 +0x25 fp=0xc0003cffe0 sp=0xc0003cffc8 pc=0x7ff787b86165
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0003cffe8 sp=0xc0003cffe0 pc=0x7ff787be1ee1
+created by runtime.gcBgMarkStartWorkers in goroutine 1
+/usr/local/go/src/runtime/mgc.go:1373 +0x105
+goroutine 24 gp=0xc00039c8c0 m=nil [GC worker (idle)]:
+runtime.gopark(0x7ff788b51690?, 0xc000420a00?, 0x1c?, 0xa?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc000461f38 sp=0xc000461f18 pc=0x7ff787bd9c0e
+runtime.gcBgMarkWorker(0xc0003a0070)
+/usr/local/go/src/runtime/mgc.go:1463 +0xeb fp=0xc000461fc8 sp=0xc000461f38 pc=0x7ff787b8628b
+runtime.gcBgMarkStartWorkers.gowrap1()
+/usr/local/go/src/runtime/mgc.go:1373 +0x25 fp=0xc000461fe0 sp=0xc000461fc8 pc=0x7ff787b86165
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000461fe8 sp=0xc000461fe0 pc=0x7ff787be1ee1
+created by runtime.gcBgMarkStartWorkers in goroutine 1
+/usr/local/go/src/runtime/mgc.go:1373 +0x105
+goroutine 25 gp=0xc00039ca80 m=nil [select, 2 minutes]:
+runtime.gopark(0xc000463f60?, 0x2?, 0x0?, 0x0?, 0xc000463f24?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc000463da8 sp=0xc000463d88 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc000463f60, 0xc000463f20, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc000463ee8 sp=0xc000463da8 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run(0xc000423f10, 
+{0x7ff788cacd60, 0xc00033cdc0})
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:88 +0x10c 
+fp=0xc000463fb8 sp=0xc000463ee8 pc=0x7ff7881863ec
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer.gowrap1()
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x28 
+fp=0xc000463fe0 sp=0xc000463fb8 pc=0x7ff7881861c8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000463fe8 sp=0xc000463fe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer in goroutine 1
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x11a
+goroutine 26 gp=0xc00039cc40 m=nil [select, 2 minutes]:
+runtime.gopark(0xc00045df60?, 0x2?, 0x0?, 0x0?, 0xc00045df24?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc00045dda8 sp=0xc00045dd88 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc00045df60, 0xc00045df20, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc00045dee8 sp=0xc00045dda8 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run(0xc000423f40, 
+{0x7ff788cacd60, 0xc00033ce10})
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:88 +0x10c 
+fp=0xc00045dfb8 sp=0xc00045dee8 pc=0x7ff7881863ec
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer.gowrap1()
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x28 
+fp=0xc00045dfe0 sp=0xc00045dfb8 pc=0x7ff7881861c8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc00045dfe8 sp=0xc00045dfe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer in goroutine 1
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x11a
+goroutine 27 gp=0xc00039ce00 m=nil [select, 2 minutes]:
+runtime.gopark(0xc00045ff60?, 0x2?, 0x50?, 0x4e?, 0xc00045ff24?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc00045fda8 sp=0xc00045fd88 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc00045ff60, 0xc00045ff20, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc00045fee8 sp=0xc00045fda8 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run(0xc000423f70, 
+{0x7ff788cacd60, 0xc00033ce60})
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:88 +0x10c 
+fp=0xc00045ffb8 sp=0xc00045fee8 pc=0x7ff7881863ec
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer.gowrap1()
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x28 
+fp=0xc00045ffe0 sp=0xc00045ffb8 pc=0x7ff7881861c8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc00045ffe8 sp=0xc00045ffe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer in goroutine 1
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x11a
+goroutine 28 gp=0xc00039cfc0 m=nil [select, 2 minutes]:
+runtime.gopark(0xc0004dff60?, 0x2?, 0x0?, 0x0?, 0xc0004dff24?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0004dfda8 sp=0xc0004dfd88 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc0004dff60, 0xc0004dff20, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc0004dfee8 sp=0xc0004dfda8 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run(0xc0004d25a0, 
+{0x7ff788cacd60, 0xc00033cff0})
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:88 +0x10c 
+fp=0xc0004dffb8 sp=0xc0004dfee8 pc=0x7ff7881863ec
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer.gowrap1()
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x28 
+fp=0xc0004dffe0 sp=0xc0004dffb8 pc=0x7ff7881861c8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0004dffe8 sp=0xc0004dffe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer in goroutine 1
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x11a
+goroutine 29 gp=0xc00039d180 m=nil [select, 2 minutes]:
+runtime.gopark(0xc0004e1f60?, 0x2?, 0x0?, 0x0?, 0xc0004e1f24?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0004e1da8 sp=0xc0004e1d88 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc0004e1f60, 0xc0004e1f20, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc0004e1ee8 sp=0xc0004e1da8 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run(0xc0004d25d0, 
+{0x7ff788cacd60, 0xc00033d040})
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:88 +0x10c 
+fp=0xc0004e1fb8 sp=0xc0004e1ee8 pc=0x7ff7881863ec
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer.gowrap1()
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x28 
+fp=0xc0004e1fe0 sp=0xc0004e1fb8 pc=0x7ff7881861c8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0004e1fe8 sp=0xc0004e1fe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer in goroutine 1
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x11a
+goroutine 30 gp=0xc00039d340 m=nil [select, 2 minutes]:
+runtime.gopark(0xc0004dbf60?, 0x2?, 0x0?, 0x0?, 0xc0004dbf24?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0004dbda8 sp=0xc0004dbd88 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc0004dbf60, 0xc0004dbf20, 0x0?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc0004dbee8 sp=0xc0004dbda8 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.(*CallbackSerializer).run(0xc0004d2600, 
+{0x7ff788cacd60, 0xc00033d090})
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:88 +0x10c 
+fp=0xc0004dbfb8 sp=0xc0004dbee8 pc=0x7ff7881863ec
+github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer.gowrap1()
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x28 
+fp=0xc0004dbfe0 sp=0xc0004dbfb8 pc=0x7ff7881861c8
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0004dbfe8 sp=0xc0004dbfe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync.NewCallbackSerializer in goroutine 1
+/go/src/github.com/docker/cli/vendor/google.golang.org/grpc/internal/grpcsync/callback_serializer.go:52 +0x11a
+goroutine 34 gp=0xc000524000 m=nil [select, 2 minutes]:
+runtime.gopark(0xc00052bf30?, 0x3?, 0xe0?, 0xf1?, 0xc00052bef2?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc00052bd68 sp=0xc00052bd48 pc=0x7ff787bd9c0e
+runtime.selectgo(0xc00052bf30, 0xc00052beec, 0xc0000d8000?, 0x0, 0x0?, 0x1)
+/usr/local/go/src/runtime/select.go:351 +0x8c5 fp=0xc00052bea8 sp=0xc00052bd68 pc=0x7ff787bba0a5
+github.com/docker/cli/vendor/go.opentelemetry.io/otel/sdk/trace.(*batchSpanProcessor).processQueue(0xc000520000)
+/go/src/github.com/docker/cli/vendor/go.opentelemetry.io/otel/sdk/trace/batch_span_processor.go:390 +0x11a 
+fp=0xc00052bfa0 sp=0xc00052bea8 pc=0x7ff7880822ba
+github.com/docker/cli/vendor/go.opentelemetry.io/otel/sdk/trace.NewBatchSpanProcessor.func2()
+/go/src/github.com/docker/cli/vendor/go.opentelemetry.io/otel/sdk/trace/batch_span_processor.go:145 +0x51 
+fp=0xc00052bfe0 sp=0xc00052bfa0 pc=0x7ff78807fd71
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc00052bfe8 sp=0xc00052bfe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/vendor/go.opentelemetry.io/otel/sdk/trace.NewBatchSpanProcessor in goroutine 1
+/go/src/github.com/docker/cli/vendor/go.opentelemetry.io/otel/sdk/trace/batch_span_processor.go:143 +0x565
+goroutine 51 gp=0xc0005241c0 m=nil [IO wait, 2 minutes]:
+runtime.gopark(0x0?, 0xc000529bd0?, 0x80?, 0x1?, 0x0?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc000529b48 sp=0xc000529b28 pc=0x7ff787bd9c0e
+runtime.netpollblock(0x7ff787bc4b6e?, 0x87be3700?, 0xf7?)
+/usr/local/go/src/runtime/netpoll.go:575 +0xf7 fp=0xc000529b80 sp=0xc000529b48 pc=0x7ff787b9f2f7
+internal/poll.runtime_pollWait(0x27668968600, 0x72)
+/usr/local/go/src/runtime/netpoll.go:351 +0x85 fp=0xc000529ba0 sp=0xc000529b80 pc=0x7ff787bd8da5
+internal/poll.(*pollDesc).wait(0x1a0?, 0x7ff787b709e6?, 0x0)
+/usr/local/go/src/internal/poll/fd_poll_runtime.go:84 +0x27 fp=0xc000529bc8 sp=0xc000529ba0 pc=0x7ff787c67b27
+internal/poll.waitIO(0x7ff787b83eb6?)
+/usr/local/go/src/internal/poll/fd_windows.go:187 +0x65 fp=0xc000529c10 sp=0xc000529bc8 pc=0x7ff787c68f65
+internal/poll.execIO(0xc000546520, 0xc000529cb0)
+/usr/local/go/src/internal/poll/fd_windows.go:240 +0x13a fp=0xc000529c80 sp=0xc000529c10 pc=0x7ff787c692da
+internal/poll.(*FD).acceptOne(0xc000546508, 0x180, {0xc0002620f0?, 0xc0001121e0?, 0x4d?}, 0xc000396300?)
+/usr/local/go/src/internal/poll/fd_windows.go:1063 +0x65 fp=0xc000529ce0 sp=0xc000529c80 pc=0x7ff787c6dc05
+internal/poll.(*FD).Accept(0xc000546508, 0xc000529e90)
+/usr/local/go/src/internal/poll/fd_windows.go:1097 +0x1b6 fp=0xc000529d98 sp=0xc000529ce0 pc=0x7ff787c6df36
+net.(*netFD).accept(0xc000546508)
+/usr/local/go/src/net/fd_windows.go:202 +0x4b fp=0xc000529eb0 sp=0xc000529d98 pc=0x7ff787cf8e0b
+net.(*UnixListener).accept(0x0?)
+/usr/local/go/src/net/unixsock_posix.go:172 +0x16 fp=0xc000529ed8 sp=0xc000529eb0 pc=0x7ff787d19f76
+net.(*UnixListener).Accept(0xc0001ac330)
+/usr/local/go/src/net/unixsock.go:260 +0x30 fp=0xc000529f08 sp=0xc000529ed8 pc=0x7ff787d188b0
+github.com/docker/cli/cli-plugins/socket.(*PluginServer).accept(0xc00011f180)
+/go/src/github.com/docker/cli/cli-plugins/socket/socket.go:68 +0x45 fp=0xc000529fa0 sp=0xc000529f08 pc=0x7ff788269de5
+github.com/docker/cli/cli-plugins/socket.NewPluginServer.func2()
+/go/src/github.com/docker/cli/cli-plugins/socket/socket.go:49 +0x4f fp=0xc000529fe0 sp=0xc000529fa0 pc=0x7ff788269d0f
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc000529fe8 sp=0xc000529fe0 pc=0x7ff787be1ee1
+created by github.com/docker/cli/cli-plugins/socket.NewPluginServer in goroutine 1
+/go/src/github.com/docker/cli/cli-plugins/socket/socket.go:46 +0x1c8
+goroutine 8 gp=0xc00039d6c0 m=nil [chan receive, 2 minutes]:
+runtime.gopark(0x0?, 0x7ff78888bac0?, 0x0?, 0x0?, 0xc0002d1f70?)
+/usr/local/go/src/runtime/proc.go:460 +0xce fp=0xc0002d1ee0 sp=0xc0002d1ec0 pc=0x7ff787bd9c0e
+runtime.chanrecv(0xc000088380, 0x0, 0x1)
+/usr/local/go/src/runtime/chan.go:667 +0x473 fp=0xc0002d1f58 sp=0xc0002d1ee0 pc=0x7ff787b72c33
+runtime.chanrecv1(0xc00033c910?, 0x0?)
+/usr/local/go/src/runtime/chan.go:509 +0x12 fp=0xc0002d1f80 sp=0xc0002d1f58 pc=0x7ff787b72792
+main.tryPluginRun.func3()
+/go/src/github.com/docker/cli/cmd/docker/docker.go:365 +0x30 fp=0xc0002d1fe0 sp=0xc0002d1f80 pc=0x7ff788724d10
+runtime.goexit({})
+/usr/local/go/src/runtime/asm_amd64.s:1693 +0x1 fp=0xc0002d1fe8 sp=0xc0002d1fe0 pc=0x7ff787be1ee1
+created by main.tryPluginRun in goroutine 1
+/go/src/github.com/docker/cli/cmd/docker/docker.go:362 +0x379
+#13 94.07 npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+#13 94.10 npm warn deprecated stable@0.1.8: Modern JS already guarantees Array#sort() is a stable sort, so this library is deprecated. See the compatibility table on MDN: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort#browser_compatibility
+#13 95.81 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#13 96.71 npm warn deprecated rollup-plugin-terser@7.0.2: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-terser
+#13 102.0 npm warn deprecated q@1.5.1: You or someone you depend on is using Q, the JavaScript Promise library that gave JavaScript developers strong feelings about promises. They can almost certainly migrate to the native JavaScript promise now. Thank you literally everyone for joining me in this bet against the odds. Be excellent to each other.
+#13 102.0 npm warn deprecated
+#13 102.0 npm warn deprecated (For a CapTP with native promises, see @endo/eventual-send and @endo/captp)
+#13 102.8 npm warn deprecated workbox-google-analytics@6.6.0: It is not compatible with newer versions of GA starting with v4, as long as you are using GAv3 it should be ok, but the package is not longer being maintained
+#13 106.4 npm warn deprecated workbox-cacheable-response@6.6.0: workbox-background-sync@6.6.0
+#13 123.0 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+#13 125.5 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#13 132.5 npm warn deprecated domexception@2.0.1: Use your platform's native DOMException instead
+#13 152.0 npm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead
+#13 157.1 npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+#13 157.8 npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
+#13 171.0 npm warn deprecated svgo@1.3.2: This SVGO version is no longer supported. Upgrade to v2.x.x.
+#13 179.2 npm warn deprecated source-map@0.8.0-beta.0: The work that was done in this beta branch won't be included in future versions
+#13 183.3 npm warn deprecated @babel/plugin-proposal-private-property-in-object@7.21.11: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-private-property-in-object instead.
+#13 183.3 npm warn deprecated @babel/plugin-proposal-optional-chaining@7.21.0: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-optional-chaining instead.
+#13 183.3 npm warn deprecated @babel/plugin-proposal-nullish-coalescing-operator@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-nullish-coalescing-operator instead.
+#13 183.5 npm warn deprecated @babel/plugin-proposal-numeric-separator@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-numeric-separator instead.
+#13 183.5 npm warn deprecated @babel/plugin-proposal-class-properties@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-class-properties instead.
+#13 183.7 npm warn deprecated @babel/plugin-proposal-private-methods@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-private-methods instead.
+#13 228.7 npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+#13 285.6 
+#13 285.6 added 1574 packages, and audited 1575 packages in 5m
+#13 285.6 
+#13 285.6 282 packages are looking for funding
+#13 285.6   run `npm fund` for details
+#13 286.3 
+#13 286.3 54 vulnerabilities (10 low, 17 moderate, 26 high, 1 critical)
+#13 286.3 
+#13 286.3 To address issues that do not require attention, run:
+#13 286.3   npm audit fix
+#13 286.3 
+#13 286.3 To address all issues (including breaking changes), run:
+#13 286.3   npm audit fix --force
+#13 286.3 
+#13 286.3 Run `npm audit` for details.
+#13 286.3 npm notice
+#13 286.3 npm notice New major version of npm available! 10.9.2 -> 11.18.0
+#13 286.3 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.18.0
+#13 286.3 npm notice To update run: npm install -g npm@11.18.0
+#13 286.3 npm notice
+#13 DONE 290.0s
+
+#14 [builder 5/6] COPY . .
+#14 DONE 6.6s
+
+#15 [builder 6/6] RUN echo "cache_buster=20260701b" && npm run build && test -f /app/build/index.html
+#15 4.342 cache_buster=20260701b
+#15 6.368 
+#15 6.368 > mensa-frontend@1.0.0 build
+#15 6.368 > react-scripts build
+#15 6.368 
+#15 19.61 Creating an optimized production build...
+#15 21.18 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#15 21.18   npx update-browserslist-db@latest
+#15 21.18   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#15 110.8 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#15 110.8   npx update-browserslist-db@latest
+#15 110.8   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#15 122.9 Compiled successfully.
+#15 122.9 
+#15 122.9 File sizes after gzip:
+#15 122.9 
+#15 123.1   102.78 kB  build/static/js/main.a35a3fd7.js
+#15 123.1   38.41 kB   build/static/css/main.82489a38.css
+#15 123.1 
+#15 123.1 The project was built assuming it is hosted at /.
+#15 123.1 You can control this with the homepage field in your package.json.
+#15 123.1 
+#15 123.1 The build folder is ready to be deployed.
+#15 123.1 You may serve it with a static server:
+#15 123.1 
+#15 123.1   npm install -g serve
+#15 123.1   serve -s build
+#15 123.1 
+#15 123.1 Find out more about deployment here:
+#15 123.1 
+#15 123.1   https://cra.link/deployment
+#15 123.1 
+#15 DONE 124.0s
+
+#16 [stage-1 2/5] RUN rm -rf /usr/share/nginx/html/*
+#16 CACHED
+
+#17 [stage-1 3/5] COPY --from=builder /app/build/ /usr/share/nginx/html/
+#17 DONE 0.5s
+
+#18 [stage-1 4/5] COPY nginx.conf /etc/nginx/nginx.conf
+#18 DONE 0.7s
+
+#19 [stage-1 5/5] RUN mkdir -p /var/run/nginx /var/cache/nginx /var/log/nginx &&     chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/nginx.conf /var/cache/nginx /var/run/nginx /var/log/nginx &&     chmod -R 755 /usr/share/nginx/html
+#19 DONE 3.4s
+
+#20 exporting to image
+#20 exporting layers
+#20 exporting layers 4.1s done
+#20 exporting manifest sha256:faab68dffb0152eb9fd40d235d91aa9c4851e88c9dfa37c86323c0e97d7c37e6
+#20 exporting manifest sha256:faab68dffb0152eb9fd40d235d91aa9c4851e88c9dfa37c86323c0e97d7c37e6 0.3s done
+#20 exporting config sha256:f3452e5aeff06fd11d325e41a036904f34efb9ef43697baca2c09acbad37b45d
+#20 exporting config sha256:f3452e5aeff06fd11d325e41a036904f34efb9ef43697baca2c09acbad37b45d 0.2s done
+#20 exporting attestation manifest sha256:ca64389ac764c45120723fd6605876c30040cffe3c5de74f964419019c470963
+#20 exporting attestation manifest sha256:ca64389ac764c45120723fd6605876c30040cffe3c5de74f964419019c470963 0.5s done
+#20 exporting manifest list sha256:bad57cf1fcf6f259c01db0e7d35780722ea1d3e35f26126be4848314fb95a8cd
+#20 exporting manifest list sha256:bad57cf1fcf6f259c01db0e7d35780722ea1d3e35f26126be4848314fb95a8cd 0.4s done
+#20 naming to docker.io/library/mensa_project-frontend:latest
+#20 naming to docker.io/library/mensa_project-frontend:latest 0.4s done
+#20 unpacking to docker.io/library/mensa_project-frontend:latest
+#20 unpacking to docker.io/library/mensa_project-frontend:latest 1.4s done
+#20 DONE 8.0s
+
+#21 resolving provenance for metadata file
+#21 DONE 0.8s
+ Image mensa_project-frontend Built 

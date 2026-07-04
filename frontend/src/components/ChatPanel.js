@@ -18,7 +18,7 @@ function renderMarkdown(text) {
 
 const ChatPanel = () => {
     const [messages, setMessages] = useState([
-        { sender: 'bot', text: 'Hello! I am a helpful assistant. You can ask me about the lottery games, the model, or the predictions.' }
+        { sender: 'bot', text: 'Hello! I am a helpful assistant. You can ask me about the lottery games, the model, or the suggestions.' }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);

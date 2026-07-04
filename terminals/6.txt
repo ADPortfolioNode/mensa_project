@@ -1,0 +1,30 @@
+---
+pid: 1028
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"from main import app; routes=[(list(r.methods), r.path) for r in app.routes if hasattr(r,'methods')]; print('routes', len(routes)); [print(m,p) for m,p in sorted(routes,key=lambda x:x[1])]\""
+started_at: 2026-07-01T08:16:14.516Z
+running_for_ms: 16399998 
+---
+routes 22
+['GET'] /api
+['POST'] /api/chat
+['GET'] /api/chroma/collections
+['GET'] /api/chroma/status
+['GET'] /api/experiments
+['GET'] /api/games
+['GET'] /api/games/{game}/summary
+['GET'] /api/health
+['POST'] /api/ingest
+['GET'] /api/ingest_progress
+['GET'] /api/ingest_stream
+['GET'] /api/models/metadata
+['GET'] /api/models/{game}/metadata
+['POST'] /api/predict
+['GET'] /api/predictions/all
+['POST'] /api/startup_init
+['GET'] /api/startup_status
+['POST'] /api/train
+['GET', 'HEAD'] /docs
+['GET', 'HEAD'] /docs/oauth2-redirect
+['GET', 'HEAD'] /openapi.json
+['GET', 'HEAD'] /redoc

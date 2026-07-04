@@ -8,13 +8,13 @@ export default function AllPredictionsPanel({ predictions }) {
 
   return (
     <div className="card p-3 mb-3">
-      <h5>All Predictions</h5>
+      <h5>All Suggestions</h5>
       {predictions.map((item) => (
         <div key={item.game} className="mb-3">
           <h6>{item.game.toUpperCase()}</h6>
           {item.status === 'error' ? (
             <div className="alert alert-danger mb-0">
-              <strong>Error:</strong> {item.message || 'Prediction failed.'}
+              <strong>Error:</strong> {item.message || 'Suggestion failed.'}
             </div>
           ) : (
             <PredictionDisplay prediction={item.prediction} />

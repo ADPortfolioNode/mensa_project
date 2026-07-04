@@ -1,0 +1,56 @@
+---
+pid: 10684
+cwd: "E:\2024 RESET\mensa_project"
+command: "powershell -ExecutionPolicy Bypass -File \"E:\\2024 RESET\\mensa_project\\production_test.ps1\""
+started_at: 2026-07-01T08:10:37.150Z
+running_for_ms: 16735011 
+---
+
+============================================================
+MENSA PROJECT PRODUCTION TEST SUITE
+Build: 2026-07-01 04:10:39
+============================================================
+
+[1] CONTAINER HEALTH CHECK
+------------------------------------------------------------
+  [PASS] mensa_frontend running
+  [PASS] mensa_backend running
+  [PASS] mensa_chroma running
+Summary: 3/3 containers healthy
+
+[2] FRONTEND HTML VALIDATION
+------------------------------------------------------------
+  [PASS] Frontend HTML (200 OK)
+  [PASS] React root element present
+
+[3] CRITICAL API ENDPOINTS
+------------------------------------------------------------
+  [PASS] /api/health (200 OK)
+  [PASS] /api/games (200 OK)
+  [PASS] /api/startup_status (200 OK)
+  [FAIL] /api/chroma/collections (Error: The operation has timed out.)
+  [FAIL] /api/experiments (Error: The operation has timed out.)
+Summary: 3/5 endpoints responding
+
+[4] RESPONSE CONTRACT CHECKS
+------------------------------------------------------------
+  [FAIL] Could not parse /api/games response
+  [FAIL] Could not parse /api/startup_status response
+
+[5] REGRESSION CHECKS
+------------------------------------------------------------
+  [PASS] No double /api path found
+
+[6] CONNECTIVITY
+------------------------------------------------------------
+  [PASS] Frontend (Nginx) reachable on localhost:3000
+  [PASS] Backend (FastAPI) reachable on localhost:5000
+  [PASS] ChromaDB reachable on localhost:8000
+
+============================================================
+TEST SUMMARY
+============================================================
+Containers healthy: 3/3
+Critical API endpoints responding: 3/5
+Ready URL: http://localhost:3000
+

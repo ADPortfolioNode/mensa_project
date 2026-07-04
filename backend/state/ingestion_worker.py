@@ -1,64 +1,131 @@
 """
 Background ingestion worker for automatic startup ingestion.
 """
+import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from state.ingest_state import (
-    startup_state, 
-    update_startup_progress, 
+    startup_state,
+    update_startup_progress,
     set_game_status,
-    get_startup_state
 )
 from services.ingest import ingest_service
+
+
+_startup_state_lock = threading.Lock()
+_startup_parallel = max(1, int(os.getenv("INGEST_STARTUP_PARALLEL", "1")))
+_startup_count_workers = max(1, int(os.getenv("INGEST_STARTUP_COUNT_WORKERS", "4")))
+
+
+def _prefetch_existing_counts(games: list[str]) -> dict[str, int]:
+    """Parallel read-only Chroma counts to avoid serial round-trips before ingest."""
+    from services.chroma_client import chroma_client
+
+    counts: dict[str, int] = {}
+    workers = min(_startup_count_workers, len(games))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(chroma_client.count_documents, game): game for game in games}
+        for future in as_completed(futures):
+            game = futures[future]
+            try:
+                counts[game] = int(future.result() or 0)
+            except Exception as exc:
+                print(f"⚠ [STARTUP] Could not count existing draws for {game}: {exc}")
+                counts[game] = 0
+    return counts
+
+
+def _ingest_single_game(game: str, game_index: int, total_games: int, existing_draws: int):
+    """Ingest one configured game and update startup state."""
+    try:
+        if existing_draws > 0:
+            print(f"⏭ [STARTUP] Skipping {game} — {existing_draws} draws already in Chroma")
+            with _startup_state_lock:
+                set_game_status(game, "completed")
+                update_startup_state(
+                    startup_state,
+                    current_game=game,
+                    current_task="skipped_existing",
+                    progress=float(game_index),
+                    current_game_rows_fetched=existing_draws,
+                    current_game_rows_total=existing_draws,
+                )
+            return
+
+        with _startup_state_lock:
+            update_startup_state(
+                startup_state,
+                current_game=game,
+                current_task="fetching",
+                progress=float(game_index - 1),
+                current_game_rows_fetched=0,
+                current_game_rows_total=0,
+            )
+            set_game_status(game, "ingesting")
+
+        def update_game_progress(rows_fetched, total_rows):
+            with _startup_state_lock:
+                update_startup_state(
+                    startup_state,
+                    current_game=game,
+                    current_game_rows_fetched=rows_fetched,
+                    current_game_rows_total=total_rows,
+                    progress=calculate_progress(game_index, rows_fetched, total_rows, total_games),
+                )
+
+        result = ingest_service.fetch_and_sync(
+            game,
+            progress_callback=update_game_progress,
+            force=False,
+        )
+
+        with _startup_state_lock:
+            set_game_status(game, "completed")
+            update_startup_state(
+                startup_state,
+                current_game=game,
+                progress=float(game_index),
+                current_game_rows_fetched=result.get("total", 0),
+                current_game_rows_total=result.get("total", 0),
+            )
+    except Exception as exc:
+        with _startup_state_lock:
+            set_game_status(game, "error", error=str(exc))
+        print(f"Failed to ingest {game}: {exc}")
 
 
 def start_background_ingestion():
     """Start non-blocking background ingestion in a daemon thread."""
     def ingest_all():
-        global _ingestion_started
         from config import GAME_CONFIGS
-        
+
         startup_state["started_at"] = time.time()
         startup_state["status"] = "ingesting"
         update_startup_state(startup_state, status="ingesting", started_at=time.time())
 
-        for i, game in enumerate(GAME_CONFIGS.keys(), 1):
-            try:
-                update_startup_state(
-                    startup_state,
-                    current_game=game,
-                    current_task="fetching",
-                    progress=float(i - 1),
-                    current_game_rows_fetched=0,
-                    current_game_rows_total=0
-                )
-                set_game_status(game, "ingesting")
+        games = list(GAME_CONFIGS.keys())
+        existing_counts = _prefetch_existing_counts(games)
 
-                def update_game_progress(rows_fetched, total_rows):
-                    update_startup_state(
-                        startup_state,
-                        current_game_rows_fetched=rows_fetched,
-                        current_game_rows_total=total_rows,
-                        progress=calculate_progress(i, rows_fetched, total_rows, len(GAME_CONFIGS))
+        if _startup_parallel <= 1:
+            for index, game in enumerate(games, 1):
+                _ingest_single_game(game, index, len(games), existing_counts.get(game, 0))
+        else:
+            workers = min(_startup_parallel, len(games))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = [
+                    pool.submit(
+                        _ingest_single_game,
+                        game,
+                        index,
+                        len(games),
+                        existing_counts.get(game, 0),
                     )
-
-                result = ingest_service.fetch_and_sync(
-                    game,
-                    progress_callback=update_game_progress,
-                    force=False,
-                )
-
-                set_game_status(game, "completed")
-                update_startup_state(
-                    startup_state,
-                    progress=float(i),
-                    current_game_rows_fetched=result.get("total", 0),
-                    current_game_rows_total=result.get("total", 0)
-                )
-
-            except Exception as exc:
-                set_game_status(game, "error", error=str(exc))
-                print(f"Failed to ingest {game}: {exc}")
+                    for index, game in enumerate(games, 1)
+                ]
+                for future in as_completed(futures):
+                    future.result()
 
         startup_state["status"] = "completed"
         startup_state["completed_at"] = time.time()
@@ -80,8 +147,7 @@ def calculate_progress(index, rows_fetched, total_rows, total_games):
         fraction = rows_fetched / max(total_rows, 1)
         fraction = max(0.0, min(1.0, fraction))
         return float(index - 1) + fraction
-    else:
-        return float(index - 1)
+    return float(index - 1)
 
 
 # Global flag for ingestion status

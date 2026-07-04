@@ -3,7 +3,7 @@ import React from 'react';
 export default function PredictionDisplayWindow({ ingestStatus, trainStatus, ingestProgress, trainProgress, experiments, predictions }) {
   return (
     <div className="card p-3 mb-3">
-      <h5 className="card-title">Prediction Display Window</h5>
+      <h5 className="card-title">Suggestion Display Window</h5>
 
       {/* Ingestion Steps */}
       <div className="mb-3">
@@ -46,9 +46,9 @@ export default function PredictionDisplayWindow({ ingestStatus, trainStatus, ing
         {trainStatus === 'error' && <p className="text-danger">Model training failed. Check logs.</p>}
       </div>
 
-      {/* Rendering of Predictions */}
+      {/* Rendering of Suggestions */}
       <div className="mb-3">
-        <h6>Predictions</h6>
+        <h6>Suggestions</h6>
         {predictions && Object.keys(predictions).length > 0 ? (
           Object.entries(predictions).map(([game, preds]) => (
             <div key={game} className="mb-2">
@@ -56,14 +56,14 @@ export default function PredictionDisplayWindow({ ingestStatus, trainStatus, ing
               <ul className="list-group">
                 {preds.map((pred, index) => (
                   <li key={index} className="list-group-item">
-                    <strong>Prediction {index + 1}:</strong> {JSON.stringify(pred)}
+                    <strong>Suggestion {index + 1}:</strong> {JSON.stringify(pred)}
                   </li>
                 ))}
               </ul>
             </div>
           ))
         ) : (
-          <p>No predictions available. Complete ingestion and training first.</p>
+          <p>No suggestions available. Complete ingestion and training first.</p>
         )}
       </div>
     </div>

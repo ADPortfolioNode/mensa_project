@@ -1,0 +1,9 @@
+---
+pid: 1872
+cwd: "E:\2024 RESET\mensa_project"
+command: "curl.exe -s -o NUL -w \"ingest_stream_all:%{http_code}\" --max-time 8 http://localhost:3000/api/ingest_stream; Write-Host \"\"; curl.exe -s -o NUL -w \"ingest_stream_pick3:%{http_code}\" --max-time 8 \"http://localhost:3000/api/ingest_stream?game=pick3\""
+started_at: 2026-07-01T13:48:56.861Z
+running_for_ms: 22799998 
+---
+ingest_stream_all:200
+ingest_stream_pick3:200

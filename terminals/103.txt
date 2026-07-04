@@ -1,0 +1,15 @@
+---
+pid: 5636
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker cp backend/routes/training.py mensa_backend:/app/routes/training.py; curl.exe -s -m 300 -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@train_take5.json\" | python -c \"import sys,json; d=json.load(sys.stdin); print('status',d.get('status')); print('score',d.get('score')); print('accuracy',d.get('accuracy')); print('prev',d.get('previous_accuracy')); print('candidate',d.get('candidate_accuracy') or d.get('new_accuracy')); print('retained',d.get('retained_previous_model')); print('strategy',d.get('model_strategy')); print('msg',d.get('message','')[:120])\""
+started_at: 2026-07-01T18:39:18.824Z
+running_for_ms: 5380003  
+---
+status success
+score 0.8967400781424194
+accuracy 0.8967400781424194
+prev None
+candidate 0.8624798857856014
+retained True
+strategy single
+msg Training completed for take5, but previous model was retained to minimize regression (new accuracy=0.8625 < previous acc

@@ -1,6 +1,8 @@
 """
 Experiments API routes.
 """
+import asyncio
+
 from fastapi import APIRouter
 from experiments.store import ExperimentStore
 
@@ -10,16 +12,20 @@ exp_store = ExperimentStore("/data/experiments/experiments.json")
 
 
 @router.get("/api/experiments")
-async def get_experiments():
+async def get_experiments(limit: int = 100):
     """
-    Returns list of all completed experiments.
+    Returns recent completed experiments (newest first).
     """
     try:
-        experiments = exp_store.list_experiments()
+        safe_limit = max(1, min(limit, 500))
+        experiments = await asyncio.to_thread(exp_store.list_experiments)
+        experiments.sort(key=lambda item: float(item.get("timestamp") or 0), reverse=True)
+        recent = experiments[:safe_limit]
         return {
             "status": "ok",
-            "experiments": experiments,
-            "count": len(experiments)
+            "experiments": recent,
+            "count": len(recent),
+            "total": len(experiments),
         }
     except Exception as e:
         return {

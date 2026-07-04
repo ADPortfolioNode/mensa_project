@@ -1,0 +1,26 @@
+---
+pid: 26940
+cwd: "E:\2024 RESET\mensa_project"
+command: "python \"E:\\2024 RESET\\mensa_project\\verify_training_learning.py\""
+started_at: 2026-07-03T19:24:49.419Z
+running_for_ms: 12100002 
+---
+=== Training Learning Verification ===
+
+-- Unit checks --
+[PASS] baseline picks max stored/live: resolved=0.8400
+[PASS] training_target uses prior baseline: target=0.8700
+[PASS] accuracy_history keeps top values: [0.83, 0.82, 0.81]
+[PASS] blend does not regress below best single: cand=1.0000, prev=0.9877, blend=1.0000
+[PASS] recursive training holds/improves best: first=0.8745, best=0.8745, attempts=6
+
+-- Integration checks --
+[PASS] API incremental training (skipped): backend missing /api/train_settings — unit checks only
+
+=== SUMMARY: 6 PASS, 0 FAIL / 6 checks ===
+  baseline picks max stored/live: PASS — resolved=0.8400
+  training_target uses prior baseline: PASS — target=0.8700
+  accuracy_history keeps top values: PASS — [0.83, 0.82, 0.81]
+  blend does not regress below best single: PASS — cand=1.0000, prev=0.9877, blend=1.0000
+  recursive training holds/improves best: PASS — first=0.8745, best=0.8745, attempts=6
+  API incremental training (skipped): PASS — backend missing /api/train_settings — unit checks only

@@ -1,13 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script>
+      // Windows Docker Desktop: localhost may resolve to IPv6 (::1) and hit wslrelay instead of Docker.
+      (function () {
+        var h = window.location.hostname;
+        if (h === 'localhost' || h === '::1') {
+          var port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+          var target = 'http://127.0.0.1' + (port ? ':' + port : '') + window.location.pathname + window.location.search + window.location.hash;
+          window.location.replace(target);
+        }
+      })();
+    </script>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0d6efd" />
     <meta
       name="description"
-      content="Mensa Project - Lottery Prediction & Analysis"
+      content="Mensa Project - Lottery Suggestion & Analysis"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />

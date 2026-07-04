@@ -1,0 +1,23 @@
+---
+pid: 5748
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose up -d --force-recreate"
+started_at: 2026-07-01T14:24:53.456Z
+running_for_ms: 20645016 
+---
+ Container mensa_chroma Recreate 
+ Container mensa_chroma Recreated 
+ Container mensa_backend Recreate 
+ Container mensa_backend Recreated 
+ Container mensa_frontend Recreate 
+ Container mensa_frontend Recreated 
+ Container mensa_chroma Starting 
+ Container mensa_chroma Started 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 
+ Container mensa_backend Waiting 
+ Container mensa_backend Healthy 
+ Container mensa_frontend Starting 
+ Container mensa_frontend Started 

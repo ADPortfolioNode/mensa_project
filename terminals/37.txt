@@ -1,0 +1,188 @@
+---
+pid: 7540
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" build frontend"
+started_at: 2026-07-01T12:57:30.126Z
+running_for_ms: 25890003 
+---
+ Image mensa_project-backend Building 
+ Image mensa_project-frontend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.11kB 0.0s done
+#1 DONE 0.1s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 1.23kB 0.4s done
+#2 DONE 1.1s
+
+#3 [internal] load metadata for docker.io/library/node:22.13.1-slim
+#3 ...
+
+#4 [auth] library/node:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [auth] library/nginx:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [internal] load metadata for docker.io/library/nginx:alpine
+#6 DONE 5.2s
+
+#3 [internal] load metadata for docker.io/library/node:22.13.1-slim
+#3 DONE 6.4s
+
+#7 [internal] load .dockerignore
+#7 transferring context:
+#7 transferring context: 891B 0.3s done
+#7 DONE 0.7s
+
+#8 [internal] load build context
+#8 DONE 0.0s
+
+#9 [builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 resolve docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 resolve docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc 0.8s done
+#9 DONE 0.8s
+
+#10 [stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#10 resolve docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa 0.8s done
+#10 DONE 0.9s
+
+#8 [internal] load build context
+#8 transferring context: 51.62kB 0.5s done
+#8 DONE 0.8s
+
+#9 [builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 DONE 1.9s
+
+#9 [builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 DONE 2.4s
+
+#9 [builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#9 extracting sha256:506c1d361a3229040aa68aa8bd25ab713a2d8dab9fdfb5b00630cba465b00e51
+#9 extracting sha256:506c1d361a3229040aa68aa8bd25ab713a2d8dab9fdfb5b00630cba465b00e51 0.8s done
+#9 DONE 3.2s
+
+#11 [builder 2/6] WORKDIR /app
+#11 DONE 1.7s
+
+#12 [builder 3/6] COPY package*.json ./
+#12 DONE 2.2s
+
+#13 [builder 4/6] RUN npm ci --legacy-peer-deps || npm ci
+#13 67.07 npm warn deprecated whatwg-encoding@1.0.5: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+#13 67.74 npm warn deprecated w3c-hr-time@1.0.2: Use your platform's native performance.now() and performance.timeOrigin.
+#13 73.57 npm warn deprecated sourcemap-codec@1.4.8: Please use @jridgewell/sourcemap-codec instead
+#13 74.11 npm warn deprecated stable@0.1.8: Modern JS already guarantees Array#sort() is a stable sort, so this library is deprecated. See the compatibility table on MDN: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort#browser_compatibility
+#13 76.93 npm warn deprecated rollup-plugin-terser@7.0.2: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-terser
+#13 77.29 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#13 81.71 npm warn deprecated workbox-cacheable-response@6.6.0: workbox-background-sync@6.6.0
+#13 82.79 npm warn deprecated q@1.5.1: You or someone you depend on is using Q, the JavaScript Promise library that gave JavaScript developers strong feelings about promises. They can almost certainly migrate to the native JavaScript promise now. Thank you literally everyone for joining me in this bet against the odds. Be excellent to each other.
+#13 82.79 npm warn deprecated
+#13 82.79 npm warn deprecated (For a CapTP with native promises, see @endo/eventual-send and @endo/captp)
+#13 86.57 npm warn deprecated workbox-google-analytics@6.6.0: It is not compatible with newer versions of GA starting with v4, as long as you are using GAv3 it should be ok, but the package is not longer being maintained
+#13 92.43 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+#13 93.94 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#13 99.53 npm warn deprecated domexception@2.0.1: Use your platform's native DOMException instead
+#13 107.3 npm warn deprecated abab@2.0.6: Use your platform's native atob() and btoa() methods instead
+#13 111.3 npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+#13 111.6 npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
+#13 125.8 npm warn deprecated svgo@1.3.2: This SVGO version is no longer supported. Upgrade to v2.x.x.
+#13 128.4 npm warn deprecated source-map@0.8.0-beta.0: The work that was done in this beta branch won't be included in future versions
+#13 135.6 npm warn deprecated @babel/plugin-proposal-nullish-coalescing-operator@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-nullish-coalescing-operator instead.
+#13 135.6 npm warn deprecated @babel/plugin-proposal-class-properties@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-class-properties instead.
+#13 135.6 npm warn deprecated @babel/plugin-proposal-optional-chaining@7.21.0: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-optional-chaining instead.
+#13 135.6 npm warn deprecated @babel/plugin-proposal-private-property-in-object@7.21.11: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-private-property-in-object instead.
+#13 135.9 npm warn deprecated @babel/plugin-proposal-private-methods@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-private-methods instead.
+#13 136.6 npm warn deprecated @babel/plugin-proposal-numeric-separator@7.18.6: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-numeric-separator instead.
+#13 164.5 npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+#13 203.6 
+#13 203.6 added 1574 packages, and audited 1575 packages in 3m
+#13 203.6 
+#13 203.6 282 packages are looking for funding
+#13 203.6   run `npm fund` for details
+#13 204.3 
+#13 204.3 54 vulnerabilities (10 low, 17 moderate, 26 high, 1 critical)
+#13 204.3 
+#13 204.3 To address issues that do not require attention, run:
+#13 204.3   npm audit fix
+#13 204.3 
+#13 204.3 To address all issues (including breaking changes), run:
+#13 204.3   npm audit fix --force
+#13 204.3 
+#13 204.3 Run `npm audit` for details.
+#13 204.4 npm notice
+#13 204.4 npm notice New major version of npm available! 10.9.2 -> 11.18.0
+#13 204.4 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.18.0
+#13 204.4 npm notice To update run: npm install -g npm@11.18.0
+#13 204.4 npm notice
+#13 DONE 206.7s
+
+#14 [builder 5/6] COPY . .
+#14 DONE 2.9s
+
+#15 [builder 6/6] RUN npm run build && test -f /app/build/index.html
+#15 3.233 
+#15 3.233 > mensa-frontend@1.0.0 build
+#15 3.233 > react-scripts build
+#15 3.233 
+#15 9.669 Creating an optimized production build...
+#15 10.57 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#15 10.57   npx update-browserslist-db@latest
+#15 10.57   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#15 70.14 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#15 70.14   npx update-browserslist-db@latest
+#15 70.14   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#15 79.81 Compiled successfully.
+#15 79.81 
+#15 79.81 File sizes after gzip:
+#15 79.81 
+#15 79.89   101.02 kB  build/static/js/main.4c0f0798.js
+#15 79.89   38.41 kB   build/static/css/main.82489a38.css
+#15 79.89 
+#15 79.89 The project was built assuming it is hosted at /.
+#15 79.90 You can control this with the homepage field in your package.json.
+#15 79.90 
+#15 79.90 The build folder is ready to be deployed.
+#15 79.90 You may serve it with a static server:
+#15 79.90 
+#15 79.91   npm install -g serve
+#15 79.91   serve -s build
+#15 79.92 
+#15 79.92 Find out more about deployment here:
+#15 79.92 
+#15 79.92   https://cra.link/deployment
+#15 79.92 
+#15 DONE 81.1s
+
+#16 [stage-1 2/5] RUN rm -rf /usr/share/nginx/html/*
+#16 CACHED
+
+#17 [stage-1 3/5] COPY --from=builder /app/build/ /usr/share/nginx/html/
+#17 DONE 0.8s
+
+#18 [stage-1 4/5] COPY nginx.conf /etc/nginx/nginx.conf
+#18 DONE 1.3s
+
+#19 [stage-1 5/5] RUN mkdir -p /var/run/nginx /var/cache/nginx /var/log/nginx &&     chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/nginx.conf /var/cache/nginx /var/run/nginx /var/log/nginx &&     chmod -R 755 /usr/share/nginx/html
+#19 DONE 4.3s
+
+#20 exporting to image
+#20 exporting layers
+#20 exporting layers 5.1s done
+#20 exporting manifest sha256:94f53338f661226b40c235a2ba4c224bf027c51eceb3b640a63014b2c6c59acf
+#20 exporting manifest sha256:94f53338f661226b40c235a2ba4c224bf027c51eceb3b640a63014b2c6c59acf 0.4s done
+#20 exporting config sha256:160a32de881508abc3a829fe2c36e07d9811de992bfa9b1c359b09589be1b36b
+#20 exporting config sha256:160a32de881508abc3a829fe2c36e07d9811de992bfa9b1c359b09589be1b36b 0.6s done
+#20 exporting attestation manifest sha256:f99af1d00d4d18ec1a12e1b1c9f5844d74aef8ca0e066af56a5e73d440669000
+#20 exporting attestation manifest sha256:f99af1d00d4d18ec1a12e1b1c9f5844d74aef8ca0e066af56a5e73d440669000 1.0s done
+#20 exporting manifest list sha256:9bbd59c713fb8de20ac99f994c388f59b6afd50302f78dce7be3a69bdbed02f9
+#20 exporting manifest list sha256:9bbd59c713fb8de20ac99f994c388f59b6afd50302f78dce7be3a69bdbed02f9 0.3s done
+#20 naming to docker.io/library/mensa_project-frontend:latest 0.1s done
+#20 unpacking to docker.io/library/mensa_project-frontend:latest
+#20 unpacking to docker.io/library/mensa_project-frontend:latest 1.3s done
+#20 DONE 9.6s
+
+#21 resolving provenance for metadata file
+#21 DONE 1.3s
+ Image mensa_project-frontend Built 

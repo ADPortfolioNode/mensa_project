@@ -1,0 +1,28 @@
+---
+pid: 10712
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"
+from services.trainer import trainer_service
+from services.chroma_client import chroma_client
+c = chroma_client.client.get_collection('quickdraw')
+data = c.get(limit=6000, include=['metadatas'])
+metas = data.get('metadatas') or []
+seqs = trainer_service._extract_winning_sequences(metas, 'quickdraw')
+print('metadatas', len(metas), 'sequences', len(seqs))
+if seqs:
+    print('sample', seqs[0], 'len', len(seqs[0]))
+else:
+    m = metas[0]
+    print('primary candidate', trainer_service._extract_primary_candidate(m))
+    print('record', trainer_service._extract_record_sequence(m, 'quickdraw'))
+    rules = trainer_service._get_rules('quickdraw')
+    print('rules primary_count', rules['primary_count'])
+\""
+started_at: 2026-07-01T19:07:17.320Z
+running_for_ms: 3700005  
+---
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+metadatas 6000 sequences 0
+primary candidate []
+record []
+rules primary_count 20

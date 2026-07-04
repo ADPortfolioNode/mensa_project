@@ -45,7 +45,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
             return {
               game,
               status: 'error',
-              message: payload?.message || payload?.error || 'Prediction failed.',
+              message: payload?.message || payload?.error || 'Suggestion failed.',
               prediction: null,
             };
           }
@@ -60,7 +60,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
         return {
           game,
           status: 'error',
-          message: entry.reason?.response?.data?.detail || entry.reason?.message || 'Prediction request failed.',
+          message: entry.reason?.response?.data?.detail || entry.reason?.message || 'Suggestion request failed.',
           prediction: null,
         };
       });
@@ -69,12 +69,12 @@ export default function PredictionPanel({ games = [], disabled = false }) {
 
       const failedCount = normalized.filter((item) => item.status === 'error').length;
       if (failedCount === normalized.length) {
-        setAllError('All game predictions failed. Check backend status and trained models.');
+        setAllError('All game suggestions failed. Check backend status and trained models.');
       } else if (failedCount > 0) {
-        setAllError(`${failedCount} game prediction(s) failed. Showing successful results.`);
+        setAllError(`${failedCount} game suggestion(s) failed. Showing successful results.`);
       }
     } catch (error) {
-      setAllError(error?.message || 'Failed to run all-game predictions.');
+      setAllError(error?.message || 'Failed to run all-game suggestions.');
     } finally {
       setLoadingAll(false);
     }
@@ -84,7 +84,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
     <>
       {disabled ? (
         <div className="alert alert-warning mb-0">
-          <strong>Prediction unavailable:</strong> Train a model first for the selected game.
+          <strong>Suggestion unavailable:</strong> Train a model first for the selected game.
         </div>
       ) : games.length > 0 ? (
         <>
@@ -97,8 +97,8 @@ export default function PredictionPanel({ games = [], disabled = false }) {
 
           {selectedGame === ALL_GAMES_VALUE ? (
             <div className="card p-3 mb-3">
-              <h5>Prediction for All Games</h5>
-              <p>Runs one prediction request per game concurrently.</p>
+              <h5>Suggestions for All Games</h5>
+              <p>Runs one suggestion request per game concurrently.</p>
               <div className="input-group mb-2">
                 <input
                   type="number"
@@ -109,7 +109,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
                   min="1"
                 />
                 <button className="btn btn-success" onClick={predictAllGamesConcurrently} disabled={loadingAll}>
-                  {loadingAll ? 'Running...' : 'Predict All Games'}
+                  {loadingAll ? 'Running...' : 'Suggest All Games'}
                 </button>
               </div>
 
@@ -134,7 +134,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
           )}
         </>
       ) : (
-        <p>No games available for prediction.</p>
+        <p>No games available for suggestions.</p>
       )}
     </>
   );

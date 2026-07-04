@@ -3,6 +3,11 @@ set -euxo pipefail
 
 # cspell:ignore BUILDKIT BuildKit gtimeout healthcheck
 # === Mensa Project Robust Start Script ===
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/resolve_host_ports.sh
+. "${SCRIPT_DIR}/scripts/resolve_host_ports.sh"
+# shellcheck source=scripts/verify_windows_ports.sh
+. "${SCRIPT_DIR}/scripts/verify_windows_ports.sh"
 # Performs a safe reset and robust startup for development.
 # Usage: ./start.sh [--prune|--purge] [--yes] [--no-ingest-wait] [--build] [--diag]
 #   --prune|--purge  : run `docker system prune -a -f` and `docker volume prune -f` before starting
@@ -61,7 +66,11 @@ build_images_windows_direct() {
     fi
 
     echo "Building frontend image directly (Windows stability path)..."
-    if ! run_compose_with_timeout "${START_BUILD_TIMEOUT}" env DOCKER_BUILDKIT=1 docker build --progress=plain -t mensa_project-frontend:latest --build-arg "NODE_VERSION=${node_version}" -f frontend/Dockerfile frontend; then
+    if ! run_compose_with_timeout "${START_BUILD_TIMEOUT}" env DOCKER_BUILDKIT=1 docker build --progress=plain -t mensa_project-frontend:latest \
+        --build-arg "NODE_VERSION=${node_version}" \
+        --build-arg "REACT_APP_API_BASE=" \
+        --build-arg "CACHE_BUSTER=${FRONTEND_CACHE_BUSTER:-${BACKEND_CACHE_BUSTER}}" \
+        -f frontend/Dockerfile frontend; then
         return 1
     fi
 
@@ -73,6 +82,41 @@ is_windows_shell() {
         MINGW*|MSYS*|CYGWIN*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+configure_windows_runtime() {
+    if ! is_windows_shell; then
+        return 0
+    fi
+
+    if [ -z "${DOCKER_BIND_HOST:-}" ]; then
+        export DOCKER_BIND_HOST=127.0.0.1
+        echo "Windows: using DOCKER_BIND_HOST=${DOCKER_BIND_HOST} (avoids localhost/IPv6 wslrelay conflicts)"
+    else
+        echo "Windows: DOCKER_BIND_HOST=${DOCKER_BIND_HOST}"
+    fi
+
+    if [ "${START_UP_ATTEMPTS}" -eq 1 ]; then
+        START_UP_ATTEMPTS=2
+    fi
+}
+
+app_bind_host() {
+    if is_windows_shell; then
+        echo "${DOCKER_BIND_HOST:-127.0.0.1}"
+    else
+        echo "127.0.0.1"
+    fi
+}
+
+run_compose_up_staged() {
+    echo "Staged compose up (chroma -> backend -> frontend)..."
+    compose_cmd up -d --force-recreate chroma || return 1
+    sleep 8
+    compose_cmd up -d --force-recreate backend || return 1
+    sleep 15
+    compose_cmd up -d --force-recreate frontend || return 1
+    return 0
 }
 
 configure_build_backend() {
@@ -242,7 +286,11 @@ run_compose_up_with_retries() {
         fi
 
         echo "Starting services..."
-        if run_compose_with_timeout "${START_UP_TIMEOUT}" compose_cmd up -d --force-recreate; then
+        if is_windows_shell; then
+            if run_compose_up_staged; then
+                return 0
+            fi
+        elif run_compose_with_timeout "${START_UP_TIMEOUT}" compose_cmd up -d --force-recreate; then
             return 0
         fi
 
@@ -313,6 +361,7 @@ force_cleanup_mensa_runtime_once() {
 
     run_compose_with_timeout 30 docker rm -f mensa_frontend mensa_backend mensa_chroma >/dev/null 2>&1 || true
     run_compose_with_timeout 20 docker network rm mensa_project_default >/dev/null 2>&1 || true
+    run_compose_with_timeout 20 docker network rm mensa_project_mensa-net >/dev/null 2>&1 || true
     if ! is_windows_shell; then
         run_compose_with_timeout 30 docker network prune -f >/dev/null 2>&1 || true
     fi
@@ -433,7 +482,8 @@ echo ""
 echo "Stopping and removing any old containers..."
 kill_stale_cleanup_jobs
 if is_windows_shell; then
-    echo "Windows shell detected; skipping compose down/cleanup to avoid CLI hang."
+    echo "Windows shell detected; using direct container cleanup (skipping compose down)."
+    force_cleanup_mensa_runtime_once
 else
     if [ "${PRUNE}" = true ]; then
         echo "Purge volumes requested: adding -v flag to compose down."
@@ -452,6 +502,21 @@ echo ""
 
 # 4. Build and start services
 echo "Building and starting services (this may take a few minutes on first run)..."
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    . "${SCRIPT_DIR}/.env"
+    set +a
+fi
+configure_windows_runtime
+if ! resolve_compose_host_ports; then
+    echo "ERROR: could not resolve free host ports for docker compose." >&2
+    exit 1
+fi
+echo "Using host ports: backend=${BACKEND_HOST_PORT:-5000}, chroma=${CHROMA_HOST_PORT:-8000}, frontend=${FRONTEND_HOST_PORT:-3000}"
+if is_windows_shell; then
+    echo "Windows app URL: http://$(app_bind_host):${FRONTEND_HOST_PORT:-3000}/"
+fi
 if ! run_compose_up_with_retries; then
     echo "ERROR: docker-compose failed after retries. This is often a Docker environment issue." >&2
     emit_startup_failure_bundle
@@ -557,7 +622,9 @@ _print_progress_bar() {
 
 # Polls the backend API for ingestion status
 monitor_ingestion_progress() {
-    local api_endpoint="http://127.0.0.1:5000/api/startup_status"
+    local bind_host
+    bind_host="$(app_bind_host)"
+    local api_endpoint="http://${bind_host}:${FRONTEND_HOST_PORT:-3000}/api/startup_status"
     local max_retries=15 # wait for ~30s for API to appear
     local retries=0
     echo ""
@@ -657,6 +724,18 @@ if [ ${FAILED} -ne 0 ]; then
 fi
 echo "✓ All services are running."
 
+if is_windows_shell; then
+    if ! verify_windows_host_connectivity; then
+        repair_windows_port_forwarding
+        if ! verify_windows_host_connectivity; then
+            echo "ERROR: Windows host still cannot reach published Docker ports." >&2
+            echo "Restart Docker Desktop, then re-run: ./start.sh" >&2
+            echo "Or run: powershell.exe -File ./start-windows.ps1 -Recreate" >&2
+            exit 2
+        fi
+    fi
+fi
+
 if [ "${BUILD}" = true ]; then
     echo ""
     echo "Verifying backend source sync..."
@@ -693,8 +772,14 @@ echo "Container Status:"
 eval "${COMPOSE_CMD} ps"
 echo ""
 echo "Access your application:"
-echo "  Frontend: http://localhost:3000"
-echo "  Backend API: http://localhost:5000/api"
+if is_windows_shell; then
+    echo "  Frontend: http://$(app_bind_host):${FRONTEND_HOST_PORT:-3000}/"
+    echo "  Backend API: http://$(app_bind_host):${BACKEND_HOST_PORT:-5001}/api"
+    echo "  (Use 127.0.0.1 — not localhost — if you see API timeouts on Windows)"
+else
+    echo "  Frontend: http://localhost:${FRONTEND_HOST_PORT:-3000}"
+    echo "  Backend API: http://localhost:${BACKEND_HOST_PORT:-5000}/api"
+fi
 echo ""
 echo "To view live logs from all services, run:" 
 echo "  ${COMPOSE_CMD} logs -f"

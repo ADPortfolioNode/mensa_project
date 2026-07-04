@@ -1,0 +1,7 @@
+---
+pid: 45784
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" ps -a 2>&1; Write-Host \"---\"; docker logs mensa_backend --tail 40 2>&1; Write-Host \"---\"; docker logs mensa_frontend --tail 15 2>&1"
+started_at: 2026-07-03T22:35:13.272Z
+running_for_ms: 680002   
+---

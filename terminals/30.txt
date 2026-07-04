@@ -1,0 +1,9 @@
+---
+pid: 11192
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"from services.trainer import trainer_service; print(hasattr(trainer_service,'train')); print(hasattr(trainer_service,'train_model'))\""
+started_at: 2026-07-01T09:21:34.138Z
+running_for_ms: 12479991 
+---
+True
+True

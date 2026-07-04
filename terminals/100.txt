@@ -1,0 +1,8 @@
+---
+pid: 6712
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; for ($i=1; $i -le 24; $i++) { $h = curl.exe -s -m 5 http://localhost:5000/api/health; if ($h -match 'healthy') { Write-Host \"backend up\"; break }; Start-Sleep 5 }"
+started_at: 2026-07-01T17:44:35.394Z
+running_for_ms: 8665013  
+---
+backend up

@@ -1,0 +1,15 @@
+---
+pid: 15392
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; $i=0; while ($i -lt 40) { $s = docker inspect --format='{{.State.Health.Status}}' mensa_chroma 2>$null; if ($s -eq 'healthy') { Write-Host \"chroma healthy\"; break }; Start-Sleep 3; $i++ }; docker compose up -d --force-recreate backend"
+started_at: 2026-07-02T14:12:46.178Z
+running_for_ms: 4629986  
+---
+chroma healthy
+ Container mensa_chroma Running 
+ Container mensa_backend Creating 
+ Container mensa_backend Created 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 

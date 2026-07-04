@@ -1,0 +1,18 @@
+---
+pid: 9660
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; bash ./diag_start.sh"
+started_at: 2026-07-01T16:24:59.179Z
+running_for_ms: 13439983 
+---
+Running diagnostic startup (2026-07-01-daemon-wait)...
+Builds images, then starts services in stages (chroma -> backend -> frontend).
+All output is written to 'diag_output.log'.
+
+Monitoring containers for restart loops (30 second check)...
+
+---
+✓ Diagnostic startup appears SUCCESSFUL - no restart loops detected.
+All containers are running normally.
+Check the 'diag_output.log' for detailed output.
+---

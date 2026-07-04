@@ -1,0 +1,13 @@
+---
+pid: 15228
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; $routes = @('/api/health','/api/games','/api/games/summaries','/api/startup_status','/api/experiments','/api/chroma/status'); foreach ($r in $routes) { try { $resp = Invoke-WebRequest -Uri \"http://localhost:3000$r\" -UseBasicParsing -TimeoutSec 30; Write-Host \"$r -> $($resp.StatusCode)\" } catch { Write-Host \"$r -> FAIL $($_.Exception.Message)\" } }"
+started_at: 2026-07-01T17:28:44.397Z
+running_for_ms: 9609962  
+---
+/api/health -> 200
+/api/games -> 200
+/api/games/summaries -> FAIL The request was aborted: The request was canceled.
+/api/startup_status -> 200
+/api/experiments -> 200
+/api/chroma/status -> 200

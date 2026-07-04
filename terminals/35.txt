@@ -1,0 +1,15 @@
+---
+pid: 10756
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 40; Get-Content \"E:\\2024 RESET\\mensa_project\\quick_train_check.py\" | docker exec -i mensa_backend python -"
+started_at: 2026-07-01T09:45:28.121Z
+running_for_ms: 11044993 
+---
+Get-Content : Cannot find path 'E:\2024 RESET\mensa_project\quick_train_check.py' because it does not exist.
+At line:1 char:26
++ ... Seconds 40; Get-Content "E:\2024 RESET\mensa_project\quick_train_chec ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (E:\2024 RESET\m..._train_check.py:String) [Get-Content], ItemNotFoundEx 
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+ 

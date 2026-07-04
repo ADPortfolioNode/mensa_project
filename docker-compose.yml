@@ -16,7 +16,7 @@ services:
       args:
         CACHE_BUSTER: ${BACKEND_CACHE_BUSTER:-stable}
     ports:
-      - "5000:5000"
+      - "${DOCKER_BIND_HOST:-0.0.0.0}:${BACKEND_HOST_PORT:-5000}:5000"
     environment:
       - DATA_DIR=/data
       - MAX_CONCURRENT_CLONES=3
@@ -29,12 +29,29 @@ services:
       - GROK_MODEL=${GROK_MODEL:-grok-3-mini-beta}
       - CHROMA_HOST=mensa_chroma
       - CHROMA_PORT=8000
-      - INGEST_BATCH_SIZE=4000
-      - INGEST_REQUEST_TIMEOUT=20
-      - INGEST_MAX_RETRIES=2
+      - INGEST_BATCH_SIZE=6000
+      - INGEST_REQUEST_TIMEOUT=30
+      - INGEST_MAX_RETRIES=3
       - INGEST_RETRY_DELAY=1
+      - INGEST_BATCH_MAX_RETRIES=2
+      - INGEST_PROGRESS_INTERVAL_S=0.5
+      - INGEST_STATE_SAVE_INTERVAL_S=2
+      - INGEST_STARTUP_COUNT_WORKERS=4
+      - INGEST_STARTUP_PARALLEL=1
       - INGEST_ENABLE_CATALOG_FALLBACK=0
       - INGEST_MAX_CATALOG_CANDIDATES=3
+      - INGEST_SKIP_FETCH_THRESHOLD=50000
+      - INGEST_FAST_COMPLETE_POPULATED=1
+      - TRAIN_TARGET_ACCURACY=0.90
+      - TRAIN_MAX_ATTEMPTS=40
+      - TRAIN_SIZE=0.25
+      - TRAIN_N_ESTIMATORS=250
+      - TRAIN_MAX_DEPTH=18
+      - TRAIN_RANDOM_STATE=42
+      - TRAIN_BLEND_STEP=0.05
+      - TRAIN_DATA_LIMIT=0
+      - TRAIN_WINDOW_SIZE=3
+      - TRAIN_AUTO_TUNE=1
     depends_on:
       chroma:
         condition: service_healthy
@@ -45,7 +62,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 6G
     restart: unless-stopped
   frontend:
     build:
@@ -53,16 +70,17 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_VERSION: 22.13.1
+        REACT_APP_API_BASE: ""
+        CACHE_BUSTER: ${FRONTEND_CACHE_BUSTER:-20260703b}
     container_name: mensa_frontend
     ports:
-      - "3000:80"
+      - "${DOCKER_BIND_HOST:-0.0.0.0}:${FRONTEND_HOST_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
     environment:
       - HOME=/app
       - CHOKIDAR_USEPOLLING=true
-      - REACT_APP_API_BASE=http://localhost:5000
     networks:
       - mensa-net
     restart: unless-stopped
@@ -73,7 +91,7 @@ services:
       - IS_PERSISTENT=TRUE
       - ANONYMIZED_TELEMETRY=FALSE
     ports:
-      - "8000:8000"
+      - "${DOCKER_BIND_HOST:-0.0.0.0}:${CHROMA_HOST_PORT:-8000}:8000"
     volumes:
       - chroma_data:/chroma/chroma
     healthcheck:

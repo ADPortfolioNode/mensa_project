@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from services.lm_router import lm_router
 from services.rag_service import rag_service
-from services.gemini_client import gemini_client, LM_UNAVAILABLE_PREFIX
+from services.gemini_client import LM_UNAVAILABLE_PREFIX
 from utils.chat_tools import _render_tool_response
 from config import GAME_CONFIGS
 
@@ -27,9 +27,9 @@ class ChatResponse(BaseModel):
     sources: list = []
     context_used: bool = False
     sources_count: int = 0
-    lm_provider: str = None
-    tool_name: str = None
-    tool_result: dict = None
+    lm_provider: Optional[str] = None
+    tool_name: Optional[str] = None
+    tool_result: Optional[Dict[str, Any]] = None
 
 
 def _chat_fallback_for_lm_unavailable(user_text: str, lm_response: str, raw_game: Optional[str] = None) -> str:
@@ -53,9 +53,6 @@ async def chat(request: ChatRequest):
     AI chat endpoint with optional RAG context and tool calling.
     """
     try:
-        # Route to appropriate LM provider
-        selected_provider = lm_router.select_provider(request.lm_provider)
-        
         # Prepare context if RAG is enabled
         context_docs = []
         if request.use_rag and request.game:
@@ -83,20 +80,21 @@ async def chat(request: ChatRequest):
             augmented_prompt = request.text
             context_used = False
         
-        # Get response from language model
+        # Get response from language model via router (auto-failover across providers)
+        selected_provider = request.lm_provider or "auto"
         try:
-            if selected_provider == "gemini":
-                lm_response = await gemini_client.generate_response(augmented_prompt)
-            else:
-                # Default to gemini for now
-                lm_response = await gemini_client.generate_response(augmented_prompt)
-            
-            # Check for LM unavailability
+            result = await lm_router.generate_with_provider(
+                augmented_prompt,
+                preferred_provider=request.lm_provider,
+            )
+            selected_provider = result.get("provider", selected_provider)
+            lm_response = result.get("response", "")
+
             if lm_response.startswith(LM_UNAVAILABLE_PREFIX):
                 lm_response = _chat_fallback_for_lm_unavailable(
                     request.text, lm_response, request.game
                 )
-            
+
         except Exception as e:
             lm_response = _chat_fallback_for_lm_unavailable(
                 request.text, f"Error: {str(e)}", request.game

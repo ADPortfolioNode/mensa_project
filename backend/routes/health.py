@@ -10,7 +10,7 @@ router = APIRouter()
 @router.get("/api")
 async def api_root():
     """Root API endpoint."""
-    return {"message": "Mensa Lottery Prediction API", "version": "1.0.0"}
+    return {"message": "Mensa Lottery Suggestion API", "version": "1.0.0"}
 
 
 @router.get("/api/health")
@@ -71,6 +71,13 @@ async def start_initialization():
         return {
             "status": startup_state["status"],
             "message": "Initialization already running",
+            "available_games": list(startup_state.get("games", {}).keys()),
+        }
+
+    if startup_state.get("status") == "completed":
+        return {
+            "status": "completed",
+            "message": "Initialization already completed",
             "available_games": list(startup_state.get("games", {}).keys()),
         }
 

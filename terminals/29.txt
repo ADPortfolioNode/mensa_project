@@ -1,0 +1,18 @@
+---
+pid: 12416
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"
+import json,urllib.request,time
+for p in ['/api/chroma/collections','/api/models/metadata','/api/models/pick3/metadata']:
+  try:
+    with urllib.request.urlopen('http://127.0.0.1:5000'+p,timeout=30) as r:
+      d=json.loads(r.read().decode()); print('PASS',p,r.status,str(d)[:70])
+  except Exception as e: print('FAIL',p,e)
+  time.sleep(1)
+\""
+started_at: 2026-07-01T09:19:07.841Z
+running_for_ms: 12625007 
+---
+FAIL /api/chroma/collections timed out
+FAIL /api/models/metadata timed out
+FAIL /api/models/pick3/metadata timed out

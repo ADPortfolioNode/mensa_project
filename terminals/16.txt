@@ -1,0 +1,99 @@
+---
+pid: 9564
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" build backend; docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" up -d backend"
+started_at: 2026-07-01T08:39:38.370Z
+running_for_ms: 14995003 
+---
+ Image mensa_project-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 603B 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 2.00kB 0.2s done
+#2 DONE 0.6s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 ...
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 2.3s
+
+#5 [internal] load .dockerignore
+#5 transferring context:
+#5 transferring context: 762B 0.2s done
+#5 DONE 0.5s
+
+#6 [internal] load build context
+#6 DONE 0.0s
+
+#7 [builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#7 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#7 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 0.4s done
+#7 DONE 0.5s
+
+#6 [internal] load build context
+#6 transferring context: 8.76kB 0.6s done
+#6 DONE 0.9s
+
+#8 [stage-1 4/9] COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+#8 CACHED
+
+#9 [builder 2/4] WORKDIR /app
+#9 CACHED
+
+#10 [stage-1 3/9] RUN groupadd -r appuser && useradd -r -g appuser appuser
+#10 CACHED
+
+#11 [builder 3/4] COPY requirements.txt requirements.txt
+#11 CACHED
+
+#12 [builder 4/4] RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt     && python -c "from hypercorn.config import Config; print(f'hypercorn install verified: {Config.__module__}')"
+#12 CACHED
+
+#13 [stage-1 5/9] COPY --from=builder /usr/local/bin /usr/local/bin
+#13 CACHED
+
+#14 [stage-1 6/9] COPY --chown=appuser:appuser . .
+#14 DONE 2.4s
+
+#15 [stage-1 7/9] RUN mkdir -p /data && chown -R appuser:appuser /data /app && mkdir -p /data/experiments && chown -R appuser:appuser /data/experiments
+#15 DONE 9.8s
+
+#16 [stage-1 8/9] COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+#16 DONE 1.0s
+
+#17 [stage-1 9/9] RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+#17 DONE 2.4s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 4.2s done
+#18 exporting manifest sha256:964ff0232cc6f7f22d18a4d68314c7c804701ab3452986e86183d92938f3f468
+#18 exporting manifest sha256:964ff0232cc6f7f22d18a4d68314c7c804701ab3452986e86183d92938f3f468 0.3s done
+#18 exporting config sha256:fbd1a6161bbb937003c4bd728b0b390c83b42d147200ec2cdc7a769a57acc883
+#18 exporting config sha256:fbd1a6161bbb937003c4bd728b0b390c83b42d147200ec2cdc7a769a57acc883 0.5s done
+#18 exporting attestation manifest sha256:20d3b74d23ac5024405596c7bf0e56f6e56b752f1c7ba53c6a578ad18f8e5f29
+#18 exporting attestation manifest sha256:20d3b74d23ac5024405596c7bf0e56f6e56b752f1c7ba53c6a578ad18f8e5f29 0.6s done
+#18 exporting manifest list sha256:bb1f8df6f71558e360ef262bccbb820b179b024531655cf74f187330482d8185
+#18 exporting manifest list sha256:bb1f8df6f71558e360ef262bccbb820b179b024531655cf74f187330482d8185 0.3s done
+#18 naming to docker.io/library/mensa_project-backend:latest 0.1s done
+#18 unpacking to docker.io/library/mensa_project-backend:latest
+#18 unpacking to docker.io/library/mensa_project-backend:latest 1.7s done
+#18 DONE 8.5s
+
+#19 resolving provenance for metadata file
+#19 DONE 0.4s
+ Image mensa_project-backend Built 
+ Container mensa_chroma Running 
+ Container mensa_backend Recreate 
+ Container mensa_backend Recreated 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 

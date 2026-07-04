@@ -1,0 +1,8 @@
+---
+pid: 8336
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 25; curl.exe -s -m 10 http://localhost:5000/api/health"
+started_at: 2026-07-01T18:54:57.244Z
+running_for_ms: 4439999  
+---
+{"status":"healthy"}

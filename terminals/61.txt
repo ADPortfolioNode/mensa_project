@@ -1,0 +1,16 @@
+---
+pid: 1824
+cwd: "E:\2024 RESET\mensa_project"
+command: "$ready = $false; for ($i=1; $i -le 20; $i++) { $h = curl.exe -s http://localhost:3000/api/health; if ($h -match 'healthy') { Write-Host \"Backend healthy at attempt $i\"; $ready = $true; break }; Write-Host \"waiting $i - $h\"; Start-Sleep 5 }; if (-not $ready) { Write-Host \"TIMEOUT\" }"
+started_at: 2026-07-01T13:55:39.416Z
+running_for_ms: 22400017 
+---
+waiting 1 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 2 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 3 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 4 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 5 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 6 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 7 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+waiting 8 - <html> <head><title>502 Bad Gateway</title></head> <body> <center><h1>502 Bad Gateway</h1></center> <hr><center>nginx</center> </body> </html>
+Backend healthy at attempt 9

@@ -1,0 +1,25 @@
+---
+pid: 11516
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker restart mensa_backend; Start-Sleep -Seconds 35; docker exec mensa_backend python -c \"
+import urllib.request, time
+paths=['/api/health','/api/games','/api/startup_status','/api/experiments','/api/games/pick3/summary','/api/ingest_progress?game=pick3','/api/chroma/collections']
+for p in paths:
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:5000'+p, timeout=30) as r:
+            print('OK', p, r.status)
+    except Exception as e:
+        print('FAIL', p, type(e).__name__, e)
+    time.sleep(1)
+\""
+started_at: 2026-07-01T08:20:29.920Z
+running_for_ms: 16144996 
+---
+mensa_backend
+OK /api/health 200
+OK /api/games 200
+OK /api/startup_status 200
+OK /api/experiments 200
+FAIL /api/games/pick3/summary TimeoutError timed out
+FAIL /api/ingest_progress?game=pick3 TimeoutError timed out
+FAIL /api/chroma/collections TimeoutError timed out

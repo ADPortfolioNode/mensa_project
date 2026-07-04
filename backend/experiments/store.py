@@ -1,6 +1,92 @@
 import json
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+MAX_STORED_PER_GAME = 3
+
+
+def _experiment_accuracy(experiment: Dict[str, Any]) -> float | None:
+    for key in ("highest_accuracy", "final_accuracy", "accuracy", "score"):
+        value = experiment.get(key)
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _experiment_timestamp(experiment: Dict[str, Any]) -> float:
+    try:
+        return float(experiment.get("timestamp") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def prune_experiments(
+    experiments: List[Dict[str, Any]],
+    *,
+    max_per_game: int = MAX_STORED_PER_GAME,
+) -> List[Dict[str, Any]]:
+    """Keep at most *max_per_game* records per game (top accuracy, then newest)."""
+    if max_per_game <= 0:
+        return []
+
+    by_game: dict[str, list[Dict[str, Any]]] = {}
+    unscoped: list[Dict[str, Any]] = []
+
+    for item in experiments or []:
+        game = str(item.get("game") or "").strip().lower()
+        if game:
+            by_game.setdefault(game, []).append(item)
+        else:
+            unscoped.append(item)
+
+    pruned: list[Dict[str, Any]] = []
+
+    for items in by_game.values():
+        items.sort(
+            key=lambda exp: (
+                _experiment_accuracy(exp) if _experiment_accuracy(exp) is not None else -1.0,
+                _experiment_timestamp(exp),
+            ),
+            reverse=True,
+        )
+        pruned.extend(items[:max_per_game])
+
+    unscoped.sort(key=_experiment_timestamp, reverse=True)
+    pruned.extend(unscoped[:max_per_game])
+    return pruned
+
+
+def update_accuracy_history(
+    existing: List[Any] | None,
+    new_accuracy: float | None,
+    *,
+    limit: int = MAX_STORED_PER_GAME,
+) -> List[float]:
+    """Maintain up to *limit* highest accuracy values (descending)."""
+    values: list[float] = []
+    for item in existing or []:
+        try:
+            values.append(float(item))
+        except (TypeError, ValueError):
+            continue
+    if new_accuracy is not None:
+        try:
+            values.append(float(new_accuracy))
+        except (TypeError, ValueError):
+            pass
+    if not values:
+        return []
+    values.sort(reverse=True)
+    deduped: list[float] = []
+    for value in values:
+        if not deduped or abs(deduped[-1] - value) > 1e-9:
+            deduped.append(value)
+    return deduped[:limit]
+
 
 class ExperimentStore:
     def __init__(self, store_path: str):
@@ -20,5 +106,6 @@ class ExperimentStore:
     def save_experiment(self, experiment_data: Dict[str, Any]):
         experiments = self.list_experiments()
         experiments.append(experiment_data)
+        experiments = prune_experiments(experiments)
         with open(self.store_path, "w") as f:
             json.dump(experiments, f, indent=2)

@@ -1,0 +1,7 @@
+---
+pid: 5680
+cwd: "E:\2024 RESET\mensa_project"
+command: "curl.exe -s -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@E:\\2024 RESET\\mensa_project\\agent-tools\\train_body.json\" --max-time 180"
+started_at: 2026-07-01T14:04:48.830Z
+running_for_ms: 21850003 
+---

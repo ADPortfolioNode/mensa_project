@@ -22,16 +22,16 @@ export default function GamePrediction({ game }) {
       });
       const payload = r.data || {};
       if (payload.status === 'error') {
-        setError(payload.message || 'Prediction failed');
+        setError(payload.message || 'Suggestion failed');
         return;
       }
       if (!payload.predicted_numbers) {
-        setError('Prediction response did not include predicted numbers.');
+        setError('Suggestion response did not include suggested numbers.');
         return;
       }
       setPrediction(payload);
     } catch (e) {
-      setError(e.response?.data?.detail || e.message || 'Prediction failed');
+      setError(e.response?.data?.detail || e.message || 'Suggestion failed');
     } finally {
       setLoading(false);
     }
@@ -39,12 +39,12 @@ export default function GamePrediction({ game }) {
 
   return (
     <div className="card p-3 mb-3">
-      <h5>Prediction for {game}</h5>
-      <p>Enter the number of recent draws to consider for prediction (e.g., 10)</p>
+      <h5>Suggestion for {game}</h5>
+      <p>Enter the number of recent draws to consider for suggestions (e.g., 10)</p>
       <div className="input-group mb-2">
         <input type="number" className="form-control" value={recentK} onChange={e => setRecentK(e.target.value)} disabled={loading} min="1" />
         <button className="btn btn-success" onClick={submit} disabled={loading}>
-          {loading ? 'Loading...' : 'Predict'}
+          {loading ? 'Loading...' : 'Suggest'}
         </button>
       </div>
       {loading && (

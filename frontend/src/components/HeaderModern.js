@@ -9,7 +9,7 @@ export default function Header() {
           <h1 className="app-title">
             <span className="title-accent">⚡</span> Mensa Lottery
           </h1>
-          <p className="app-subtitle">AI-Powered Lottery Data Analysis & Prediction</p>
+          <p className="app-subtitle">AI-Powered Lottery Data Analysis & Suggestions</p>
         </div>
         <div className="header-status">
           <div className="status-indicator">

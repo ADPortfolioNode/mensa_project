@@ -114,7 +114,7 @@ class RAGService:
             f"Query: {user_query}\n"
             f"Relevant games: {games_text}\n"
             f"Top context records:\n{context_preview}\n\n"
-            "You can continue using ingestion, training, prediction, and diagnostics while Gemini reconnects."
+            "You can continue using ingestion, training, suggestions, and diagnostics while Gemini reconnects."
         )
 
     def _retrieve_context(

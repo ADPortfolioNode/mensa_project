@@ -32,7 +32,8 @@ COPY --chown=appuser:appuser . .
 # Create data directory and set permissions
 RUN mkdir -p /data && chown -R appuser:appuser /data /app && mkdir -p /data/experiments && chown -R appuser:appuser /data/experiments
 
-# Add entrypoint script to fix permissions at runtime  
+# Add entrypoint script to fix permissions at runtime
+ARG ENTRYPOINT_REV=2
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
@@ -43,7 +44,7 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 # USER appuser
 
 # Add health check: verify API port is accepting connections
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=8s --start-period=90s --retries=6 \
     CMD python -c "import socket; socket.create_connection(('127.0.0.1', 5000), timeout=2).close()" || exit 1
 
 # Run ASGI app with a single worker so in-memory startup/progress state remains consistent

@@ -1,0 +1,7 @@
+---
+pid: 25748
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" ps 2>&1"
+started_at: 2026-07-03T19:43:38.105Z
+running_for_ms: 10975009 
+---

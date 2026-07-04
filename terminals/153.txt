@@ -1,0 +1,26 @@
+---
+pid: 9568
+cwd: "E:\2024 RESET\mensa_project"
+command: "$env:VERIFY_UNIT_ONLY='1'; python \"E:\\2024 RESET\\mensa_project\\verify_training_learning.py\""
+started_at: 2026-07-03T19:44:34.043Z
+running_for_ms: 10919997 
+---
+=== Training Learning Verification ===
+
+-- Unit checks --
+[PASS] baseline picks max stored/live: resolved=0.8400
+[PASS] training_target uses prior baseline: target=0.8700
+[PASS] accuracy_history keeps top values: [0.83, 0.82, 0.81]
+[PASS] blend does not regress below best single: cand=1.0000, prev=0.9877, blend=1.0000
+[PASS] retention blocks accuracy regression: kept 0.8600 over candidate 0.8200
+[PASS] training target builds on baseline: target=0.8700 from requested=0.80, baseline=0.87
+[PASS] recursive training holds/improves best: first=0.8745, best=0.8745, attempts=6
+
+=== SUMMARY: 7 PASS, 0 SKIP, 0 FAIL / 7 checks ===
+  baseline picks max stored/live: PASS — resolved=0.8400
+  training_target uses prior baseline: PASS — target=0.8700
+  accuracy_history keeps top values: PASS — [0.83, 0.82, 0.81]
+  blend does not regress below best single: PASS — cand=1.0000, prev=0.9877, blend=1.0000
+  retention blocks accuracy regression: PASS — kept 0.8600 over candidate 0.8200
+  training target builds on baseline: PASS — target=0.8700 from requested=0.80, baseline=0.87
+  recursive training holds/improves best: PASS — first=0.8745, best=0.8745, attempts=6

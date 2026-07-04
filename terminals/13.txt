@@ -1,0 +1,57 @@
+---
+pid: 9796
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 20; docker exec mensa_backend python -c \"import urllib.request; paths=['/api','/api/health','/api/games','/api/startup_status','/api/experiments']; ok=0
+for p in paths:
+  r=urllib.request.urlopen('http://127.0.0.1:5000'+p, timeout=8); print('OK',p,r.status); ok+=1
+print('CORE',ok,'/',len(paths))\"; docker exec mensa_frontend wget -qO- --timeout=10 http://127.0.0.1/api/health; echo \"\"; docker exec mensa_frontend wget -qO- --timeout=10 http://127.0.0.1/api/games"
+started_at: 2026-07-01T08:25:35.180Z
+running_for_ms: 15839988 
+---
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.11/urllib/request.py", line 1348, in do_open
+    h.request(req.get_method(), req.selector, req.data, headers,
+  File "/usr/local/lib/python3.11/http/client.py", line 1323, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "/usr/local/lib/python3.11/http/client.py", line 1369, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "/usr/local/lib/python3.11/http/client.py", line 1318, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/local/lib/python3.11/http/client.py", line 1078, in _send_output
+    self.send(msg)
+  File "/usr/local/lib/python3.11/http/client.py", line 1016, in send
+    self.connect()
+  File "/usr/local/lib/python3.11/http/client.py", line 982, in connect
+    self.sock = self._create_connection(
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/socket.py", line 863, in create_connection
+    raise exceptions[0]
+  File "/usr/local/lib/python3.11/socket.py", line 848, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<string>", line 3, in <module>
+  File "/usr/local/lib/python3.11/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 519, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 536, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 1377, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 1351, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 111] Connection refused>
+wget: server returned error: HTTP/1.1 502 Bad Gateway
+
+wget: server returned error: HTTP/1.1 502 Bad Gateway

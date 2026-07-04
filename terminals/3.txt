@@ -1,0 +1,26 @@
+---
+pid: 7412
+cwd: "E:\2024 RESET\mensa_project"
+command: "$quick = @('/api','/api/health','/api/games','/api/startup_status','/api/experiments','/api/chroma/status','/api/chroma/collections','/api/models/metadata','/api/predictions/all','/api/games/pick3/summary','/api/ingest_progress?game=pick3')
+foreach ($p in $quick) {
+  try {
+    $r = Invoke-WebRequest -Uri \"http://localhost:5000$p\" -UseBasicParsing -TimeoutSec 15
+    Write-Host \"OK  $p -> $($r.StatusCode)\"
+  } catch {
+    Write-Host \"FAIL $p -> $($_.Exception.Message)\"
+  }
+}"
+started_at: 2026-07-01T08:12:30.229Z
+running_for_ms: 16625001 
+---
+FAIL /api -> The operation has timed out.
+FAIL /api/health -> The operation has timed out.
+FAIL /api/games -> The operation has timed out.
+FAIL /api/startup_status -> The operation has timed out.
+FAIL /api/experiments -> The operation has timed out.
+FAIL /api/chroma/status -> The operation has timed out.
+FAIL /api/chroma/collections -> The operation has timed out.
+FAIL /api/models/metadata -> The operation has timed out.
+FAIL /api/predictions/all -> The operation has timed out.
+FAIL /api/games/pick3/summary -> The operation has timed out.
+FAIL /api/ingest_progress?game=pick3 -> The underlying connection was closed: The connection was closed unexpectedly.

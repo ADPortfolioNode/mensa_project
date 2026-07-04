@@ -1,0 +1,8 @@
+---
+pid: 8404
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker restart mensa_backend; Start-Sleep -Seconds 40"
+started_at: 2026-07-01T09:15:33.524Z
+running_for_ms: 12839998 
+---
+mensa_backend

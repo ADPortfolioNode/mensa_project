@@ -1,0 +1,30 @@
+---
+pid: 13400
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; curl.exe -s -m 10 -X POST http://localhost:5000/api/startup_init; Write-Host \"\"; Get-Content test_all_workflows.py | docker exec -i mensa_backend python -"
+started_at: 2026-07-01T17:46:23.920Z
+running_for_ms: 8555006  
+---
+{"status":"completed","message":"Initialization already completed","available_games":["take5","pick3","powerball","megamillions","pick10","cash4life","quickdraw","nylotto"]}
+============================================================
+MENSA PROJECT - ALL WORKFLOWS TEST
+============================================================
+[PASS] 1. Health: backend healthy
+[PASS] 2. Startup Status: status=completed
+[PASS] 4. List Games: 8 games
+[PASS] 5. Game Summary: pick3 draws=53114
+[PASS] 3. Startup Init: status=completed
+[PASS] 6. Ingest Queue: pick3 already has 53114 draws (skipped re-fetch; use force=true to reingest)
+[PASS] 7. Ingest Progress: status=completed draws=53114
+[PASS] 8. Train Model: accuracy=0.8599463309783281
+[PASS] 9. Predict: numbers=[4, 6, 7]
+[PASS] 10. Experiments: count=100
+[PASS] 11. Chroma Status: connected
+[PASS] 12. Chroma Collections: 8 collections
+[PASS] 13. Models Metadata: keys=['status', 'models']
+[PASS] 14. Game Model Metadata: game=pick3
+[PASS] 15. Predictions All: games=8
+[PASS] 16. Chat: response_len=254
+============================================================
+SUMMARY: 16 PASS, 0 WARN, 0 FAIL / 16 total
+============================================================

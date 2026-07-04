@@ -1,0 +1,12 @@
+---
+pid: 11276
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_frontend sh -c \"wget -qO- --timeout=12 http://127.0.0.1/api/health; echo; wget -qO- --timeout=12 http://127.0.0.1/api/games; echo; wget -qO- --timeout=12 http://127.0.0.1/api/experiments\""
+started_at: 2026-07-01T08:24:52.340Z
+running_for_ms: 15880003 
+---
+
+wget: server returned error: HTTP/1.1 504 Gateway Time-out
+
+wget: download timed out
+wget: download timed out

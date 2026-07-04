@@ -1,0 +1,7 @@
+---
+pid: 18316
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker info 2>&1 | Select-Object -First 5; docker ps -a --filter \"name=mensa\""
+started_at: 2026-07-02T15:08:26.710Z
+running_for_ms: 1289991  
+---
