@@ -4,6 +4,7 @@ import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanelRAG.css';
 import getApiBase from '../utils/apiBase';
+import { formatApiError } from '../utils/errorUtils';
 
 const API_BASE = getApiBase();
 
@@ -166,11 +167,15 @@ const ChatPanel = ({ game = null }) => {
                 body: JSON.stringify(payload),
             });
 
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
+            const data = await response.json().catch(() => ({}));
 
-            const data = await response.json();
+            if (!response.ok) {
+                const detail = formatApiError(
+                    { response: { data } },
+                    `Request failed (${response.status})`,
+                );
+                throw new Error(detail);
+            }
             
             const botMessageText = data.response || "Sorry, I didn't understand that.";
             const botMessage = { 
@@ -188,7 +193,7 @@ const ChatPanel = ({ game = null }) => {
             console.error('Error sending message:', error);
             const errorMessage = { 
                 sender: 'bot', 
-                text: 'Error: Could not connect to the server. Please try again.',
+                text: `Error: ${error?.message || 'Could not connect to the server. Please try again.'}`,
                 sources: []
             };
             setMessages((prevMessages) => [...prevMessages, errorMessage]);

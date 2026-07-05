@@ -116,6 +116,8 @@ async def make_prediction(request: PredictionRequest):
             "status": "COMPLETED",
             "game": game_key,
             "next_draw_date": next_draw_date,
+            "highest_accuracy": result.get("highest_accuracy"),
+            "model_metadata": result.get("model_metadata"),
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

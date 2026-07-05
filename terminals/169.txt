@@ -1,0 +1,9 @@
+---
+pid: 1444
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker cp \"E:\\2024 RESET\\mensa_project\\backend\\scripts\\test_chroma_quick.py\" mensa_backend:/tmp/test_chroma_quick.py; docker exec mensa_backend python /tmp/test_chroma_quick.py hostport; docker exec mensa_backend python /tmp/test_chroma_quick.py url"
+started_at: 2026-07-04T14:02:51.238Z
+running_for_ms: 315025   
+---
+ERROR: chromadb call timed out
+ERROR: chromadb call timed out

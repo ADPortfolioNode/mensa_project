@@ -3,7 +3,7 @@ pid: 2340
 cwd: "E:\2024 RESET\mensa_project"
 command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" up -d --force-recreate 2>&1"
 started_at: 2026-07-04T00:54:17.867Z
-running_for_ms: 25204993 
+running_for_ms: 25570001 
 ---
 docker :  Container mensa_chroma Creating 
 At line:1 char:1

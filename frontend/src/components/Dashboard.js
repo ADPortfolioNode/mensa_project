@@ -35,7 +35,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   const API_BASE = getApiBase();
   // Use runtime-computed API base
   // eslint-disable-next-line no-console
-  console.debug('API base:', API_BASE);
+  console.debug('API base:', API_BASE || '(same-origin via nginx proxy)');
   const [ingestStatus, setIngestStatus] = useState('idle');
   const [ingestErrorMessage, setIngestErrorMessage] = useState('');
   const [ingestingGame, setIngestingGame] = useState(null);
@@ -182,7 +182,14 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
       try {
         const response = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
         if (cancelled || !response?.data) return;
-        const mapped = mapDefaults(response.data.defaults || {}, trainParams);
+        const recreateDefaults = response.data.recreate_defaults
+          || response.data.incremental?.recreate_defaults
+          || response.data.incremental?.best_training_params
+          || {};
+        const mapped = mapDefaults(
+          { ...(response.data.defaults || {}), ...recreateDefaults },
+          trainParams,
+        );
         const keys = ['testSize', 'randomState', 'nEstimators', 'maxDepth', 'maxIterations', 'targetAccuracy', 'windowSize', 'autoTune', 'blendStep'];
         const shouldOverwrite = trainDefaultsForGame === null || shallowEqual(trainParams, trainDefaultsForGame, keys);
         if (shouldOverwrite) {
@@ -596,6 +603,14 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     return 'idle';
   }, [ingestStatus, hasStoredDataForSelection]);
 
+  const effectiveTrainingTarget = useMemo(() => {
+    const requested = Number(trainParams.targetAccuracy ?? 0.9);
+    const prior = trainIncremental?.highest_accuracy ?? trainIncremental?.baseline_accuracy;
+    const safeRequested = Number.isFinite(requested) ? Math.min(0.99, Math.max(0.5, requested)) : 0.9;
+    if (prior == null || !Number.isFinite(Number(prior))) return safeRequested;
+    return Math.max(safeRequested, Number(prior));
+  }, [trainParams.targetAccuracy, trainIncremental]);
+
   const startTrain = useCallback(async () => {
     if (effectiveIngestStatus !== 'completed' || !selectedTrainGame) {
       alert('Please complete data ingestion first and select a game.');
@@ -615,7 +630,10 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     try {
       const response = await axios.post(
         `${API_BASE}/api/train`,
-        buildTrainRequestBody(selectedTrainGame, trainParams),
+        buildTrainRequestBody(selectedTrainGame, {
+          ...trainParams,
+          targetAccuracy: effectiveTrainingTarget,
+        }),
         { timeout: 600000 },
       );
       clearInterval(interval); // Clear interval regardless of outcome
@@ -651,15 +669,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
       setTrainErrorMessage(errText);
       alert(`Training failed due to an error: ${errText}`);
     }
-  }, [effectiveIngestStatus, selectedTrainGame, selectedTrainGameStoredDraws, trainParams, API_BASE]);
-
-  const effectiveTrainingTarget = useMemo(() => {
-    const requested = Number(trainParams.targetAccuracy ?? 0.9);
-    const prior = trainIncremental?.highest_accuracy ?? trainIncremental?.baseline_accuracy;
-    const safeRequested = Number.isFinite(requested) ? Math.min(0.99, Math.max(0.5, requested)) : 0.9;
-    if (prior == null || !Number.isFinite(Number(prior))) return safeRequested;
-    return Math.max(safeRequested, Number(prior));
-  }, [trainParams.targetAccuracy, trainIncremental]);
+  }, [effectiveIngestStatus, selectedTrainGame, selectedTrainGameStoredDraws, trainParams, effectiveTrainingTarget, API_BASE]);
 
   const trainingModelTypeLabel = useMemo(() => {
     const strategy =

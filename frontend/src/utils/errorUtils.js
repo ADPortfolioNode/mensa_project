@@ -11,8 +11,11 @@ const errorPatterns = {
         /connection was closed/i,
         /empty response/i,
         /502 bad gateway/i,
+        /status code 502/i,
         /503 service unavailable/i,
+        /status code 503/i,
         /504 gateway timeout/i,
+        /status code 504/i,
         /timeout of \d+ms exceeded/i,
         /ECONNABORTED/i,
     ],
@@ -50,13 +53,17 @@ export function formatApiError(error, fallback = 'Request failed') {
 }
 
 export function analyzeError(error) {
-    const errorMessage = error.message || String(error);
+    const errorMessage = formatApiError(error, error?.message || String(error));
+    const statusCode = error?.response?.status;
+    const isGatewayError = statusCode === 502 || statusCode === 503 || statusCode === 504;
 
-    let category = ErrorCategory.UNKNOWN_ERROR;
-    for (const [cat, patterns] of Object.entries(errorPatterns)) {
-        if (patterns.some(pattern => pattern.test(errorMessage))) {
-            category = cat;
-            break;
+    let category = isGatewayError ? ErrorCategory.CONNECTION_ERROR : ErrorCategory.UNKNOWN_ERROR;
+    if (!isGatewayError) {
+        for (const [cat, patterns] of Object.entries(errorPatterns)) {
+            if (patterns.some((pattern) => pattern.test(errorMessage))) {
+                category = cat;
+                break;
+            }
         }
     }
 

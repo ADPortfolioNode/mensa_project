@@ -57,19 +57,16 @@ async def chat(request: ChatRequest):
         context_docs = []
         if request.use_rag and request.game:
             try:
-                # Resolve game key if provided
                 from utils.validation import _require_game_key
                 game_key = _require_game_key(request.game)
-                
-                # Retrieve relevant context
                 context_docs = rag_service.retrieve_context(
                     query=request.text,
                     game=game_key,
-                    top_k=3
+                    top_k=3,
                 )
-            except ValueError:
-                # Invalid game key, continue without RAG
-                pass
+            except (ValueError, Exception):
+                # Invalid game key or retrieval failure — continue without RAG
+                context_docs = []
         
         # Build prompt with context if available
         if context_docs:

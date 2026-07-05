@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from services.trainer import trainer_service
 from experiments.store import ExperimentStore
+from utils.training_params import extract_training_params, merge_training_params
 from utils.validation import _require_game_key
 from config import GAME_CONFIGS
 from services.chroma_client import chroma_client
@@ -74,14 +75,33 @@ async def get_train_settings(game: str = None):
             game_key,
             requested_target=defaults["target_accuracy"],
         )
+        recreate_defaults = incremental.get("recreate_defaults") or {}
+        merged_defaults = {
+            **defaults,
+            **{key: value for key, value in recreate_defaults.items() if value is not None},
+        }
         return {
             "game": game_key,
-            "defaults": defaults,
+            "defaults": merged_defaults,
             "dataset": _dataset_snapshot(game_key),
             "incremental": incremental,
+            "best_training_params": incremental.get("best_training_params") or {},
+            "recreate_defaults": recreate_defaults,
         }
 
-    per_game = {game_name: _dataset_snapshot(game_name) for game_name in GAME_CONFIGS.keys()}
+    per_game = {}
+    for game_name in GAME_CONFIGS.keys():
+        incremental = trainer_service.get_incremental_training_context(
+            game_name,
+            requested_target=defaults["target_accuracy"],
+        )
+        per_game[game_name] = {
+            **_dataset_snapshot(game_name),
+            "highest_accuracy": incremental.get("highest_accuracy"),
+            "best_training_params": incremental.get("best_training_params") or {},
+            "recreate_defaults": incremental.get("recreate_defaults") or {},
+            "score_leaderboard": incremental.get("score_leaderboard") or [],
+        }
     return {"game": None, "defaults": defaults, "per_game": per_game}
 
 
@@ -99,21 +119,7 @@ async def train_model(request: TrainingRequest):
         game_key = _require_game_key(request.game)
         timestamp = datetime.now().timestamp()
 
-        trainer_service.configure_training(
-            target_accuracy=request.target_accuracy,
-            max_iterations=request.max_iterations,
-            train_size=request.train_size,
-            n_estimators=request.n_estimators,
-            max_depth=request.max_depth,
-            random_state=request.random_state,
-            window_size=request.window_size,
-            auto_tune=request.auto_tune,
-            blend_step=request.blend_step,
-        )
-
         def _run_training():
-            if hasattr(trainer_service, "train_model"):
-                return trainer_service.train_model(game_key)
             if hasattr(trainer_service, "train"):
                 return trainer_service.train(
                     game_key,
@@ -123,10 +129,24 @@ async def train_model(request: TrainingRequest):
                     n_estimators=request.n_estimators,
                     max_depth=request.max_depth,
                     random_state=request.random_state,
+                    blend_step=request.blend_step,
                     window_size=request.window_size,
                     auto_tune=request.auto_tune,
                 )
-            raise RuntimeError("TrainerService is missing train_model/train methods")
+            if hasattr(trainer_service, "train_model"):
+                trainer_service.configure_training(
+                    target_accuracy=request.target_accuracy,
+                    max_iterations=request.max_iterations,
+                    train_size=request.train_size,
+                    n_estimators=request.n_estimators,
+                    max_depth=request.max_depth,
+                    random_state=request.random_state,
+                    window_size=request.window_size,
+                    auto_tune=request.auto_tune,
+                    blend_step=request.blend_step,
+                )
+                return trainer_service.train_model(game_key)
+            raise RuntimeError("TrainerService is missing train/train_model methods")
 
         result = await asyncio.to_thread(_run_training)
 
@@ -135,11 +155,40 @@ async def train_model(request: TrainingRequest):
                 "status": "error",
                 "game": game_key,
                 "message": result.get("message", "Training failed."),
+                "training_time": result.get("training_time"),
+                "leaderboard": result.get("leaderboard", []),
+                "accuracy_history": result.get("accuracy_history", []),
+                "optimal_config_applied": result.get("optimal_config_applied", False),
+                "optimal_config": result.get("optimal_config", {}),
             }
 
-        accuracy = result.get("accuracy")
+        accuracy = (
+            result.get("highest_accuracy")
+            or result.get("record_accuracy")
+            or result.get("accuracy")
+        )
         experiment_id = f"train-{game_key}-{int(timestamp)}"
 
+        scored_params = merge_training_params(
+            result.get("best_training_params"),
+            result.get("training_params"),
+            extract_training_params(request.model_dump()),
+            {
+                "train_size": result.get("train_size", request.train_size),
+                "validation_size": result.get("validation_size"),
+                "n_estimators": request.n_estimators,
+                "max_depth": request.max_depth,
+                "random_state": request.random_state,
+                "window_size": request.window_size,
+                "auto_tune": request.auto_tune,
+                "blend_step": request.blend_step,
+                "max_iterations": request.max_iterations,
+                "target_accuracy": result.get("target_accuracy", request.target_accuracy),
+                "training_target": result.get("training_target"),
+                "model_strategy": result.get("model_strategy"),
+                "blend_weight": result.get("blend_weight"),
+            },
+        )
         exp_store.save_experiment({
             "experiment_id": experiment_id,
             "game": game_key,
@@ -151,9 +200,11 @@ async def train_model(request: TrainingRequest):
             "baseline_accuracy": result.get("baseline_accuracy"),
             "final_accuracy": accuracy,
             "highest_accuracy": result.get("highest_accuracy", accuracy),
-            "score": accuracy,
-            "accuracy": accuracy,
+            "record_accuracy": result.get("record_accuracy", result.get("highest_accuracy", accuracy)),
+            "score": result.get("highest_accuracy", accuracy),
+            "accuracy": result.get("highest_accuracy", accuracy),
             "iterations": result.get("attempts"),
+            "max_iterations": scored_params.get("max_iterations", request.max_iterations),
             "training_time": result.get("training_time"),
             "model_strategy": result.get("model_strategy"),
             "blend_weight": result.get("blend_weight"),
@@ -162,10 +213,21 @@ async def train_model(request: TrainingRequest):
             "retained_previous_model": result.get("retained_previous_model"),
             "used_previous_training": result.get("used_previous_training"),
             "message": result.get("message"),
-            "train_size": request.train_size,
-            "n_estimators": request.n_estimators,
-            "max_depth": request.max_depth,
-            "random_state": request.random_state,
+            "train_size": scored_params.get("train_size", result.get("train_size", request.train_size)),
+            "validation_size": scored_params.get("validation_size", result.get("validation_size")),
+            "n_estimators": scored_params.get("n_estimators", request.n_estimators),
+            "max_depth": scored_params.get("max_depth", request.max_depth),
+            "random_state": scored_params.get("random_state", request.random_state),
+            "window_size": scored_params.get("window_size", request.window_size),
+            "auto_tune": scored_params.get("auto_tune", request.auto_tune),
+            "blend_step": scored_params.get("blend_step", request.blend_step),
+            "data_limit": scored_params.get("data_limit"),
+            "training_params": scored_params,
+            "best_training_params": result.get("best_training_params") or scored_params,
+            "leaderboard": result.get("leaderboard", []),
+            "accuracy_history": result.get("accuracy_history", []),
+            "optimal_config_applied": result.get("optimal_config_applied", False),
+            "optimal_config": result.get("optimal_config", {}),
         })
 
         return {
@@ -175,6 +237,8 @@ async def train_model(request: TrainingRequest):
             "experiment_id": experiment_id,
             "score": accuracy,
             "accuracy": accuracy,
+            "highest_accuracy": result.get("highest_accuracy", accuracy),
+            "record_accuracy": result.get("record_accuracy", accuracy),
         }
 
     except ValueError as e:

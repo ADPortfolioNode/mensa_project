@@ -192,6 +192,38 @@ class IngestService:
 
         return ordered
 
+    def _pick3_digit_string(self, raw_value) -> str | None:
+        digits = "".join(ch for ch in str(raw_value or "").strip() if ch.isdigit())
+        if not digits:
+            return None
+        if len(digits) < 3:
+            digits = digits.zfill(3)
+        if len(digits) != 3:
+            return None
+        return digits
+
+    def _normalize_game_records(self, game: str, metadata_item: dict, row_id_base: str) -> list[tuple[str, dict]]:
+        """Expand/normalize source rows into one Chroma record per draw."""
+        if game != "pick3":
+            return [(row_id_base, metadata_item)]
+
+        draw_date = str(metadata_item.get("draw_date") or "").strip()
+        expanded: list[tuple[str, dict]] = []
+        for session, field in (("midday", "midday_daily"), ("evening", "evening_daily")):
+            digits = self._pick3_digit_string(metadata_item.get(field))
+            if not digits:
+                continue
+            record = {
+                **metadata_item,
+                "draw_session": session,
+                "winning_numbers": digits,
+                "draw_date": draw_date or str(metadata_item.get("draw_date") or ""),
+            }
+            row_id = hashlib.md5(f"{game}|{draw_date}|{session}|{digits}".encode()).hexdigest()
+            expanded.append((row_id, record))
+
+        return expanded if expanded else [(row_id_base, metadata_item)]
+
     def _process_endpoints(self, game: str, endpoints: list[str], collection, column_names: list[str],
                            total_rows_processed: int, progress_callback=None, existing_ids: set[str] | None = None):
         """Process a list of endpoints and return (rows_processed, rows_added, updated_column_names)."""
@@ -278,11 +310,13 @@ class IngestService:
                             row_id = hashlib.md5(str(row).encode()).hexdigest()
                             total_rows_processed += 1
 
-                            if row_id in existing_ids:
-                                continue
-
-                            metadatas.append(metadata_item)
-                            ids.append(row_id)
+                            for record_id, record_meta in self._normalize_game_records(
+                                game, metadata_item, row_id
+                            ):
+                                if record_id in existing_ids:
+                                    continue
+                                metadatas.append(record_meta)
+                                ids.append(record_id)
 
                         total_for_progress = max(discovered_total_rows, total_rows_processed - rows_before, 1)
                         if not ids:
@@ -411,6 +445,13 @@ class IngestService:
         column_names = []
 
         collection_name = game_key
+        if force:
+            try:
+                from state.draw_counts import invalidate_draw_count
+
+                invalidate_draw_count(collection_name)
+            except Exception:
+                pass
         # Use default embedding function to avoid dimension mismatch
         default_ef = embedding_functions.DefaultEmbeddingFunction()
         
@@ -426,7 +467,7 @@ class IngestService:
         except Exception as conn_error:
             raise Exception(f"Failed to connect to ChromaDB collection '{collection_name}': {str(conn_error)}")
 
-        existing_count = collection.count()
+        existing_count = chroma_client.count_documents(collection_name, allow_refresh=False)
         existing_ids: set[str] = set()
 
         if existing_count > 0 and not force:
@@ -500,7 +541,13 @@ class IngestService:
         if total_rows_processed == 0 and existing_count == 0:
             raise Exception(f"No data was successfully ingested for game '{game_key}'. Check backend logs for details.")
 
-        final_total = collection.count()
+        final_total = max(existing_count + total_rows_added, existing_count, total_rows_processed)
+        try:
+            from state.draw_counts import update_draw_count
+
+            update_draw_count(collection_name, final_total)
+        except Exception:
+            pass
         if progress_callback:
             progress_callback(final_total, final_total)
 

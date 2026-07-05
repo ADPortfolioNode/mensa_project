@@ -66,7 +66,12 @@ const PredictionDisplay = ({ prediction }) => {
           {meta.blend_weight !== undefined && (
             <span style={{ marginLeft: 12 }}>Blend: {meta.blend_weight}</span>
           )}
-          {meta.used_previous_training !== undefined && (
+          {meta.highest_accuracy != null && (
+            <span style={{ marginLeft: 12 }}>
+              Highest accuracy: {(Number(meta.highest_accuracy) * 100).toFixed(2)}%
+            </span>
+          )}
+        {meta.used_previous_training !== undefined && (
             <span style={{ marginLeft: 12 }}>PrevTrain: {meta.used_previous_training ? 'Yes' : 'No'}</span>
           )}
         </div>
@@ -123,6 +128,11 @@ const PredictionDisplay = ({ prediction }) => {
         )}
         {meta.blend_weight !== undefined && (
           <span style={{ marginLeft: 12 }}>Blend: {meta.blend_weight}</span>
+        )}
+        {(meta.highest_accuracy != null || prediction.highest_accuracy != null) && (
+          <span style={{ marginLeft: 12 }}>
+            Highest accuracy: {(Number(meta.highest_accuracy ?? prediction.highest_accuracy) * 100).toFixed(2)}%
+          </span>
         )}
         {meta.used_previous_training !== undefined && (
           <span style={{ marginLeft: 12 }}>PrevTrain: {meta.used_previous_training ? 'Yes' : 'No'}</span>

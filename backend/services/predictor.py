@@ -3,8 +3,13 @@ import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import numpy as np
-import joblib
 from config import GAME_CONFIGS, GAME_PREDICTION_FORMATS, GAME_PREDICTION_SCHEDULES
+from utils.model_utils import (
+    _load_model_metadata,
+    build_prediction_model_metadata,
+    load_model_artifact,
+    resolve_highest_accuracy,
+)
 
 class PredictorService:
     def __init__(self):
@@ -236,6 +241,25 @@ class PredictorService:
             "predicted_bonus_numbers": [],
         }
 
+    def get_prediction_summary(self, game: str):
+        """Summarize saved model readiness and highest known accuracy for suggestions."""
+        game_key = str(game or "").strip().lower()
+        artifact, error = load_model_artifact(game_key, self.models_dir)
+        metadata = _load_model_metadata(game_key)
+        highest_accuracy = resolve_highest_accuracy(
+            game_key,
+            artifact=artifact,
+            metadata=metadata,
+        )
+        return {
+            "game": game_key,
+            "has_model": artifact is not None,
+            "accuracy": highest_accuracy,
+            "highest_accuracy": highest_accuracy,
+            "model_strategy": str((artifact or {}).get("model_strategy", "single")),
+            "message": error,
+        }
+
     def predict_next_draw(self, game: str, recent_k: int = 10):
         session_result = self.predict_prediction_session(game=game, recent_k=recent_k)
         if session_result.get("status") != "success":
@@ -256,36 +280,33 @@ class PredictorService:
             "predicted_for_date": session_result.get("prediction_date"),
             "model_strategy": session_result.get("model_strategy", "single"),
             "blend_weight": session_result.get("blend_weight"),
+            "model_metadata": session_result.get("model_metadata"),
+            "highest_accuracy": session_result.get("highest_accuracy"),
         }
 
     def predict_prediction_session(self, game: str, recent_k: int = 10):
         # Lazy import to avoid ChromaDB connection during module import
         from .chroma_client import chroma_client
-        
-        model_path = os.path.join(self.models_dir, f"{game}_model.joblib")
-        if not os.path.exists(model_path):
-            return {"status": "error", "message": f"Model for game '{game}' not found."}
-        if os.path.getsize(model_path) <= 0:
-            return {"status": "error", "message": f"Model for game '{game}' is empty/corrupted."}
-
-        try:
-            artifact = joblib.load(model_path)
-        except Exception as exc:
-            return {"status": "error", "message": f"Unable to load model for game '{game}': {str(exc)}"}
         from services.trainer import TrainerService
 
-        model = artifact.get("model")
+        game_key = str(game or "").strip().lower()
+        artifact, load_error = load_model_artifact(game_key, self.models_dir)
+        if load_error:
+            return {"status": "error", "message": load_error}
+
+        metadata = _load_model_metadata(game_key)
+        model_metadata = build_prediction_model_metadata(game_key, artifact, metadata)
+        highest_accuracy = model_metadata.get("highest_accuracy")
+
         model_strategy = str(artifact.get("model_strategy", "single"))
         blend_weight = artifact.get("blend_weight")
         feature_len = int(artifact.get("feature_len", 10))
         output_len = int(artifact.get("output_len", 6))
         window_size = int(artifact.get("window_size", 1))
-        rules = artifact.get("rules") or self._get_rules(game)
-        if model is None:
-            return {"status": "error", "message": f"Model artifact for game '{game}' is invalid."}
+        rules = artifact.get("rules") or self._get_rules(game_key)
 
         # Fetch recent draws from ChromaDB for prediction input
-        collection = chroma_client.client.get_collection(game)
+        collection = chroma_client.client.get_collection(game_key)
         fetch_k = max(int(recent_k), window_size + 2)
         data = collection.get(limit=fetch_k, include=["metadatas"])
 
@@ -300,18 +321,20 @@ class PredictorService:
             return {"status": "error", "message": "Not enough historical draws for model window."}
         
         prediction_dt = self._current_prediction_datetime()
-        session_draw_count = self._get_session_draw_count(game, prediction_dt)
+        session_draw_count = self._get_session_draw_count(game_key, prediction_dt)
 
         if session_draw_count <= 0:
             return {
                 "status": "success",
-                "game": game,
+                "game": game_key,
                 "prediction_session": [],
                 "session_draw_count": 0,
                 "prediction_date": prediction_dt.date().isoformat(),
                 "prediction_weekday": prediction_dt.strftime("%A"),
                 "prediction_timezone": self.prediction_timezone,
-                "message": f"No scheduled draws for {game} on {prediction_dt.strftime('%A')}.",
+                "model_metadata": model_metadata,
+                "highest_accuracy": highest_accuracy,
+                "message": f"No scheduled draws for {game_key} on {prediction_dt.strftime('%A')}.",
             }
 
         primary_count = int(rules.get("primary_count", 5))
@@ -337,7 +360,7 @@ class PredictorService:
             primary_numbers = self._normalize_primary_predictions(primary_raw, rules)
             bonus_numbers = self._normalize_bonus_predictions(bonus_raw, rules, include_bonus)
             predicted_numbers = primary_numbers + bonus_numbers
-            formatted_prediction, normalized_flat = self._format_prediction(game, predicted_numbers)
+            formatted_prediction, normalized_flat = self._format_prediction(game_key, predicted_numbers)
 
             session_predictions.append({
                 "draw_index": draw_index + 1,
@@ -354,7 +377,7 @@ class PredictorService:
 
         return {
             "status": "success",
-            "game": game,
+            "game": game_key,
             "prediction_session": session_predictions,
             "session_draw_count": len(session_predictions),
             "prediction_date": prediction_dt.date().isoformat(),
@@ -362,6 +385,8 @@ class PredictorService:
             "prediction_timezone": self.prediction_timezone,
             "model_strategy": model_strategy,
             "blend_weight": blend_weight,
+            "model_metadata": model_metadata,
+            "highest_accuracy": highest_accuracy,
         }
 
     def predict_all_games(self, games, recent_k: int = 10):

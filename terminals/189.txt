@@ -1,0 +1,27 @@
+---
+pid: 11360
+cwd: "E:\2024 RESET\mensa_project"
+command: "$deadline = (Get-Date).AddMinutes(5); do { Start-Sleep -Seconds 15; try { $p = Invoke-RestMethod -Uri \"http://localhost:3000/api/ingest_progress?game=pick3\" -TimeoutSec 20; Write-Output \"status=$($p.status) rows=$($p.rows_fetched)/$($p.total_rows) added=$($p.added)\"; if ($p.status -eq 'completed' -or $p.status -eq 'error') { break } } catch { Write-Output \"poll error: $_\" } } while ((Get-Date) -lt $deadline)"
+started_at: 2026-07-04T20:32:32.903Z
+running_for_ms: 13810001 
+---
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=
+status=queued rows=/ added=

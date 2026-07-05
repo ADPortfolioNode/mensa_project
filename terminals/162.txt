@@ -3,7 +3,7 @@ pid: 2788
 cwd: "E:\2024 RESET\mensa_project"
 command: "docker compose -f \"E:\\2024 RESET\\mensa_project\\docker-compose.yml\" ps -a 2>&1"
 started_at: 2026-07-04T00:56:58.965Z
-running_for_ms: 25040013 
+running_for_ms: 25405005 
 ---
 NAME             IMAGE                    COMMAND                  SERVICE    CREATED         STATUS                   PORTS
 mensa_backend    mensa_project-backend    "/usr/local/bin/dock…"   backend    2 minutes ago   Up 2 minutes (healthy)   0.0.0.0:5001->5000/tcp, [::]:5001->5000/tcp

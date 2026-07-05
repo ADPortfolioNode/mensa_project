@@ -1,0 +1,39 @@
+---
+pid: 3012
+cwd: "E:\2024 RESET\mensa_project"
+command: "python -c \"import json,urllib.request; r=urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:5001/api/ingest',data=json.dumps({'game':'pick3','force':False}).encode(),method='POST',headers={'Content-Type':'application/json'}),timeout=15); print(r.read().decode())\""
+started_at: 2026-07-04T14:00:43.129Z
+running_for_ms: 445000   
+---
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\Program Files\Python311\Lib\urllib\request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\urllib\request.py", line 519, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\urllib\request.py", line 536, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\urllib\request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\urllib\request.py", line 1377, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\urllib\request.py", line 1352, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\http\client.py", line 1386, in getresponse
+    response.begin()
+  File "C:\Program Files\Python311\Lib\http\client.py", line 325, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\http\client.py", line 286, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python311\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: timed out

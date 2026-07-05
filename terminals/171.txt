@@ -1,0 +1,15 @@
+---
+pid: 12304
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker cp \"E:\\2024 RESET\\mensa_project\\backend\\scripts\\test_chroma_steps.py\" mensa_backend:/tmp/test_chroma_steps.py; docker exec mensa_backend python /tmp/test_chroma_steps.py"
+started_at: 2026-07-04T14:04:12.493Z
+running_for_ms: 234998   
+---
+[1783173857] import chromadb
+[1783173868] build settings
+[1783173868] ClientCreator
+[1783173868] heartbeat
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+1783173868129152023
+[1783173868] list_collections
+['take5', 'cash4life', 'pick10', 'nylotto', 'megamillions', 'quickdraw', 'powerball', 'pick3']

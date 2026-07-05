@@ -10,6 +10,7 @@ const StartupProgress = ({ onComplete }) => {
     const [errorReport, setErrorReport] = useState(null);
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [isStarting, setIsStarting] = useState(false);
+    const [startError, setStartError] = useState(null);
     const transientErrorCountRef = useRef(0);
 
     const getStartupStatus = async () => {
@@ -19,7 +20,7 @@ const StartupProgress = ({ onComplete }) => {
 
     const postStartupInit = async () => {
         const apiBase = getApiBase();
-        return axios.post(`${apiBase}/api/startup_init`, null, { timeout: 30000 });
+        return axios.post(`${apiBase}/api/startup_init`, {}, { timeout: 30000 });
     };
 
     useEffect(() => {
@@ -137,10 +138,15 @@ const StartupProgress = ({ onComplete }) => {
 
     const handleStartInitialization = async () => {
         setIsStarting(true);
+        setStartError(null);
         try {
-            await postStartupInit();
+            const response = await postStartupInit();
+            if (response?.data?.status === 'completed') {
+                onComplete();
+            }
         } catch (error) {
-            console.error("Error starting initialization:", error);
+            console.error('Error starting initialization:', error);
+            setStartError(analyzeError(error));
         } finally {
             setIsStarting(false);
         }
@@ -149,16 +155,23 @@ const StartupProgress = ({ onComplete }) => {
     return (
         <div className="container py-4 startup-shell">
             <h2 className="mb-3">🎰 Lottery Data Initialization</h2>
-            {(status.status === 'pending' || status.status === 'ready') && (
+            {startError && (
+                <div className="mb-3">
+                    <ErrorMessage errorReport={startError} />
+                </div>
+            )}
+            {(status.status === 'pending' || status.status === 'ready' || status.status === 'completed') && (
                 <div className="mb-3 d-flex flex-wrap gap-2">
-                    <button
-                        onClick={handleStartInitialization}
-                        disabled={isStarting}
-                        className="btn btn-primary"
-                    >
-                        {isStarting ? 'Starting...' : 'Start Initialization'}
-                    </button>
-                    {status.status === 'ready' && (
+                    {status.status !== 'completed' && (
+                        <button
+                            onClick={handleStartInitialization}
+                            disabled={isStarting}
+                            className="btn btn-primary"
+                        >
+                            {isStarting ? 'Starting...' : 'Start Initialization'}
+                        </button>
+                    )}
+                    {(status.status === 'ready' || status.status === 'completed') && (
                         <button
                             onClick={onComplete}
                             className="btn btn-outline-secondary"

@@ -118,6 +118,15 @@ def set_manual_ingest_state(game_key: str, state: dict):
     """Update manual ingest state for a specific game."""
     manual_ingest_state[game_key] = state
     terminal = str(state.get("status", "")).lower() in {"completed", "error", "failed"}
+    if terminal and str(state.get("status", "")).lower() == "completed":
+        try:
+            from state.draw_counts import update_draw_count
+
+            total = state.get("total_rows") or state.get("rows_fetched")
+            if total is not None:
+                update_draw_count(game_key, int(total))
+        except Exception:
+            pass
     _schedule_manual_ingest_state_save(force=terminal)
 
 
@@ -187,5 +196,8 @@ def enqueue_manual_ingest(game_key: str, force: bool = False) -> int:
 # Load persisted state at startup (best-effort)
 try:
     _load_manual_ingest_state()
+    from state.draw_counts import seed_from_manual_ingest_state
+
+    seed_from_manual_ingest_state(manual_ingest_state)
 except Exception:
     pass
