@@ -1,0 +1,17 @@
+---
+pid: 12092
+cwd: "E:\2024 RESET\mensa_project"
+command: "$max=24; for ($i=1; $i -le $max; $i++) { $fe=$null; $be=$null; try { $fe=Invoke-RestMethod -Uri \"http://localhost:3000/api/health\" -TimeoutSec 4 } catch {}; try { $be=Invoke-RestMethod -Uri \"http://localhost:5001/api/health\" -TimeoutSec 4 } catch {}; Write-Output \"attempt $i frontend=$($fe.status) backend=$($be.status)\"; if ($fe -and $be) { break }; Start-Sleep -Seconds 5 }"
+started_at: 2026-07-05T02:13:45.522Z
+running_for_ms: 110011   
+---
+attempt 1 frontend= backend=
+attempt 2 frontend=starting backend=
+attempt 3 frontend=starting backend=
+attempt 4 frontend=starting backend=
+attempt 5 frontend=starting backend=
+attempt 6 frontend=starting backend=
+attempt 7 frontend=starting backend=
+attempt 8 frontend=starting backend=
+attempt 9 frontend=starting backend=
+attempt 10 frontend=starting backend=

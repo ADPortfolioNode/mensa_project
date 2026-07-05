@@ -2,6 +2,24 @@
   margin-top: 1rem;
 }
 
+.prediction-schedule-banner {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+}
+
+.prediction-schedule-label {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(13, 110, 253, 0.12);
+  border: 1px solid rgba(13, 110, 253, 0.35);
+  color: #0d6efd;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 .prediction-group + .prediction-group {
   margin-top: 0.75rem;
 }

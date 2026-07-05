@@ -1,0 +1,36 @@
+---
+pid: 6792
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; .\\scripts\\diag_gateway_502.ps1 2>&1"
+started_at: 2026-07-05T07:05:38.111Z
+running_for_ms: 26875018 
+---
+[2026-07-05 03:05:40] 
+[2026-07-05 03:05:40] --- RUNTIME GATEWAY PROBE [runtime-502-check] ---
+[2026-07-05 03:05:40] Ports: backend=5001 frontend=3000
+[2026-07-05 03:05:40] [compose ps]
+[2026-07-05 03:05:43] NAME             IMAGE                                                                     COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+[2026-07-05 03:05:43] mensa_backend    sha256:8c116be2e98022dc2a9b1c4f4aedadd5481f7387a8783ef74cc1d568e5e61276   "/usr/local/bin/dock…"   backend    15 minutes ago   Up 15 minutes (healthy)   127.0.0.1:5001->5000/tcp
+[2026-07-05 03:05:43] mensa_chroma     chromadb/chroma:0.5.3                                                     "/docker_entrypoint.…"   chroma     33 minutes ago   Up 33 minutes (healthy)   127.0.0.1:8001->8000/tcp
+[2026-07-05 03:05:44] mensa_frontend   mensa_project-frontend                                                    "/docker-entrypoint.…"   frontend   15 minutes ago   Up 14 minutes (healthy)   127.0.0.1:3000->80/tcp
+[2026-07-05 03:05:49] CONTAINER mensa_backend running=True health=healthy oom=False restarts=0
+[2026-07-05 03:05:52] CONTAINER mensa_frontend running=True health=healthy oom=False restarts=0
+[2026-07-05 03:05:54] CONTAINER mensa_chroma running=True health=healthy oom=False restarts=0
+[2026-07-05 03:05:54] [docker stats]
+[2026-07-05 03:05:56] NAME             CPU %     MEM USAGE / LIMIT
+[2026-07-05 03:05:56] mensa_backend    0.50%     226MiB / 6GiB
+[2026-07-05 03:05:56] mensa_frontend   0.00%     3.594MiB / 7.464GiB
+[2026-07-05 03:05:56] mensa_chroma     0.45%     170.8MiB / 7.464GiB
+[2026-07-05 03:05:56] [nginx error log tail]
+[2026-07-05 03:06:00] PROBE OK GET direct_health -> 200 {"status":"healthy"}
+[2026-07-05 03:06:00] PROBE OK GET direct_experiments -> 200 {"status":"ok","experiments":[{"experiment_id":"train-powerball-1783232250","game":"powerball","timestamp":1783232250.88
+[2026-07-05 03:06:02] PROBE OK POST direct_predict -> status=COMPLETED
+[2026-07-05 03:06:04] PROBE OK GET proxy_health -> 200 {"status":"healthy"}
+[2026-07-05 03:06:05] PROBE OK GET proxy_experiments -> 200 {"status":"ok","experiments":[{"experiment_id":"train-powerball-1783232250","game":"powerball","timestamp":1783232250.88
+[2026-07-05 03:06:06] PROBE OK POST proxy_predict -> status=COMPLETED
+[2026-07-05 03:06:11] CLASSIFICATION: ALL_OK
+[2026-07-05 03:06:11] HINT: Gateway path looks healthy. If browser still 502, hard-refresh (Ctrl+Shift+R) after recent docker compose rebuild.
+[2026-07-05 03:06:11] --- END RUNTIME GATEWAY PROBE ---
+
+Gateway diagnostic: ALL_OK
+  Gateway path looks healthy. If browser still 502, hard-refresh (Ctrl+Shift+R) after recent docker compose rebuild.

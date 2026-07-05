@@ -1,0 +1,20 @@
+# Public HTTPS — no subscriber login (demo / marketing site)
+# Requires DOMAIN and ACME_EMAIL in .env
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	header {
+		-Server
+	}
+
+	reverse_proxy frontend:80
+}
+
+http://{$DOMAIN} {
+	redir https://{host}{uri} permanent
+}

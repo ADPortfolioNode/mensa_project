@@ -1,0 +1,13 @@
+---
+pid: 14928
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker cp \"E:\\2024 RESET\\mensa_project\\backend\\scripts\\test_chroma_compare.py\" mensa_backend:/tmp/test_chroma_compare.py; docker exec mensa_backend python /tmp/test_chroma_compare.py"
+started_at: 2026-07-04T14:04:38.286Z
+running_for_ms: 210000   
+---
+--- fixed host+port ---
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+ok heartbeat=1783173892386651534 cols=['take5', 'cash4life', 'pick10', 'nylotto', 'megamillions', 'quickdraw', 'powerball', 'pick3'] elapsed=0.60s
+--- broken url host ---
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+ok heartbeat=1783173892478521879 cols=['take5', 'cash4life', 'pick10', 'nylotto', 'megamillions', 'quickdraw', 'powerball', 'pick3'] elapsed=0.11s

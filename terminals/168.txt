@@ -1,0 +1,8 @@
+---
+pid: 11920
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker cp \"E:\\2024 RESET\\mensa_project\\backend\\scripts\\test_chroma_client.py\" mensa_backend:/tmp/test_chroma_client.py; docker exec mensa_backend python /tmp/test_chroma_client.py"
+started_at: 2026-07-04T14:01:43.482Z
+running_for_ms: 385005   
+---
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given

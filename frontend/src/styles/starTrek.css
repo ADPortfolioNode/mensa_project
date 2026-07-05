@@ -263,6 +263,42 @@ body {
   position: relative;
 }
 
+.star-trek-app .focus-cards-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.star-trek-app .focus-cards-col {
+  min-width: 0;
+}
+
+.star-trek-app .focus-cards-col-maximized {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 767.98px) {
+  .star-trek-app .focus-cards-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.star-trek-app .focus-card.card-maximized,
+.star-trek-app .focus-card.is-focused {
+  z-index: 2;
+}
+
+.star-trek-app .focus-card.card-maximized {
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.55),
+    0 0 0 2px rgba(143, 123, 255, 0.45),
+    0 0 28px rgba(138, 215, 255, 0.2);
+}
+
+.star-trek-app .focus-card:not(.card-maximized):hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
 .star-trek-app .expandable-card-header {
   display: flex;
   justify-content: space-between;

@@ -11,8 +11,31 @@
   transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-.card.card-selected {
+.card.card-selected,
+.focus-card.card-maximized {
   box-shadow: 0 0 0 2px rgba(138, 215, 255, 0.4), 0 10px 26px rgba(0, 0, 0, 0.38);
+}
+
+.focus-cards-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.focus-cards-col {
+  min-width: 0;
+  transition: grid-column 0.25s ease;
+}
+
+.focus-cards-col-maximized {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 767.98px) {
+  .focus-cards-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .overflow-auto::-webkit-scrollbar {

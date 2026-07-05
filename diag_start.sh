@@ -36,6 +36,68 @@ compose_cmd() {
     fi
 }
 
+append_runtime_gateway_probe() {
+    echo "" >> "${LOG_FILE}"
+    echo "--- RUNTIME GATEWAY PROBE ---" >> "${LOG_FILE}"
+
+    local backend_port="${BACKEND_HOST_PORT:-5001}"
+    local frontend_port="${FRONTEND_HOST_PORT:-3000}"
+    echo "Host ports: backend=${backend_port} frontend=${frontend_port}" >> "${LOG_FILE}"
+
+    compose_cmd ps -a >> "${LOG_FILE}" 2>&1 || true
+
+    for svc in mensa_backend mensa_frontend mensa_chroma; do
+        local cid running oom restarts health
+        cid=$(docker ps -aq --filter "name=${svc}" 2>/dev/null | head -n1 || true)
+        if [ -n "${cid}" ]; then
+            running=$(docker inspect --format='{{.State.Running}}' "${cid}" 2>/dev/null || echo "false")
+            oom=$(docker inspect --format='{{.State.OOMKilled}}' "${cid}" 2>/dev/null || echo "false")
+            restarts=$(docker inspect --format='{{.RestartCount}}' "${cid}" 2>/dev/null || echo "0")
+            health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${cid}" 2>/dev/null || echo "missing")
+            echo "CONTAINER ${svc} running=${running} health=${health} oom=${oom} restarts=${restarts}" >> "${LOG_FILE}"
+        else
+            echo "CONTAINER ${svc} missing" >> "${LOG_FILE}"
+        fi
+    done
+
+    probe_url() {
+        local label="$1"
+        local url="$2"
+        local code
+        code=$(curl -fsS -o /tmp/mensa_diag_body.txt -w "%{http_code}" --max-time 12 "${url}" 2>>"${LOG_FILE}" || echo "000")
+        if [ "${code}" = "200" ] || [ "${code}" = "201" ]; then
+            echo "PROBE OK GET ${label} -> ${code}" >> "${LOG_FILE}"
+            return 0
+        fi
+        echo "PROBE FAIL GET ${label} -> ${code}" >> "${LOG_FILE}"
+        return 1
+    }
+
+    direct_health_ok=0
+    direct_exp_ok=0
+    proxy_health_ok=0
+    proxy_exp_ok=0
+    if probe_url "direct_health" "http://127.0.0.1:${backend_port}/api/health"; then direct_health_ok=1; fi
+    if probe_url "direct_experiments" "http://127.0.0.1:${backend_port}/api/experiments?limit=5"; then direct_exp_ok=1; fi
+    if probe_url "proxy_health" "http://127.0.0.1:${frontend_port}/api/health"; then proxy_health_ok=1; fi
+    if probe_url "proxy_experiments" "http://127.0.0.1:${frontend_port}/api/experiments?limit=5"; then proxy_exp_ok=1; fi
+
+    direct_ok=0
+    proxy_ok=0
+    if [ "${direct_health_ok}" -eq 1 ] && [ "${direct_exp_ok}" -eq 1 ]; then direct_ok=1; fi
+    if [ "${proxy_health_ok}" -eq 1 ] && [ "${proxy_exp_ok}" -eq 1 ]; then proxy_ok=1; fi
+
+    if [ "${direct_ok}" -eq 1 ] && [ "${proxy_ok}" -eq 1 ]; then
+        echo "CLASSIFICATION: ALL_OK" >> "${LOG_FILE}"
+    elif [ "${direct_ok}" -eq 1 ] && [ "${proxy_ok}" -eq 0 ]; then
+        echo "CLASSIFICATION: PROXY_ONLY_FAIL" >> "${LOG_FILE}"
+    else
+        echo "CLASSIFICATION: BACKEND_DOWN" >> "${LOG_FILE}"
+    fi
+
+    echo "--- END RUNTIME GATEWAY PROBE ---" >> "${LOG_FILE}"
+}
+
 append_diag_failure_bundle() {
     echo "" >> "${LOG_FILE}"
     echo "--- FAILURE SNAPSHOT ---" >> "${LOG_FILE}"
@@ -622,6 +684,7 @@ echo "" | tee -a "${LOG_FILE}"
 echo "---" | tee -a "${LOG_FILE}"
 echo "✓ Diagnostic startup appears SUCCESSFUL - no restart loops detected." | tee -a "${LOG_FILE}"
 echo "All containers are running normally." | tee -a "${LOG_FILE}"
+append_runtime_gateway_probe
 echo "Check the '${LOG_FILE}' for detailed output." | tee -a "${LOG_FILE}"
 echo "---" | tee -a "${LOG_FILE}"
 exit 0

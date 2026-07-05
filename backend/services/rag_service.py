@@ -117,6 +117,21 @@ class RAGService:
             "You can continue using ingestion, training, suggestions, and diagnostics while Gemini reconnects."
         )
 
+    def retrieve_context(
+        self,
+        query: str,
+        game: str = None,
+        use_all_games: bool = False,
+        top_k: int = None,
+    ) -> list:
+        """Public API for retrieving relevant ChromaDB documents for a query."""
+        return self._retrieve_context(
+            query,
+            game=game,
+            use_all_games=use_all_games,
+            top_k=top_k,
+        )
+
     def _retrieve_context(
         self, 
         query: str, 

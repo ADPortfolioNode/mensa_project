@@ -1,0 +1,17 @@
+---
+pid: 3152
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; Start-Sleep -Seconds 30; docker compose ps; foreach ($g in @('pick3','megamillions','powerball')) { Write-Host \"--- $g ---\"; try { $r = Invoke-RestMethod -Uri \"http://127.0.0.1:5001/api/predict\" -Method POST -ContentType \"application/json\" -Body (@{game=$g;recent_k=10} | ConvertTo-Json) -TimeoutSec 90; Write-Host \"status=$($r.status) numbers=$($r.predicted_numbers -join ',') session=$($r.prediction_session.Count) message=$($r.message)\" } catch { Write-Host \"ERROR: $($_.Exception.Message)\" } }"
+started_at: 2026-07-05T07:28:15.950Z
+running_for_ms: 25514991 
+---
+NAME             IMAGE                    COMMAND                  SERVICE    CREATED              STATUS                        PORTS
+mensa_backend    mensa_project-backend    "/usr/local/bin/dock…"   backend    About a minute ago   Up About a minute (healthy)   127.0.0.1:5001->5000/tcp
+mensa_chroma     chromadb/chroma:0.5.3    "/docker_entrypoint.…"   chroma     56 minutes ago       Up 56 minutes (healthy)       127.0.0.1:8001->8000/tcp
+mensa_frontend   mensa_project-frontend   "/docker-entrypoint.…"   frontend   About a minute ago   Up 32 seconds (healthy)       127.0.0.1:3000->80/tcp
+--- pick3 ---
+status=COMPLETED numbers=4,4,6 session=2 message=
+--- megamillions ---
+status=COMPLETED numbers= session=0 message=No scheduled draws for megamillions on Sunday.
+--- powerball ---
+status=error numbers= session=0 message=Not enough historical draws for model window.

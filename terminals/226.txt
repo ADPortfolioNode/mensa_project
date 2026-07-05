@@ -1,0 +1,10 @@
+---
+pid: 11036
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; Start-Sleep -Seconds 15; docker compose ps"
+started_at: 2026-07-05T07:45:42.368Z
+running_for_ms: 24470002 
+---
+NAME            IMAGE                   COMMAND                  SERVICE   CREATED             STATUS                             PORTS
+mensa_backend   mensa_project-backend   "/usr/local/bin/dock…"   backend   32 seconds ago      Up 21 seconds (health: starting)   127.0.0.1:5001->5000/tcp
+mensa_chroma    chromadb/chroma:0.5.3   "/docker_entrypoint.…"   chroma    About an hour ago   Up About an hour (healthy)         127.0.0.1:8001->8000/tcp

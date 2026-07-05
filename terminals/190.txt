@@ -1,0 +1,49 @@
+---
+pid: 2440
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 120; try { Invoke-RestMethod -Uri \"http://localhost:3000/api/ingest_progress?game=pick3\" -TimeoutSec 20 | ConvertTo-Json } catch { $_ }; try { Invoke-RestMethod -Uri \"http://localhost:3000/api/games/summaries?refresh=true\" -TimeoutSec 60 | ConvertTo-Json -Depth 4 } catch { $_ }"
+started_at: 2026-07-04T20:35:16.387Z
+running_for_ms: 18795000 
+---
+{
+    "game":  "pick3",
+    "status":  "queued",
+    "queued":  true,
+    "seq":  1
+}
+{
+    "summaries":  {
+                      "take5":  {
+                                    "game":  "take5",
+                                    "draw_count":  0
+                                },
+                      "pick3":  {
+                                    "game":  "pick3",
+                                    "draw_count":  0
+                                },
+                      "powerball":  {
+                                        "game":  "powerball",
+                                        "draw_count":  0
+                                    },
+                      "megamillions":  {
+                                           "game":  "megamillions",
+                                           "draw_count":  0
+                                       },
+                      "pick10":  {
+                                     "game":  "pick10",
+                                     "draw_count":  0
+                                 },
+                      "cash4life":  {
+                                        "game":  "cash4life",
+                                        "draw_count":  0
+                                    },
+                      "quickdraw":  {
+                                        "game":  "quickdraw",
+                                        "draw_count":  0
+                                    },
+                      "nylotto":  {
+                                      "game":  "nylotto",
+                                      "draw_count":  0
+                                  }
+                  }
+}

@@ -1,0 +1,78 @@
+---
+pid: 4352
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker compose ps; $body = '{\"text\":\"what were the last powerball numbers?\",\"game\":\"powerball\",\"use_rag\":true}'; Invoke-RestMethod -Uri \"http://127.0.0.1:3000/api/chat\" -Method Post -Body $body -ContentType \"application/json\" | ConvertTo-Json -Depth 3"
+started_at: 2026-07-04T21:32:09.494Z
+running_for_ms: 15385005 
+---
+NAME             IMAGE                    COMMAND                  SERVICE    CREATED             STATUS                        PORTS
+mensa_backend    mensa_project-backend    "/usr/local/bin/dock…"   backend    2 minutes ago       Up 2 minutes (healthy)        127.0.0.1:5001->5000/tcp
+mensa_chroma     chromadb/chroma:0.5.3    "/docker_entrypoint.…"   chroma     About an hour ago   Up About an hour (healthy)    127.0.0.1:8001->8000/tcp
+mensa_frontend   mensa_project-frontend   "/docker-entrypoint.…"   frontend   2 minutes ago       Up About a minute (healthy)   127.0.0.1:3000->80/tcp
+{
+    "response":  "I apologize, but I\u0027m currently unable to connect to the AI language model for powerball. This might be due to API key issues or service unavailability. Your message was: \"what were the last powerball numbers?\". Please check your API key configuration or try again later.",
+    "sources":  [
+                    {
+                        "game":  "powerball",
+                        "content":  "{\u0027:sid\u0027: \u0027row-3t5p-p9ut~2k3c\u0027, \u0027:id\u0027: \u002700000000-0000-0000-D003-926E48E19B69\u0027, \u0027:position\u0027: \u00270\u0027, \u0027:created_at\u0027: \u00271780587204\u0027, \u0027:created_meta\u0027: \u0027\u0027, \u0027:updated_at\u0027: \u00271780587204\u0027, \u0027:updated_meta\u0027: \u0027\u0027, \u0027:meta\u0027: \u0027{ }\u0027, \u0027draw_date\u0027: \u00272012-09-12T00:00:00\u0027, \u0027winning_numbers\u0027: \u002724 33 36 48 56 06\u0027, \u0027multiplier\u0027: \u0027\u0027, \u0027double_play_winning_numbers\u0027: \u0027\u0027}",
+                        "distance":  1.3142136335372925,
+                        "metadata":  {
+                                         ":created_at":  "1780587204",
+                                         ":created_meta":  "",
+                                         ":id":  "00000000-0000-0000-D003-926E48E19B69",
+                                         ":meta":  "{ }",
+                                         ":position":  "0",
+                                         ":sid":  "row-3t5p-p9ut~2k3c",
+                                         ":updated_at":  "1780587204",
+                                         ":updated_meta":  "",
+                                         "double_play_winning_numbers":  "",
+                                         "draw_date":  "2012-09-12T00:00:00",
+                                         "multiplier":  "",
+                                         "winning_numbers":  "24 33 36 48 56 06"
+                                     }
+                    },
+                    {
+                        "game":  "powerball",
+                        "content":  "{\u0027:sid\u0027: \u0027row-j7zp_6t94_ydgd\u0027, \u0027:id\u0027: \u002700000000-0000-0000-234D-7FDFB09EEA91\u0027, \u0027:position\u0027: \u00270\u0027, \u0027:created_at\u0027: \u00271780587204\u0027, \u0027:created_meta\u0027: \u0027\u0027, \u0027:updated_at\u0027: \u00271780587204\u0027, \u0027:updated_meta\u0027: \u0027\u0027, \u0027:meta\u0027: \u0027{ }\u0027, \u0027draw_date\u0027: \u00272012-06-20T00:00:00\u0027, \u0027winning_numbers\u0027: \u002711 17 29 56 57 14\u0027, \u0027multiplier\u0027: \u0027\u0027, \u0027double_play_winning_numbers\u0027: \u0027\u0027}",
+                        "distance":  1.3157291412353516,
+                        "metadata":  {
+                                         ":created_at":  "1780587204",
+                                         ":created_meta":  "",
+                                         ":id":  "00000000-0000-0000-234D-7FDFB09EEA91",
+                                         ":meta":  "{ }",
+                                         ":position":  "0",
+                                         ":sid":  "row-j7zp_6t94_ydgd",
+                                         ":updated_at":  "1780587204",
+                                         ":updated_meta":  "",
+                                         "double_play_winning_numbers":  "",
+                                         "draw_date":  "2012-06-20T00:00:00",
+                                         "multiplier":  "",
+                                         "winning_numbers":  "11 17 29 56 57 14"
+                                     }
+                    },
+                    {
+                        "game":  "powerball",
+                        "content":  "{\u0027:sid\u0027: \u0027row-usr9~45jp-8xn6\u0027, \u0027:id\u0027: \u002700000000-0000-0000-0DA4-7B69BE148D76\u0027, \u0027:position\u0027: \u00270\u0027, \u0027:created_at\u0027: \u00271780587204\u0027, \u0027:created_meta\u0027: \u0027\u0027, \u0027:updated_at\u0027: \u00271780587204\u0027, \u0027:updated_meta\u0027: \u0027\u0027, \u0027:meta\u0027: \u0027{ }\u0027, \u0027draw_date\u0027: \u00272023-09-18T00:00:00\u0027, \u0027winning_numbers\u0027: \u002702 21 26 40 42 09\u0027, \u0027multiplier\u0027: \u00273\u0027, \u0027double_play_winning_numbers\u0027: \u0027\u0027}",
+                        "distance":  1.316112995147705,
+                        "metadata":  {
+                                         ":created_at":  "1780587204",
+                                         ":created_meta":  "",
+                                         ":id":  "00000000-0000-0000-0DA4-7B69BE148D76",
+                                         ":meta":  "{ }",
+                                         ":position":  "0",
+                                         ":sid":  "row-usr9~45jp-8xn6",
+                                         ":updated_at":  "1780587204",
+                                         ":updated_meta":  "",
+                                         "double_play_winning_numbers":  "",
+                                         "draw_date":  "2023-09-18T00:00:00",
+                                         "multiplier":  "3",
+                                         "winning_numbers":  "02 21 26 40 42 09"
+                                     }
+                    }
+                ],
+    "context_used":  true,
+    "sources_count":  3,
+    "lm_provider":  "fallback",
+    "tool_name":  null,
+    "tool_result":  null
+}

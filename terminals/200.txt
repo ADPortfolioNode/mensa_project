@@ -1,0 +1,16 @@
+---
+pid: 11672
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 45; Set-Location \"E:\\2024 RESET\\mensa_project\"; docker compose ps; $body = '{\"game\":\"powerball\",\"recent_k\":10}'; Invoke-RestMethod -Uri \"http://127.0.0.1:3000/api/predict\" -Method Post -Body $body -ContentType \"application/json\" -TimeoutSec 90 | Select-Object status,highest_accuracy,@{n='uses_highest';e={$_.model_metadata.uses_highest_accuracy_model}} | ConvertTo-Json"
+started_at: 2026-07-04T22:01:57.250Z
+running_for_ms: 13595012 
+---
+NAME             IMAGE                    COMMAND                  SERVICE    CREATED              STATUS                        PORTS
+mensa_backend    mensa_project-backend    "/usr/local/bin/dock…"   backend    About a minute ago   Up About a minute (healthy)   127.0.0.1:5001->5000/tcp
+mensa_chroma     chromadb/chroma:0.5.3    "/docker_entrypoint.…"   chroma     2 minutes ago        Up About a minute (healthy)   127.0.0.1:8001->8000/tcp
+mensa_frontend   mensa_project-frontend   "/docker-entrypoint.…"   frontend   38 seconds ago       Up 33 seconds (healthy)       127.0.0.1:3000->80/tcp
+{
+    "status":  "COMPLETED",
+    "highest_accuracy":  0.917794484337912,
+    "uses_highest":  true
+}

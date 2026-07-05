@@ -1,0 +1,7 @@
+---
+pid: 4812
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker pull ghcr.io/adportfolionode/mensa-frontend:latest 2>&1; docker pull ghcr.io/adportfolionode/mensa-backend:latest 2>&1"
+started_at: 2026-07-05T00:33:09.299Z
+running_for_ms: 4524998  
+---

@@ -1,0 +1,8 @@
+# HTTP only (no TLS) — LAN testing or when TLS terminates on host nginx
+# Set DOMAIN to your server IP or internal hostname
+
+:80 {
+	encode gzip
+
+	reverse_proxy frontend:80
+}

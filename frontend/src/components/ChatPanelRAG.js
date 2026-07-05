@@ -4,8 +4,28 @@ import Prism from 'prismjs';
 import 'prismjs/themes/prism.css';
 import './ChatPanelRAG.css';
 import getApiBase from '../utils/apiBase';
+import { formatApiError } from '../utils/errorUtils';
+import { formatSuggestionStatusLine, hasSuggestionResponse } from '../utils/suggestionUtils';
 
 const API_BASE = getApiBase();
+const CHAT_REQUEST_TIMEOUT_MS = 120000;
+const TOOL_REQUEST_TIMEOUT_MS = 45000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = CHAT_REQUEST_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s`);
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
 
 const API_ENDPOINTS = [
     { label: 'Startup Status', method: 'GET', path: '/api/startup_status', description: 'Get startup progress and per-game statuses.', sampleBody: '' },
@@ -71,7 +91,34 @@ function renderMarkdown(text) {
     return rawMarkup;
 }
 
-const ChatPanel = ({ game = null }) => {
+function formatDiagnosticsPreview(toolResult) {
+    if (!toolResult || toolResult.status === 'error') {
+        return null;
+    }
+
+    const chromaOk = toolResult?.chroma?.heartbeat?.ok;
+    const localOk = toolResult?.local_health?.ok;
+    const modelCount = toolResult?.models?.count ?? 0;
+    const experimentsOk = Boolean(toolResult?.experiments?.exists);
+    const providers = toolResult?.lm_providers?.ordered_available || [];
+    const hints = toolResult?.gateway_hints || [];
+
+    return (
+        <div className="small text-muted mb-2">
+            <div>Backend: {localOk ? 'OK' : 'FAIL'} | Chroma: {chromaOk ? 'OK' : 'FAIL'} | Models: {modelCount} | Experiments file: {experimentsOk ? 'yes' : 'no'}</div>
+            <div>LM providers: {providers.length ? providers.join(', ') : 'none'}</div>
+            {hints.length > 0 && (
+                <ul className="mb-0 ps-3">
+                    {hints.map((hint, idx) => (
+                        <li key={idx}>{hint}</li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+const ChatPanel = ({ game = null, isExpanded = false, onActivityChange = null }) => {
     const [messages, setMessages] = useState(() => ([
         {
             sender: 'bot',
@@ -142,6 +189,12 @@ const ChatPanel = ({ game = null }) => {
         scrollToBottom();
     }, [messages]);
 
+    useEffect(() => {
+        if (onActivityChange) {
+            onActivityChange(isLoading);
+        }
+    }, [isLoading, onActivityChange]);
+
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!input.trim()) return;
@@ -158,19 +211,23 @@ const ChatPanel = ({ game = null }) => {
                 use_rag: useRag
             };
 
-            const response = await fetch(`${API_BASE}/api/chat`, {
+            const response = await fetchWithTimeout(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
-            });
+            }, CHAT_REQUEST_TIMEOUT_MS);
+
+            const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                const detail = formatApiError(
+                    { response: { data } },
+                    `Request failed (${response.status})`,
+                );
+                throw new Error(detail);
             }
-
-            const data = await response.json();
             
             const botMessageText = data.response || "Sorry, I didn't understand that.";
             const botMessage = { 
@@ -188,7 +245,7 @@ const ChatPanel = ({ game = null }) => {
             console.error('Error sending message:', error);
             const errorMessage = { 
                 sender: 'bot', 
-                text: 'Error: Could not connect to the server. Please try again.',
+                text: `Error: ${error?.message || 'Could not connect to the server. Please try again.'}`,
                 sources: []
             };
             setMessages((prevMessages) => [...prevMessages, errorMessage]);
@@ -207,7 +264,7 @@ const ChatPanel = ({ game = null }) => {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${API_BASE}/api/chat`, {
+            const response = await fetchWithTimeout(`${API_BASE}/api/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -221,9 +278,17 @@ const ChatPanel = ({ game = null }) => {
                         params,
                     },
                 }),
-            });
+            }, TOOL_REQUEST_TIMEOUT_MS);
 
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const detail = formatApiError(
+                    { response: { data } },
+                    `Tool request failed (${response.status})`,
+                );
+                throw new Error(detail);
+            }
             const botMessage = {
                 sender: 'bot',
                 text: data.response || 'Tool execution finished.',
@@ -303,11 +368,17 @@ const ChatPanel = ({ game = null }) => {
                 status: response.status,
             });
 
+            const isPredictEndpoint = resolvedPath === '/api/predict' || resolvedPath.endsWith('/api/predict');
+            const predictDone = isPredictEndpoint && response.ok && hasSuggestionResponse(data);
+            const botText = predictDone
+                ? formatSuggestionStatusLine(data)
+                : `API ${apiMethod} ${resolvedPath} returned status ${response.status}.`;
+
             setMessages((prev) => [
                 ...prev,
                 {
                     sender: 'bot',
-                    text: `API ${apiMethod} ${resolvedPath} returned status ${response.status}.`,
+                    text: botText,
                     sources: [],
                 },
             ]);
@@ -323,8 +394,10 @@ const ChatPanel = ({ game = null }) => {
         }
     };
 
+    const panelClassName = `chat-panel-rag ${isExpanded || isLoading ? 'is-expanded' : 'is-compact'}`;
+
     return (
-        <div className="chat-panel-rag">
+        <div className={panelClassName}>
             <div className="chat-header-rag">
                 <div className="chat-header-left">
                     <h3>Mensa Concierge</h3>
@@ -500,8 +573,9 @@ const ChatPanel = ({ game = null }) => {
                                     <div className="message-sources">
                                         <div className="source-item">
                                             <span className="source-game">Tool: {msg.toolName || 'tool'}</span>
+                                            {msg.toolName === 'self_diagnostics' && formatDiagnosticsPreview(msg.toolResult)}
                                             <details className="tool-result-details">
-                                                <summary>View tool output</summary>
+                                                <summary>View raw diagnostic JSON</summary>
                                                 <pre className="tool-result-pre">
                                                     <code>{JSON.stringify(msg.toolResult, null, 2)}</code>
                                                 </pre>

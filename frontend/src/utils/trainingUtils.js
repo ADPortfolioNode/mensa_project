@@ -74,15 +74,18 @@ export function buildTrainRequestBody(game, trainParams) {
 }
 
 export function formatTrainingSuccessMessage(game, data) {
-  const trainScore = data.highest_accuracy ?? data.score ?? data.accuracy ?? data.final_accuracy;
+  const recordScore = data.record_accuracy ?? data.highest_accuracy ?? data.baseline_accuracy;
+  const trainScore = recordScore ?? data.score ?? data.accuracy ?? data.final_accuracy;
   const scoreText = trainScore != null ? `${(Number(trainScore) * 100).toFixed(2)}%` : 'N/A';
   const strategy = data.model_strategy;
-  const prevAcc = data.previous_accuracy ?? data.baseline_accuracy;
+  const prevAcc = data.previous_accuracy ?? data.baseline_accuracy ?? recordScore;
   const candAcc = data.candidate_accuracy ?? data.new_accuracy;
   const trainTarget = data.training_target ?? data.target_accuracy;
   let learningNote = '';
-  if (data.retained_previous_model && prevAcc != null && candAcc != null) {
-    learningNote = ` Using highest current accuracy (${(prevAcc * 100).toFixed(2)}% > new ${(candAcc * 100).toFixed(2)}%).`;
+  if (data.retained_previous_model && recordScore != null && candAcc != null) {
+    learningNote = ` Record ${(Number(recordScore) * 100).toFixed(2)}% kept (new run ${(Number(candAcc) * 100).toFixed(2)}% did not beat the floor).`;
+  } else if (data.retained_previous_model && prevAcc != null && candAcc != null) {
+    learningNote = ` Record ${(Number(prevAcc) * 100).toFixed(2)}% kept (new run ${(Number(candAcc) * 100).toFixed(2)}%).`;
   } else if (strategy === 'ensemble' && data.blend_weight != null) {
     learningNote = ` Ensemble blend (weight ${Number(data.blend_weight).toFixed(2)}) improved on prior model.`;
   } else if (prevAcc != null && trainScore != null && trainScore > prevAcc) {
@@ -106,8 +109,8 @@ export function formatTrainingErrorMessage(error, formatApiError) {
       'Backend unavailable during training (HTTP '
       + (status || '502')
       + '). The API container may have restarted or run out of memory on large games like Powerball. '
-      + 'Wait 30s, check docker logs for mensa_backend, then retry with Target Accuracy 85–90%, '
-      + 'Max Iterations 10–12, N Estimators 150, and Auto-tune off. '
+      + 'Wait 30s, check docker logs for mensa_backend, then retry with Target Accuracy 85% to 90%, '
+      + 'Max Iterations 10 to 12, N Estimators 150, and Auto-tune off. '
       + 'Also confirm a completed experiment was not already saved.'
     );
   }

@@ -7,6 +7,14 @@ import joblib
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
 from config import GAME_CONFIGS
+from utils.training_params import (
+    extract_training_params,
+    merge_training_params,
+    normalize_leaderboard_entry,
+    params_to_defaults,
+    snapshot_from_trainer,
+    top_scored_params,
+)
 
 
 class TrainerService:
@@ -79,6 +87,15 @@ class TrainerService:
         tokens = re.findall(r"\d+", str(raw_value or ""))
         return [int(token) for token in tokens]
 
+    def _parse_pick3_digits(self, raw_value: str):
+        text = str(raw_value or "").strip()
+        if not text:
+            return []
+        if text.isdigit():
+            padded = text.zfill(3)[-3:]
+            return [int(digit) for digit in padded]
+        return self._parse_numbers(text)
+
     def _get_rules(self, game: str):
         base = {
             "primary_count": 5,
@@ -139,9 +156,10 @@ class TrainerService:
                             return values[:bonus_count]
         return values[:bonus_count]
 
-    def _extract_primary_candidate(self, metadata):
+    def _extract_primary_candidate(self, metadata, game: str | None = None):
         preferred = []
         fallback = []
+        daily_fields = []
 
         for key, value in (metadata or {}).items():
             key_lower = str(key).lower()
@@ -150,13 +168,16 @@ class TrainerService:
 
             if key_lower in ("winning_numbers", "winningnumbers"):
                 preferred.append(value)
+            elif key_lower in ("midday_daily", "evening_daily"):
+                daily_fields.append(value)
             elif "winning" in key_lower and "number" in key_lower:
                 fallback.append(value)
             elif "numbers" in key_lower or "result" in key_lower:
                 fallback.append(value)
 
-        for candidate in preferred + fallback:
-            numbers = self._parse_numbers(candidate)
+        parse_value = self._parse_pick3_digits if str(game or "").lower() == "pick3" else self._parse_numbers
+        for candidate in preferred + daily_fields + fallback:
+            numbers = parse_value(candidate)
             if numbers:
                 return numbers
 
@@ -164,9 +185,18 @@ class TrainerService:
 
     def _extract_record_sequence(self, metadata, game: str):
         rules = self._get_rules(game)
-        winning_numbers = self._extract_primary_candidate(metadata)
+        winning_numbers = self._extract_primary_candidate(metadata, game=game)
         if not winning_numbers:
             return []
+
+        if str(game or "").lower() == "pick3":
+            if len(winning_numbers) == 1 and int(winning_numbers[0]) > 9:
+                winning_numbers = self._parse_pick3_digits(str(winning_numbers[0]))
+            elif len(winning_numbers) > 3:
+                flattened = []
+                for value in winning_numbers:
+                    flattened.extend(self._parse_pick3_digits(str(value)))
+                winning_numbers = flattened
 
         primary_count = int(rules["primary_count"])
         bonus_count = int(rules.get("bonus_count", 0) or 0)
@@ -234,8 +264,24 @@ class TrainerService:
 
     def _extract_winning_sequences(self, metadatas, game: str):
         sequences = []
+        game_key = str(game or "").lower()
         for meta in metadatas or []:
             if not isinstance(meta, dict):
+                continue
+
+            if game_key == "pick3" and not str(meta.get("winning_numbers") or "").strip():
+                for session, field in (("midday", "midday_daily"), ("evening", "evening_daily")):
+                    digits = self._parse_pick3_digits(meta.get(field))
+                    if len(digits) != 3:
+                        continue
+                    session_meta = {
+                        **meta,
+                        "draw_session": session,
+                        "winning_numbers": "".join(str(d) for d in digits),
+                    }
+                    numbers = self._extract_record_sequence(session_meta, game)
+                    if numbers:
+                        sequences.append(numbers)
                 continue
 
             numbers = self._extract_record_sequence(meta, game)
@@ -348,8 +394,17 @@ class TrainerService:
     def _fit_and_score_model(self, X_train, y_train, X_val, y_val, y_full, attempt: int):
         base_estimators = max(50, int(self.n_estimators or 250))
         base_depth = max(4, int(self.max_depth or 18))
-        n_estimators = min(base_estimators + ((attempt - 1) * 20), 600)
-        max_depth = min(base_depth + max(0, attempt - 1), 32)
+        sample_count = len(X_train)
+        estimators_cap = 600
+        depth_cap = 32
+        if sample_count >= 3000:
+            estimators_cap = 200
+            depth_cap = 16
+        elif sample_count >= 1500:
+            estimators_cap = 300
+            depth_cap = 20
+        n_estimators = min(base_estimators + ((attempt - 1) * 20), estimators_cap)
+        max_depth = min(base_depth + max(0, attempt - 1), depth_cap)
         n_jobs = self._rf_n_jobs(len(X_train), n_estimators)
         model = RandomForestRegressor(
             n_estimators=n_estimators,
@@ -407,9 +462,24 @@ class TrainerService:
 
         return np.asarray(primary_model.predict(X), dtype=float)
 
-    def _train_iterative_collect(self, X_train, y_train, X_val, y_val, y_full):
+    def _train_iterative_collect(
+        self,
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        y_full,
+        training_target: float | None = None,
+        floor_accuracy: float | None = None,
+    ):
         candidates = []
-        for attempt in range(1, max(1, int(self.max_train_attempts)) + 1):
+        target = float(
+            training_target if training_target is not None else self.target_accuracy or 0.9
+        )
+        floor = float(floor_accuracy) if floor_accuracy is not None else None
+        effective_target = max(target, floor or 0.0)
+        max_attempts = max(1, int(self.max_train_attempts))
+        for attempt in range(1, max_attempts + 1):
             try:
                 model, mae, accuracy, predictions = self._fit_and_score_model(
                     X_train, y_train, X_val, y_val, y_full, attempt
@@ -423,6 +493,13 @@ class TrainerService:
                         "predictions": np.asarray(predictions, dtype=float),
                     }
                 )
+                candidates.sort(
+                    key=lambda item: float(item.get("accuracy", 0.0)),
+                    reverse=True,
+                )
+                candidates = candidates[:3]
+                if float(accuracy) >= effective_target:
+                    break
             except Exception:
                 continue
         return candidates
@@ -477,23 +554,44 @@ class TrainerService:
         return max(values) if values else None
 
     def _load_stored_baseline(self, game: str) -> float | None:
-        """Load highest known accuracy from persisted metadata JSON."""
+        """Load highest known accuracy from metadata, history, and leaderboard."""
         experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
         metadata_path = os.path.join(experiments_dir, f"{game}_model_metadata.json")
-        if not os.path.exists(metadata_path):
-            return None
+        values: list[float] = []
 
-        try:
-            with open(metadata_path, "r") as handle:
-                data = json.load(handle)
-            values = []
-            for key in ("highest_accuracy", "accuracy", "baseline_accuracy"):
-                value = data.get(key)
-                if value is not None:
-                    values.append(float(value))
-            return max(values) if values else None
-        except Exception:
-            return None
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, "r") as handle:
+                    data = json.load(handle)
+                if isinstance(data, dict):
+                    for key in ("highest_accuracy", "accuracy", "baseline_accuracy"):
+                        value = data.get(key)
+                        if value is not None:
+                            values.append(float(value))
+                    for item in data.get("accuracy_history") or []:
+                        try:
+                            values.append(float(item))
+                        except (TypeError, ValueError):
+                            continue
+                    leaderboard = data.get("score_leaderboard") or []
+                    if leaderboard and isinstance(leaderboard[0], dict):
+                        top = leaderboard[0].get("accuracy")
+                        if top is not None:
+                            values.append(float(top))
+            except Exception:
+                pass
+
+        model_path = os.path.join(self.models_dir, f"{game}_model.joblib")
+        if os.path.exists(model_path):
+            try:
+                artifact = joblib.load(model_path)
+                artifact_score = self._baseline_accuracy(artifact, None)
+                if artifact_score is not None:
+                    values.append(float(artifact_score))
+            except Exception:
+                pass
+
+        return max(values) if values else None
 
     def get_incremental_training_context(
         self,
@@ -523,6 +621,13 @@ class TrainerService:
             except Exception:
                 stored_meta = {}
 
+        score_leaderboard = stored_meta.get("score_leaderboard") or []
+        best_training_params = merge_training_params(
+            stored_meta.get("best_training_params"),
+            extract_training_params(stored_meta),
+            top_scored_params(score_leaderboard),
+        )
+
         return {
             "game": game_key,
             "has_saved_model": has_saved_model,
@@ -537,6 +642,9 @@ class TrainerService:
             "blend_weight": stored_meta.get("blend_weight"),
             "accuracy_history": stored_meta.get("accuracy_history") or [],
             "recent_runs": stored_meta.get("recent_runs") or [],
+            "score_leaderboard": score_leaderboard,
+            "best_training_params": best_training_params,
+            "recreate_defaults": params_to_defaults(best_training_params),
         }
 
     def _resolve_baseline_accuracy(
@@ -698,7 +806,15 @@ class TrainerService:
                 )
                 training_target = max(requested_target, baseline_accuracy or 0.0)
 
-            candidates = self._train_iterative_collect(X_train, y_train, X_val, y_val, y)
+            candidates = self._train_iterative_collect(
+                X_train,
+                y_train,
+                X_val,
+                y_val,
+                y,
+                training_target=training_target,
+                floor_accuracy=baseline_accuracy,
+            )
             if previous_model is not None and previous_predictions is not None:
                 try:
                     prev_mae, prev_acc = self._score_predictions(y_val, previous_predictions, y)
@@ -860,6 +976,42 @@ class TrainerService:
         if floor_accuracy is not None and selected_accuracy < floor_accuracy:
             _apply_previous_artifact()
 
+        if (
+            floor_accuracy is not None
+            and float(candidate_accuracy) < float(floor_accuracy)
+            and not retained_previous_model
+        ):
+            return {
+                "status": "error",
+                "message": (
+                    f"Training accuracy {candidate_accuracy:.4f} is below the record floor "
+                    f"{floor_accuracy:.4f}. Model was not saved to prevent regression."
+                ),
+                "accuracy": float(floor_accuracy),
+                "highest_accuracy": float(floor_accuracy),
+                "record_accuracy": float(floor_accuracy),
+                "baseline_accuracy": float(baseline_accuracy) if baseline_accuracy is not None else None,
+                "candidate_accuracy": float(candidate_accuracy),
+                "previous_accuracy": float(reported_previous_accuracy)
+                if reported_previous_accuracy is not None
+                else None,
+                "target_accuracy": requested_target,
+                "training_target": training_target,
+                "retained_previous_model": False,
+                "model_strategy": str(selected_strategy),
+                "train_size": train_size,
+                "validation_size": val_size,
+                "training_params": snapshot_from_trainer(
+                    self,
+                    train_size=train_size,
+                    validation_size=val_size,
+                    target_accuracy=requested_target,
+                    training_target=training_target,
+                    model_strategy=selected_strategy,
+                    blend_weight=selected_blend_weight,
+                ),
+            }
+
         artifact = {
             "model": selected_model,
             "secondary_model": selected_secondary_model,
@@ -903,7 +1055,14 @@ class TrainerService:
             },
         }
 
+        prior_record = self._load_stored_baseline(game)
         highest_accuracy = float(selected_accuracy) if selected_accuracy is not None else None
+        if prior_record is not None:
+            highest_accuracy = max(
+                [value for value in (highest_accuracy, float(prior_record)) if value is not None],
+                default=prior_record,
+            )
+        record_accuracy = highest_accuracy
         experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
         os.makedirs(experiments_dir, exist_ok=True)
         metadata_path = os.path.join(experiments_dir, f"{game}_model_metadata.json")
@@ -923,13 +1082,34 @@ class TrainerService:
             existing_meta.get("accuracy_history"),
             highest_accuracy,
         )
+        run_training_params = snapshot_from_trainer(
+            self,
+            train_size=train_size,
+            validation_size=val_size,
+            target_accuracy=requested_target,
+            training_target=training_target,
+            model_strategy=selected_strategy,
+            blend_weight=selected_blend_weight,
+        )
+        existing_best_params = merge_training_params(
+            existing_meta.get("best_training_params"),
+            extract_training_params(existing_meta),
+            extract_training_params((previous_artifact or {}).get("metrics") or {}),
+        )
+        if retained_previous_model:
+            best_training_params = existing_best_params or run_training_params
+        else:
+            best_training_params = run_training_params
+
         recent_runs = list(existing_meta.get("recent_runs") or [])
         recent_runs.insert(
             0,
             {
                 "timestamp": time.time(),
                 "accuracy": highest_accuracy,
+                "candidate_accuracy": float(candidate_accuracy) if candidate_accuracy is not None else None,
                 "retained_previous_model": bool(retained_previous_model),
+                "training_params": run_training_params,
             },
         )
         recent_runs = recent_runs[:3]
@@ -939,6 +1119,7 @@ class TrainerService:
             "model_type": "RandomForestRegressor",
             "accuracy": highest_accuracy,
             "highest_accuracy": highest_accuracy,
+            "record_accuracy": record_accuracy,
             "mae": float(selected_mae) if selected_mae is not None else None,
             "feature_len": int(feature_len),
             "output_len": int(output_len),
@@ -960,6 +1141,22 @@ class TrainerService:
             else None,
             "train_size": float(train_size),
             "validation_size": float(val_size),
+            "n_estimators": int(best_training_params.get("n_estimators") or self.n_estimators),
+            "max_depth": int(best_training_params.get("max_depth") or self.max_depth),
+            "random_state": int(best_training_params.get("random_state") or self.random_state),
+            "window_size": int(best_training_params.get("window_size") or window_size),
+            "blend_step": float(best_training_params.get("blend_step") or self.blend_step),
+            "auto_tune": bool(
+                best_training_params.get("auto_tune")
+                if best_training_params.get("auto_tune") is not None
+                else self.auto_tune
+            ),
+            "max_iterations": int(
+                best_training_params.get("max_iterations") or self.max_train_attempts
+            ),
+            "data_limit": best_training_params.get("data_limit"),
+            "training_params": run_training_params,
+            "best_training_params": best_training_params,
             "last_trained_at": time.time(),
             "accuracy_history": accuracy_history,
             "recent_runs": recent_runs,
@@ -977,8 +1174,9 @@ class TrainerService:
                     f"Training completed for {game}. Using highest current accuracy "
                     f"({reported_previous_accuracy:.4f}) — new candidate ({candidate_accuracy:.4f}) did not improve."
                 ),
-                "accuracy": reported_previous_accuracy,
+                "accuracy": highest_accuracy,
                 "highest_accuracy": highest_accuracy,
+                "record_accuracy": record_accuracy,
                 "previous_accuracy": reported_previous_accuracy,
                 "candidate_accuracy": candidate_accuracy,
                 "new_accuracy": candidate_accuracy,
@@ -1000,6 +1198,8 @@ class TrainerService:
                 "blend_weight": selected_blend_weight,
                 "train_size": train_size,
                 "validation_size": val_size,
+                "training_params": run_training_params,
+                "best_training_params": best_training_params,
             }
 
         temp_model_path = f"{model_path}.tmp"
@@ -1014,8 +1214,9 @@ class TrainerService:
                 f"Trained {game} model with highest current accuracy "
                 f"({selected_accuracy:.4f})."
             ),
-            "accuracy": selected_accuracy,
+            "accuracy": highest_accuracy,
             "highest_accuracy": highest_accuracy,
+            "record_accuracy": record_accuracy,
             "mae": selected_mae,
             "model_path": model_path,
             "feature_len": feature_len,
@@ -1037,6 +1238,8 @@ class TrainerService:
             "previous_accuracy": reported_previous_accuracy,
             "train_size": train_size,
             "validation_size": val_size,
+            "training_params": run_training_params,
+            "best_training_params": best_training_params,
         }
 
     def train(
@@ -1054,19 +1257,669 @@ class TrainerService:
         auto_tune: bool = None,
     ):
         """Backward-compatible alias used by API routes and tooling."""
-        self.configure_training(
-            target_accuracy=target_accuracy,
-            max_iterations=max_iterations,
-            train_size=train_size,
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            random_state=random_state,
-            blend_step=blend_step,
-            data_limit=data_limit,
-            window_size=window_size,
-            auto_tune=auto_tune,
+        import logging
+        from experiments.store import (
+            MAX_STORED_PER_GAME,
+            ExperimentStore,
+            _experiment_accuracy,
+            update_accuracy_history,
         )
-        return self.train_model(game)
+
+        logger = logging.getLogger(__name__)
+        started_at = time.time()
+        game_key = str(game or "").strip().lower()
+
+        caller_overrides = {
+            "target_accuracy": target_accuracy,
+            "max_iterations": max_iterations,
+            "train_size": train_size,
+            "n_estimators": n_estimators,
+            "max_depth": max_depth,
+            "random_state": random_state,
+            "blend_step": blend_step,
+            "data_limit": data_limit,
+            "window_size": window_size,
+            "auto_tune": auto_tune,
+        }
+
+        def _coerce_float(value):
+            if value is None:
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        def _coerce_int(value):
+            if value is None:
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+
+        def _config_from_mapping(source: str, accuracy, mapping: dict) -> dict | None:
+            if not isinstance(mapping, dict):
+                return None
+            resolved_accuracy = _coerce_float(accuracy)
+            if resolved_accuracy is None:
+                for key in ("highest_accuracy", "accuracy", "final_accuracy", "score"):
+                    resolved_accuracy = _coerce_float(mapping.get(key))
+                    if resolved_accuracy is not None:
+                        break
+            if resolved_accuracy is None and source == "precision_first_defaults":
+                resolved_accuracy = _coerce_float(self._load_stored_baseline(game_key))
+            stored_params = extract_training_params(mapping)
+            config = {
+                "source": source,
+                "accuracy": resolved_accuracy,
+                "target_accuracy": _coerce_float(
+                    stored_params.get("training_target")
+                    or stored_params.get("target_accuracy")
+                    or mapping.get("training_target")
+                    or mapping.get("target_accuracy")
+                ),
+                "train_size": _coerce_float(stored_params.get("train_size") or mapping.get("train_size")),
+                "n_estimators": _coerce_int(stored_params.get("n_estimators") or mapping.get("n_estimators")),
+                "max_depth": _coerce_int(stored_params.get("max_depth") or mapping.get("max_depth")),
+                "random_state": _coerce_int(stored_params.get("random_state") or mapping.get("random_state")),
+                "window_size": _coerce_int(stored_params.get("window_size") or mapping.get("window_size")),
+                "blend_step": _coerce_float(stored_params.get("blend_step") or mapping.get("blend_step")),
+                "auto_tune": stored_params.get("auto_tune", mapping.get("auto_tune")),
+                "max_iterations": _coerce_int(
+                    stored_params.get("max_iterations")
+                    or mapping.get("max_iterations")
+                    or mapping.get("max_train_attempts")
+                ),
+                "model_strategy": stored_params.get("model_strategy") or mapping.get("model_strategy"),
+                "blend_weight": _coerce_float(stored_params.get("blend_weight") or mapping.get("blend_weight")),
+                "data_limit": _coerce_int(stored_params.get("data_limit") or mapping.get("data_limit")),
+                "training_params": stored_params,
+            }
+            if resolved_accuracy is None and all(
+                config.get(key) is None
+                for key in (
+                    "target_accuracy",
+                    "train_size",
+                    "n_estimators",
+                    "max_depth",
+                    "random_state",
+                    "window_size",
+                    "blend_step",
+                    "max_iterations",
+                )
+            ):
+                return None
+            return config
+
+        def _get_dataset_record_count() -> int:
+            try:
+                from .chroma_client import chroma_client
+
+                return max(0, int(chroma_client.count_documents(game_key) or 0))
+            except Exception as exc:
+                logger.warning("Unable to count dataset records for %s: %s", game_key, exc)
+                return 0
+
+        def _precision_first_defaults(record_count: int) -> dict:
+            defaults = self.get_training_defaults()
+            baseline = self._load_stored_baseline(game_key)
+            if record_count > 3000:
+                n_estimators = 120
+                max_depth = 14
+                max_iterations = 10
+                auto_tune = False
+            elif record_count > 1500:
+                n_estimators = 150
+                max_depth = 16
+                max_iterations = 12
+                auto_tune = False
+            else:
+                n_estimators = min(max(int(defaults["n_estimators"]), 450), 600)
+                max_depth = min(max(int(defaults["max_depth"]), 28), 32)
+                max_iterations = defaults["max_iterations"]
+                auto_tune = defaults["auto_tune"]
+            return _config_from_mapping(
+                "precision_first_defaults",
+                baseline,
+                {
+                    "target_accuracy": max(
+                        float(defaults["target_accuracy"]),
+                        float(baseline or 0.0),
+                    ),
+                    "train_size": defaults["train_size"],
+                    "n_estimators": n_estimators,
+                    "max_depth": max_depth,
+                    "random_state": defaults["random_state"],
+                    "window_size": defaults["window_size"],
+                    "blend_step": defaults["blend_step"],
+                    "auto_tune": auto_tune,
+                    "max_iterations": max_iterations,
+                },
+            )
+
+        def _load_game_optimal_config(record_count: int) -> dict:
+            """Load the highest-accuracy known configuration for this game."""
+            import gc
+
+            candidates: list[dict] = []
+            experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
+            metadata_path = os.path.join(experiments_dir, f"{game_key}_model_metadata.json")
+
+            if os.path.exists(metadata_path):
+                try:
+                    with open(metadata_path, "r") as handle:
+                        metadata = json.load(handle)
+                    candidate = _config_from_mapping(
+                        "metadata",
+                        None,
+                        {
+                            **metadata,
+                            **(metadata.get("best_training_params") or {}),
+                        },
+                    )
+                    if candidate is not None:
+                        candidates.append(candidate)
+                    for item in metadata.get("score_leaderboard") or []:
+                        if not isinstance(item, dict):
+                            continue
+                        board_candidate = _config_from_mapping(
+                            "score_leaderboard",
+                            item.get("accuracy"),
+                            item,
+                        )
+                        if board_candidate is not None:
+                            candidates.append(board_candidate)
+                except Exception as exc:
+                    logger.warning(
+                        "Unable to read optimal config metadata for %s: %s",
+                        game_key,
+                        exc,
+                    )
+
+            experiments_path = os.path.join(experiments_dir, "experiments.json")
+            if os.path.exists(experiments_path):
+                try:
+                    store = ExperimentStore(experiments_path)
+                    for experiment in store.list_experiments():
+                        if str(experiment.get("game") or "").strip().lower() != game_key:
+                            continue
+                        if str(experiment.get("type") or "").lower() != "training":
+                            continue
+                        candidate = _config_from_mapping(
+                            "experiment",
+                            _experiment_accuracy(experiment),
+                            experiment,
+                        )
+                        if candidate is not None:
+                            candidates.append(candidate)
+                except Exception as exc:
+                    logger.warning(
+                        "Unable to read experiment leaderboard config for %s: %s",
+                        game_key,
+                        exc,
+                    )
+
+            # Avoid loading full model artifacts on large games — can OOM before training starts.
+            if record_count <= 1500:
+                model_path = os.path.join(self.models_dir, f"{game_key}_model.joblib")
+                if os.path.exists(model_path):
+                    try:
+                        artifact = joblib.load(model_path)
+                        if isinstance(artifact, dict):
+                            metrics = artifact.get("metrics") or {}
+                            merged = {**metrics, **artifact}
+                            candidate = _config_from_mapping("model_artifact", None, merged)
+                            if candidate is not None:
+                                candidates.append(candidate)
+                    except Exception as exc:
+                        logger.warning(
+                            "Unable to read optimal config from model artifact for %s: %s",
+                            game_key,
+                            exc,
+                        )
+                    finally:
+                        gc.collect()
+
+            if not candidates:
+                fallback = _precision_first_defaults(record_count)
+                logger.info(
+                    "No stored optimal config for %s; using precision-first defaults",
+                    game_key,
+                )
+                return fallback or {}
+
+            candidates.sort(
+                key=lambda item: (
+                    float(item.get("accuracy") if item.get("accuracy") is not None else -1.0),
+                    float(item.get("timestamp") or 0.0),
+                ),
+                reverse=True,
+            )
+            best = candidates[0]
+            logger.info(
+                "Preloaded optimal config for %s from %s (accuracy=%s)",
+                game_key,
+                best.get("source"),
+                best.get("accuracy"),
+            )
+            return best
+
+        def _apply_config(config: dict):
+            configure_kwargs = {
+                "target_accuracy": config.get("target_accuracy"),
+                "max_iterations": config.get("max_iterations"),
+                "train_size": config.get("train_size"),
+                "n_estimators": config.get("n_estimators"),
+                "max_depth": config.get("max_depth"),
+                "random_state": config.get("random_state"),
+                "blend_step": config.get("blend_step"),
+                "data_limit": data_limit,
+                "window_size": config.get("window_size"),
+                "auto_tune": config.get("auto_tune"),
+            }
+            self.configure_training(
+                **{key: value for key, value in configure_kwargs.items() if value is not None}
+            )
+
+        def _apply_memory_safe_caps(record_count: int, *, skip: bool = False) -> dict:
+            """Cap heavy training knobs on large datasets to reduce backend OOM (HTTP 502)."""
+            profile = {"record_count": record_count, "applied": False, "caps": {}}
+            if skip or record_count <= 1500:
+                return profile
+
+            record = _coerce_float(self._load_stored_baseline(game_key))
+
+            if record_count > 3000:
+                caps = {
+                    "max_iterations": 12 if record and record >= 0.85 else 10,
+                    "n_estimators": 150 if record and record >= 0.85 else 120,
+                    "max_depth": 14,
+                    "auto_tune": False,
+                    "data_limit": 2500,
+                }
+            else:
+                caps = {
+                    "max_iterations": 15 if record and record >= 0.85 else 12,
+                    "n_estimators": 180 if record and record >= 0.85 else 150,
+                    "max_depth": 16,
+                    "auto_tune": False,
+                    "data_limit": 3500,
+                }
+
+            applied: dict = {}
+            if self.max_train_attempts > caps["max_iterations"]:
+                applied["max_iterations"] = caps["max_iterations"]
+                self.max_train_attempts = caps["max_iterations"]
+            if self.n_estimators > caps["n_estimators"]:
+                applied["n_estimators"] = caps["n_estimators"]
+                self.n_estimators = caps["n_estimators"]
+            if self.max_depth > caps["max_depth"]:
+                applied["max_depth"] = caps["max_depth"]
+                self.max_depth = caps["max_depth"]
+            if self.auto_tune and caps["auto_tune"] is False:
+                applied["auto_tune"] = False
+                self.auto_tune = False
+            if (not self.data_limit or self.data_limit <= 0) and data_limit is None:
+                applied["data_limit"] = caps["data_limit"]
+                self.data_limit = caps["data_limit"]
+
+            if applied:
+                profile["applied"] = True
+                profile["caps"] = applied
+                logger.warning(
+                    "Applied memory-safe training caps for %s (%s records): %s",
+                    game_key,
+                    record_count,
+                    applied,
+                )
+            return profile
+
+        def _load_existing_leaderboard() -> list[dict]:
+            experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
+            metadata_path = os.path.join(experiments_dir, f"{game_key}_model_metadata.json")
+            entries: list[dict] = []
+
+            if os.path.exists(metadata_path):
+                try:
+                    with open(metadata_path, "r") as handle:
+                        metadata = json.load(handle)
+                    for item in metadata.get("score_leaderboard") or []:
+                        if isinstance(item, dict) and item.get("accuracy") is not None:
+                            entries.append(dict(item))
+                    for accuracy in metadata.get("accuracy_history") or []:
+                        value = _coerce_float(accuracy)
+                        if value is not None:
+                            entries.append({"accuracy": value, "timestamp": 0.0, "source": "history"})
+                except Exception as exc:
+                    logger.warning("Unable to load leaderboard for %s: %s", game_key, exc)
+
+            experiments_path = os.path.join(experiments_dir, "experiments.json")
+            if os.path.exists(experiments_path):
+                try:
+                    store = ExperimentStore(experiments_path)
+                    for experiment in store.list_experiments():
+                        if str(experiment.get("game") or "").strip().lower() != game_key:
+                            continue
+                        if str(experiment.get("type") or "").lower() != "training":
+                            continue
+                        accuracy = _experiment_accuracy(experiment)
+                        if accuracy is None:
+                            continue
+                        entry = normalize_leaderboard_entry(
+                            {
+                                "accuracy": float(accuracy),
+                                "timestamp": float(experiment.get("timestamp") or 0.0),
+                                "source": "experiment",
+                                "training_params": extract_training_params(experiment),
+                                **extract_training_params(experiment),
+                                "model_strategy": experiment.get("model_strategy"),
+                            },
+                            default_timestamp=float(experiment.get("timestamp") or 0.0),
+                        )
+                        if entry:
+                            entries.append(entry)
+                except Exception as exc:
+                    logger.warning(
+                        "Unable to load experiment scores for %s: %s",
+                        game_key,
+                        exc,
+                    )
+
+            return entries
+
+        def _update_leaderboard(existing_entries: list[dict], new_entry: dict | None) -> list[dict]:
+            merged: list[dict] = []
+            for item in existing_entries or []:
+                normalized = normalize_leaderboard_entry(
+                    item,
+                    default_timestamp=float(item.get("timestamp") or 0.0),
+                )
+                if normalized:
+                    merged.append(normalized)
+            if isinstance(new_entry, dict) and new_entry.get("accuracy") is not None:
+                normalized_new = normalize_leaderboard_entry(
+                    new_entry,
+                    default_timestamp=time.time(),
+                )
+                if normalized_new:
+                    merged.append(normalized_new)
+            merged.sort(
+                key=lambda item: (
+                    float(item.get("accuracy") if item.get("accuracy") is not None else -1.0),
+                    float(item.get("timestamp") or 0.0),
+                ),
+                reverse=True,
+            )
+            trimmed: list[dict] = []
+            seen_accuracy: list[float] = []
+            for item in merged:
+                accuracy = _coerce_float(item.get("accuracy"))
+                if accuracy is None:
+                    continue
+                if any(abs(accuracy - seen) <= 1e-9 for seen in seen_accuracy):
+                    continue
+                seen_accuracy.append(accuracy)
+                trimmed.append(item)
+                if len(trimmed) >= MAX_STORED_PER_GAME:
+                    break
+            return trimmed
+
+        def _persist_leaderboard(leaderboard: list[dict], accuracy_history: list[float]):
+            experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
+            os.makedirs(experiments_dir, exist_ok=True)
+            metadata_path = os.path.join(experiments_dir, f"{game_key}_model_metadata.json")
+            metadata: dict = {}
+            if os.path.exists(metadata_path):
+                try:
+                    with open(metadata_path, "r") as handle:
+                        loaded = json.load(handle)
+                        if isinstance(loaded, dict):
+                            metadata = loaded
+                except Exception:
+                    metadata = {}
+            metadata["score_leaderboard"] = leaderboard
+            metadata["accuracy_history"] = accuracy_history
+            top_params = top_scored_params(leaderboard)
+            if top_params:
+                metadata["best_training_params"] = top_params
+                for key, value in top_params.items():
+                    if value is not None:
+                        metadata[key] = value
+            try:
+                with open(metadata_path, "w") as handle:
+                    json.dump(metadata, handle, indent=2)
+            except Exception as exc:
+                logger.warning("Failed to persist leaderboard for %s: %s", game_key, exc)
+
+        def _build_response(
+            result: dict,
+            *,
+            leaderboard: list[dict],
+            optimal_config: dict,
+            optimal_config_applied: bool,
+            accuracy_history: list[float],
+            memory_profile: dict | None = None,
+            status_override: str | None = None,
+        ) -> dict:
+            status = status_override or str(result.get("status") or "error")
+            response = {
+                "status": status,
+                "game": game_key,
+                "message": result.get("message", ""),
+                "training_time": round(time.time() - started_at, 3),
+                "leaderboard": leaderboard,
+                "accuracy_history": accuracy_history,
+                "optimal_config_applied": bool(optimal_config_applied),
+                "optimal_config": {
+                    key: optimal_config.get(key)
+                    for key in (
+                        "source",
+                        "accuracy",
+                        "target_accuracy",
+                        "train_size",
+                        "n_estimators",
+                        "max_depth",
+                        "random_state",
+                        "window_size",
+                        "blend_step",
+                        "auto_tune",
+                        "max_iterations",
+                        "model_strategy",
+                    )
+                },
+                "memory_profile": memory_profile or {},
+            }
+            for key in (
+                "accuracy",
+                "highest_accuracy",
+                "mae",
+                "model_path",
+                "feature_len",
+                "output_len",
+                "samples",
+                "target_accuracy",
+                "training_target",
+                "baseline_accuracy",
+                "attempts",
+                "reached_target",
+                "retained_previous_model",
+                "used_previous_training",
+                "model_strategy",
+                "blend_weight",
+                "candidate_accuracy",
+                "previous_accuracy",
+                "record_accuracy",
+                "new_accuracy",
+                "train_size",
+                "validation_size",
+                "training_params",
+                "best_training_params",
+            ):
+                if key in result and result.get(key) is not None:
+                    response[key] = result.get(key)
+            if response.get("accuracy") is not None and "score" not in response:
+                response["score"] = response.get("accuracy")
+            return response
+
+        if not game_key:
+            logger.error("Training requested without a valid game key")
+            return _build_response(
+                {"status": "error", "message": "A valid game key is required."},
+                leaderboard=[],
+                optimal_config={},
+                optimal_config_applied=False,
+                accuracy_history=[],
+            )
+
+        optimal_config: dict = {}
+        optimal_config_applied = False
+        leaderboard: list[dict] = []
+        accuracy_history: list[float] = []
+        memory_profile: dict = {}
+
+        try:
+            record_count = _get_dataset_record_count()
+            logger.info("Starting training for game=%s records=%s", game_key, record_count)
+            optimal_config = _load_game_optimal_config(record_count)
+            if optimal_config:
+                _apply_config(optimal_config)
+                optimal_config_applied = True
+            self.configure_training(
+                **{key: value for key, value in caller_overrides.items() if value is not None}
+            )
+            record_baseline = _coerce_float(self._load_stored_baseline(game_key))
+            if record_baseline is not None:
+                self.target_accuracy = max(float(self.target_accuracy or 0.0), record_baseline)
+            memory_profile = _apply_memory_safe_caps(record_count)
+            logger.info(
+                "Training %s with n_estimators=%s max_depth=%s train_size=%s "
+                "target_accuracy=%s max_iterations=%s auto_tune=%s data_limit=%s",
+                game_key,
+                self.n_estimators,
+                self.max_depth,
+                self.train_size,
+                self.target_accuracy,
+                self.max_train_attempts,
+                self.auto_tune,
+                self.data_limit,
+            )
+
+            existing_leaderboard = _load_existing_leaderboard()
+            result = self.train_model(game_key)
+
+            record_before = _coerce_float(self._load_stored_baseline(game_key))
+            candidate_acc = _coerce_float(result.get("candidate_accuracy"))
+            should_recreate = (
+                str(result.get("status", "")).lower() == "success"
+                and bool(result.get("retained_previous_model"))
+                and record_before is not None
+                and candidate_acc is not None
+                and candidate_acc + 1e-9 < record_before
+                and optimal_config
+                and not memory_profile.get("recreate_attempted")
+            )
+            if should_recreate:
+                logger.info(
+                    "Recreate-accuracy retry for %s (candidate=%.4f record=%.4f)",
+                    game_key,
+                    candidate_acc,
+                    record_before,
+                )
+                memory_profile["recreate_attempted"] = True
+                _apply_config(optimal_config)
+                self.target_accuracy = max(float(self.target_accuracy or 0.0), record_before)
+                recreate_result = self.train_model(game_key)
+                recreate_acc = _coerce_float(
+                    recreate_result.get("highest_accuracy") or recreate_result.get("accuracy")
+                )
+                prior_acc = _coerce_float(result.get("highest_accuracy") or result.get("accuracy"))
+                if (
+                    str(recreate_result.get("status", "")).lower() == "success"
+                    and recreate_acc is not None
+                    and (prior_acc is None or recreate_acc + 1e-9 >= prior_acc)
+                ):
+                    result = recreate_result
+                    memory_profile["recreate_succeeded"] = True
+                else:
+                    memory_profile["recreate_succeeded"] = False
+
+            result_accuracy = _coerce_float(
+                result.get("highest_accuracy") or result.get("accuracy")
+            )
+            new_leaderboard_entry = None
+            if result_accuracy is not None:
+                scored_params = merge_training_params(
+                    result.get("best_training_params"),
+                    result.get("training_params"),
+                    {
+                        "train_size": result.get("train_size"),
+                        "validation_size": result.get("validation_size"),
+                        "n_estimators": self.n_estimators,
+                        "max_depth": self.max_depth,
+                        "random_state": self.random_state,
+                        "window_size": self.window_size,
+                        "blend_step": self.blend_step,
+                        "auto_tune": self.auto_tune,
+                        "max_iterations": self.max_train_attempts,
+                        "data_limit": self.data_limit,
+                        "target_accuracy": result.get("target_accuracy"),
+                        "training_target": result.get("training_target"),
+                        "model_strategy": result.get("model_strategy"),
+                        "blend_weight": result.get("blend_weight"),
+                    },
+                )
+                new_leaderboard_entry = {
+                    "accuracy": result_accuracy,
+                    "timestamp": time.time(),
+                    "source": "train",
+                    "training_params": scored_params,
+                    **scored_params,
+                }
+            leaderboard = _update_leaderboard(existing_leaderboard, new_leaderboard_entry)
+            accuracy_history = update_accuracy_history(
+                [
+                    item.get("accuracy")
+                    for item in existing_leaderboard
+                    if item.get("accuracy") is not None
+                ],
+                result_accuracy,
+                limit=MAX_STORED_PER_GAME,
+            )
+            _persist_leaderboard(leaderboard, accuracy_history)
+
+            if str(result.get("status", "")).lower() == "error":
+                logger.error(
+                    "Training failed for %s: %s",
+                    game_key,
+                    result.get("message", "unknown error"),
+                )
+            else:
+                logger.info(
+                    "Training completed for %s accuracy=%s leaderboard_top=%s",
+                    game_key,
+                    result_accuracy,
+                    leaderboard[0]["accuracy"] if leaderboard else None,
+                )
+
+            return _build_response(
+                result,
+                leaderboard=leaderboard,
+                optimal_config=optimal_config,
+                optimal_config_applied=optimal_config_applied,
+                accuracy_history=accuracy_history,
+                memory_profile=memory_profile,
+            )
+        except Exception as exc:
+            logger.exception("Unhandled training error for %s", game_key)
+            return _build_response(
+                {"status": "error", "message": str(exc)},
+                leaderboard=leaderboard,
+                optimal_config=optimal_config,
+                optimal_config_applied=optimal_config_applied,
+                accuracy_history=accuracy_history,
+                memory_profile=memory_profile,
+            )
 
     def train_all_games(self, games: list[str] | None = None):
         from config import GAME_CONFIGS
@@ -1075,7 +1928,7 @@ class TrainerService:
         results = []
         for game in targets:
             try:
-                results.append({"game": game, **self.train_model(game)})
+                results.append(self.train(game))
             except Exception as exc:
                 results.append({"game": game, "status": "error", "message": str(exc)})
         return results

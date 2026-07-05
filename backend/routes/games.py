@@ -33,16 +33,27 @@ async def get_games():
 
 
 @router.get("/api/games/summaries")
-async def get_all_game_summaries():
+async def get_all_game_summaries(refresh: bool = False):
     """
     Return draw counts for all games in one non-blocking request.
+    Pass refresh=true to bypass cached draw totals and re-query Chroma.
     """
     game_names = list(GAME_CONFIGS.keys())
-    snapshots = await asyncio.to_thread(
-        chroma_client.get_collections_snapshot,
-        game_names,
-        CHROMA_QUERY_TIMEOUT,
-    )
+    try:
+        snapshots = await asyncio.wait_for(
+            asyncio.to_thread(
+                chroma_client.get_collections_snapshot,
+                game_names,
+                CHROMA_QUERY_TIMEOUT,
+                refresh,
+            ),
+            timeout=CHROMA_QUERY_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        snapshots = [
+            {"name": game, "count": 0, "state": "timeout"}
+            for game in game_names
+        ]
     summaries = {
         snap["name"]: {
             "game": snap["name"],

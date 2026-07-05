@@ -7,8 +7,7 @@ from typing import Optional, Dict, Any
 from services.lm_router import lm_router
 from services.rag_service import rag_service
 from services.gemini_client import LM_UNAVAILABLE_PREFIX
-from utils.chat_tools import _render_tool_response
-from config import GAME_CONFIGS
+from utils.chat_tools import _render_tool_response, execute_chat_tool
 
 
 router = APIRouter()
@@ -53,24 +52,40 @@ async def chat(request: ChatRequest):
     AI chat endpoint with optional RAG context and tool calling.
     """
     try:
+        if request.tool:
+            tool_name = request.tool.get("name")
+            if not tool_name:
+                raise HTTPException(status_code=400, detail="Tool name is required")
+
+            tool_params = request.tool.get("params") or {}
+            tool_result = await execute_chat_tool(tool_name, tool_params)
+            response_text = _render_tool_response(tool_name, tool_result)
+
+            return ChatResponse(
+                response=response_text,
+                sources=[],
+                context_used=False,
+                sources_count=0,
+                lm_provider=None,
+                tool_name=tool_name,
+                tool_result=tool_result,
+            )
+
         # Prepare context if RAG is enabled
         context_docs = []
         if request.use_rag and request.game:
             try:
-                # Resolve game key if provided
                 from utils.validation import _require_game_key
                 game_key = _require_game_key(request.game)
-                
-                # Retrieve relevant context
                 context_docs = rag_service.retrieve_context(
                     query=request.text,
                     game=game_key,
-                    top_k=3
+                    top_k=3,
                 )
-            except ValueError:
-                # Invalid game key, continue without RAG
-                pass
-        
+            except (ValueError, Exception):
+                # Invalid game key or retrieval failure — continue without RAG
+                context_docs = []
+
         # Build prompt with context if available
         if context_docs:
             context_text = "\n".join([doc.get("content", "") for doc in context_docs])
@@ -79,7 +94,7 @@ async def chat(request: ChatRequest):
         else:
             augmented_prompt = request.text
             context_used = False
-        
+
         # Get response from language model via router (auto-failover across providers)
         selected_provider = request.lm_provider or "auto"
         try:
@@ -99,24 +114,18 @@ async def chat(request: ChatRequest):
             lm_response = _chat_fallback_for_lm_unavailable(
                 request.text, f"Error: {str(e)}", request.game
             )
-        
-        # Handle tool calling if provided
-        tool_name = None
-        tool_result = None
-        if request.tool:
-            # Process tool call (simplified for now)
-            tool_name = request.tool.get("name")
-            tool_result = {"status": "not_implemented", "message": "Tool calling not yet fully extracted"}
-        
+
         return ChatResponse(
             response=lm_response,
             sources=context_docs,
             context_used=context_used,
             sources_count=len(context_docs),
             lm_provider=selected_provider,
-            tool_name=tool_name,
-            tool_result=tool_result
+            tool_name=None,
+            tool_result=None,
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

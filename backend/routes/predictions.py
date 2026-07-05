@@ -6,11 +6,10 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from services.predictor import predictor_service
 from experiments.store import ExperimentStore
 from utils.validation import _require_game_key
-from config import GAME_PREDICTION_SCHEDULES
 
 
 router = APIRouter()
@@ -83,22 +82,11 @@ async def make_prediction(request: PredictionRequest):
                 "message": result.get("message", "Suggestion failed."),
             }
 
-        # Calculate next draw date
-        tz = None  # Use local timezone
-        dt = datetime.now(tz) if tz else datetime.now()
-        schedule = GAME_PREDICTION_SCHEDULES.get(game_key, {})
-        
-        # Find next draw date (simple: next day with >0 draws)
-        next_draw_date = None
-        for offset in range(1, 8):
-            candidate = dt + timedelta(days=offset)
-            weekday = candidate.weekday()
-            daily = int(schedule.get("daily_draws", 0) or 0)
-            weekday_draws = schedule.get("weekday_draws", {})
-            draws = int(weekday_draws.get(weekday, daily) or 0)
-            if draws > 0:
-                next_draw_date = candidate.date().isoformat()
-                break
+        next_draw_date = (
+            result.get("prediction_date")
+            or result.get("predicted_for_date")
+            or None
+        )
 
         exp_store.save_experiment({
             "experiment_id": f"predict-{game_key}-{int(timestamp)}",
@@ -116,6 +104,8 @@ async def make_prediction(request: PredictionRequest):
             "status": "COMPLETED",
             "game": game_key,
             "next_draw_date": next_draw_date,
+            "highest_accuracy": result.get("highest_accuracy"),
+            "model_metadata": result.get("model_metadata"),
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

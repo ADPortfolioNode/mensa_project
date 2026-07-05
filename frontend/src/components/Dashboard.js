@@ -35,7 +35,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   const API_BASE = getApiBase();
   // Use runtime-computed API base
   // eslint-disable-next-line no-console
-  console.debug('API base:', API_BASE);
+  console.debug('API base:', API_BASE || '(same-origin via nginx proxy)');
   const [ingestStatus, setIngestStatus] = useState('idle');
   const [ingestErrorMessage, setIngestErrorMessage] = useState('');
   const [ingestingGame, setIngestingGame] = useState(null);
@@ -55,6 +55,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   const [selectedExperimentReadyGame, setSelectedExperimentReadyGame] = useState('');
   const [selectedTrainingExperimentId, setSelectedTrainingExperimentId] = useState('');
   const [expandedCard, setExpandedCard] = useState(null);
+  const [chatIsActive, setChatIsActive] = useState(false);
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0);
   const [allGamesProgress, setAllGamesProgress] = useState({});
 
@@ -182,7 +183,14 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
       try {
         const response = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
         if (cancelled || !response?.data) return;
-        const mapped = mapDefaults(response.data.defaults || {}, trainParams);
+        const recreateDefaults = response.data.recreate_defaults
+          || response.data.incremental?.recreate_defaults
+          || response.data.incremental?.best_training_params
+          || {};
+        const mapped = mapDefaults(
+          { ...(response.data.defaults || {}), ...recreateDefaults },
+          trainParams,
+        );
         const keys = ['testSize', 'randomState', 'nEstimators', 'maxDepth', 'maxIterations', 'targetAccuracy', 'windowSize', 'autoTune', 'blendStep'];
         const shouldOverwrite = trainDefaultsForGame === null || shallowEqual(trainParams, trainDefaultsForGame, keys);
         if (shouldOverwrite) {
@@ -252,12 +260,16 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   }, [API_BASE]);
 
   useEffect(() => {
+    if (trainStatus === 'in progress' || ingestStatus === 'in progress') {
+      return undefined;
+    }
+
     return startPolling({
       intervalMs: 30000,
       maxBackoffMs: 120000,
       tick: async () => {
         try {
-          const r = await axios.get(`${API_BASE}/api/experiments?limit=100`, { timeout: 15000 });
+          const r = await axios.get(`${API_BASE}/api/experiments?limit=100`, { timeout: 30000 });
           const experimentsPayload = Array.isArray(r.data)
             ? r.data
             : (Array.isArray(r.data?.experiments) ? r.data.experiments : []);
@@ -268,11 +280,12 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
             setExperimentsErrorMessage(e?.response?.data?.detail || e.message || 'Failed to fetch experiments.');
             return;
           }
+          // Backend restarting or busy — backoff silently without UI error spam
           throw e;
         }
       },
     });
-  }, [API_BASE]);
+  }, [API_BASE, trainStatus, ingestStatus]);
 
   const startIngest = useCallback(async () => {
     if (!selectedGame) return;
@@ -596,6 +609,14 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     return 'idle';
   }, [ingestStatus, hasStoredDataForSelection]);
 
+  const effectiveTrainingTarget = useMemo(() => {
+    const requested = Number(trainParams.targetAccuracy ?? 0.9);
+    const prior = trainIncremental?.highest_accuracy ?? trainIncremental?.baseline_accuracy;
+    const safeRequested = Number.isFinite(requested) ? Math.min(0.99, Math.max(0.5, requested)) : 0.9;
+    if (prior == null || !Number.isFinite(Number(prior))) return safeRequested;
+    return Math.max(safeRequested, Number(prior));
+  }, [trainParams.targetAccuracy, trainIncremental]);
+
   const startTrain = useCallback(async () => {
     if (effectiveIngestStatus !== 'completed' || !selectedTrainGame) {
       alert('Please complete data ingestion first and select a game.');
@@ -615,7 +636,10 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     try {
       const response = await axios.post(
         `${API_BASE}/api/train`,
-        buildTrainRequestBody(selectedTrainGame, trainParams),
+        buildTrainRequestBody(selectedTrainGame, {
+          ...trainParams,
+          targetAccuracy: effectiveTrainingTarget,
+        }),
         { timeout: 600000 },
       );
       clearInterval(interval); // Clear interval regardless of outcome
@@ -651,15 +675,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
       setTrainErrorMessage(errText);
       alert(`Training failed due to an error: ${errText}`);
     }
-  }, [effectiveIngestStatus, selectedTrainGame, selectedTrainGameStoredDraws, trainParams, API_BASE]);
-
-  const effectiveTrainingTarget = useMemo(() => {
-    const requested = Number(trainParams.targetAccuracy ?? 0.9);
-    const prior = trainIncremental?.highest_accuracy ?? trainIncremental?.baseline_accuracy;
-    const safeRequested = Number.isFinite(requested) ? Math.min(0.99, Math.max(0.5, requested)) : 0.9;
-    if (prior == null || !Number.isFinite(Number(prior))) return safeRequested;
-    return Math.max(safeRequested, Number(prior));
-  }, [trainParams.targetAccuracy, trainIncremental]);
+  }, [effectiveIngestStatus, selectedTrainGame, selectedTrainGameStoredDraws, trainParams, effectiveTrainingTarget, API_BASE]);
 
   const trainingModelTypeLabel = useMemo(() => {
     const strategy =
@@ -730,10 +746,13 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     return 'Unknown';
   }, [startupStatus.status]);
 
-  // Helper to determine if card should span 2 columns
-  const getColSpan = (cardKey) => {
-    return expandedCard === cardKey ? 'col-md-12' : 'col-md-6';
+  const handleCardFocus = (cardKey) => (expanded) => {
+    setExpandedCard(expanded ? cardKey : null);
   };
+
+  const getFocusColClass = (cardKey) => (
+    `focus-cards-col${expandedCard === cardKey ? ' focus-cards-col-maximized' : ''}`
+  );
 
   const renderCardErrorAlert = (title, message, className = 'mt-3 mb-0') => {
     if (!message) return null;
@@ -759,24 +778,6 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         </div>
       </div>
       <WorkflowSummary />
-      <div className="row g-4 mb-4">
-        <div className="col-12">
-          <div className="card h-100">
-            <div className="card-body">
-              <h4 className="text-neon mb-3">Mensa Concierge</h4>
-              <p className="mb-2">
-                Friendly, personable, and deeply technical support for Python, React, ChromaDB, and RAG workflows.
-              </p>
-              <p className="mb-0 text-muted">
-                Use built-in tools for file management, internet search, and self diagnostics directly from chat.
-              </p>
-              <div className="mt-4">
-                <ChatPanelRAG game={selectedGame} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
       <div className="mb-4">
         <h4 className="text-neon">Workflow Status</h4>
         <div className="mb-2">
@@ -809,11 +810,38 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         </div>
       </div>
 
-      <div className="row g-4">
+      <div className="focus-cards-row">
+        {/* Mensa Concierge */}
+        <div className={getFocusColClass('chat')}>
+          <ExpandableCard
+            title="Mensa Concierge"
+            cardKey="chat"
+            focusedCard={expandedCard}
+            neonBorder={true}
+            isActive={chatIsActive}
+            metadata={{
+              'Game Context': selectedGame || 'All games',
+              'Status': chatIsActive ? 'Responding' : 'Ready',
+            }}
+            onToggle={handleCardFocus('chat')}
+          >
+            <p className="mb-3 text-muted">
+              Friendly support for Python, React, ChromaDB, and RAG workflows. Panel expands while chat is active.
+            </p>
+            <ChatPanelRAG
+              game={selectedGame}
+              isExpanded={expandedCard === 'chat' || chatIsActive}
+              onActivityChange={setChatIsActive}
+            />
+          </ExpandableCard>
+        </div>
+
         {/* Data Ingestion Card */}
-        <div className={`col-12 ${getColSpan('ingest')}`}>
+        <div className={getFocusColClass('ingest')}>
           <ExpandableCard
             title="Data Ingestion"
+            cardKey="ingest"
+            focusedCard={expandedCard}
             neonBorder={true}
             isActive={effectiveIngestStatus === 'in progress'}
             metadata={selectedGame ? {
@@ -829,7 +857,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
                 {effectiveIngestStatus}
               </span>
             }
-            onToggle={(expanded) => setExpandedCard(expanded ? 'ingest' : null)}
+            onToggle={handleCardFocus('ingest')}
           >
             <p>Fetch and sync lottery data from NY Open Data.</p>
             <div className="mb-3">
@@ -924,9 +952,11 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         </div>
 
         {/* Model Training Card */}
-        <div className={`col-12 ${getColSpan('train')}`}>
+        <div className={getFocusColClass('train')}>
           <ExpandableCard
             title="Model Training"
+            cardKey="train"
+            focusedCard={expandedCard}
             neonBorder={true}
             isActive={trainStatus === 'in progress'}
             metadata={{
@@ -951,7 +981,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
                 {trainStatus}
               </span>
             }
-            onToggle={(expanded) => setExpandedCard(expanded ? 'train' : null)}
+            onToggle={handleCardFocus('train')}
           >
             <p>Train machine learning model on lottery draw history. Each run builds incrementally on the saved model and highest known accuracy.</p>
             <p className="small text-neon mb-3">
@@ -1184,31 +1214,35 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         </div>
 
         {/* Suggestion Panel */}
-        <div className="col-12 col-md-6">
+        <div className={getFocusColClass('predict')}>
           <ExpandableCard
             title="Suggestions"
+            cardKey="predict"
+            focusedCard={expandedCard}
             neonBorder={true}
             metadata={{
               'Status': isTrained ? 'Model Ready' : 'Awaiting Training',
               'Experiments': experiments.length
             }}
-            onToggle={(expanded) => setExpandedCard(expanded ? 'predict' : null)}
+            onToggle={handleCardFocus('predict')}
           >
             <PredictionPanel games={games} disabled={!isTrained} />
           </ExpandableCard>
         </div>
 
         {/* Game Summary */}
-        <div className="col-12 col-md-6">
+        <div className={getFocusColClass('games')}>
           <ExpandableCard
             title="Game Contents"
+            cardKey="games"
+            focusedCard={expandedCard}
             neonBorder={true}
             metadata={{
               'Total Games': games.length,
               'Total Draws': Object.values(gameContents).reduce((a, b) => a + b, 0),
               ...(gameContentsErrorMessage ? { 'Error Message': gameContentsErrorMessage } : {})
             }}
-            onToggle={(expanded) => setExpandedCard(expanded ? 'games' : null)}
+            onToggle={handleCardFocus('games')}
           >
             {renderCardErrorAlert('Game Content Error', gameContentsErrorMessage, 'mb-3')}
             <GameSummaryPanel games={games} refreshKey={summaryRefreshKey} initialSummaries={gameContents} />
@@ -1216,31 +1250,35 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         </div>
 
         {/* ChromaDB Status */}
-        <div className="col-12 col-md-6">
+        <div className={getFocusColClass('chroma')}>
           <ExpandableCard
             title="ChromaDB Collections"
+            cardKey="chroma"
+            focusedCard={expandedCard}
             neonBorder={true}
             metadata={{
               'Host': 'mensa_chroma',
               'Port': '8000'
             }}
-            onToggle={(expanded) => setExpandedCard(expanded ? 'chroma' : null)}
+            onToggle={handleCardFocus('chroma')}
           >
             <ChromaStatusPanel />
           </ExpandableCard>
         </div>
 
         {/* Experiments */}
-        <div className="col-12">
+        <div className={getFocusColClass('experiments')}>
           <ExpandableCard
             title="Training Experiments"
+            cardKey="experiments"
+            focusedCard={expandedCard}
             neonBorder={true}
             metadata={{
               'Total Experiments': experiments.length,
               'Last Updated': new Date().toLocaleString(),
               ...(experimentsErrorMessage ? { 'Error Message': experimentsErrorMessage } : {})
             }}
-            onToggle={(expanded) => setExpandedCard(expanded ? 'experiments' : null)}
+            onToggle={handleCardFocus('experiments')}
           >
             {renderCardErrorAlert('Experiments Error', experimentsErrorMessage, 'mb-3')}
             <ExperimentsPanel experiments={experiments} />

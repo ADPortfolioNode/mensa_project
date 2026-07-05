@@ -7,7 +7,7 @@ A full-stack predictive analytics and RAG (Retrieval-Augmented Generation) appli
 ### Prerequisites
 - Docker 20.10+ and Docker Compose 2.0+
 
-### One-Command Deployment
+### One-Command Deployment (local development)
 
 ```bash
 # Clone the repository
@@ -26,6 +26,18 @@ docker compose up --build -d
 # Backend:   http://localhost:5000
 # ChromaDB:  http://localhost:8000
 ```
+
+### Public web server (subscribing customers)
+
+Deploy with HTTPS, internal-only API/Chroma, and optional subscriber login:
+
+```bash
+cp .env.production.example .env
+# Edit DOMAIN, ACME_EMAIL, API keys; set CADDY_PROFILE=subscribers for paid access
+./scripts/deploy-production.sh
+```
+
+Full guide: [docs/deployment/PUBLIC_DISTRIBUTION.md](docs/deployment/PUBLIC_DISTRIBUTION.md)
 
 ### Required API Keys
 

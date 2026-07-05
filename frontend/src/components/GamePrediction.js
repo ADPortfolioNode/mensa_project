@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import getApiBase from '../utils/apiBase';
+import { hasSuggestionResponse } from '../utils/suggestionUtils';
 import PredictionDisplay from './PredictionDisplay';
 import './PredictionDisplay.css';
 
@@ -19,14 +20,14 @@ export default function GamePrediction({ game }) {
       const r = await axios.post(`${apiBase}/api/predict`, {
         game: game,
         recent_k: parseInt(recentK, 10)
-      });
+      }, { timeout: 600000 });
       const payload = r.data || {};
       if (payload.status === 'error') {
         setError(payload.message || 'Suggestion failed');
         return;
       }
-      if (!payload.predicted_numbers) {
-        setError('Suggestion response did not include suggested numbers.');
+      if (!hasSuggestionResponse(payload)) {
+        setError('Suggestion response did not include suggested numbers or a system message.');
         return;
       }
       setPrediction(payload);

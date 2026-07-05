@@ -19,6 +19,17 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@router.get("/api/diag")
+async def runtime_diagnostics():
+    """Structured runtime diagnostics for scripts and support tooling."""
+    from utils.diagnostics import collect_runtime_diagnostics
+
+    try:
+        return await collect_runtime_diagnostics()
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+
+
 @router.get("/api/startup_status")
 async def get_startup_status():
     """

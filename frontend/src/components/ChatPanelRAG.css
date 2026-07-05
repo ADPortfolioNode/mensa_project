@@ -5,11 +5,21 @@
     flex-direction: column;
     height: 100%;
     max-height: 600px;
+    transition: max-height 0.25s ease, min-height 0.25s ease;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     overflow: hidden;
     animation: fadeIn 0.3s ease-in-out;
+}
+
+.chat-panel-rag.is-compact {
+    max-height: 420px;
+}
+
+.chat-panel-rag.is-expanded {
+    max-height: min(78vh, 920px);
+    min-height: 520px;
 }
 
 /* Chat Header */

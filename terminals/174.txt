@@ -1,0 +1,8 @@
+---
+pid: 836
+cwd: "E:\2024 RESET\mensa_project"
+command: "curl.exe -s -m 15 \"http://127.0.0.1:8001/api/v1/collections/07565012-fa30-4b72-9e38-186e0df9fbdd/count\"; Write-Host \"\"; curl.exe -s -m 15 \"http://127.0.0.1:8001/api/v1/collections/faf20147-dd61-4726-b10b-b965ae84cc85/count\""
+started_at: 2026-07-04T14:05:20.933Z
+running_for_ms: 164982   
+---
+

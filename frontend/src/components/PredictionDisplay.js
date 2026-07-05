@@ -1,4 +1,5 @@
 import React from 'react';
+import NextGameScheduleBanner from './NextGameScheduleBanner';
 import './PredictionDisplay.css';
 
 const PredictionDisplay = ({ prediction }) => {
@@ -55,6 +56,7 @@ const PredictionDisplay = ({ prediction }) => {
     const meta = prediction.model_metadata || {};
     return (
       <div className="prediction-display">
+        <NextGameScheduleBanner prediction={prediction} includeDrawCount />
         <h6 className="prediction-header">Suggested Numbers ({session.length} Draws)</h6>
         <div className="text-muted mb-2">
           {prediction.predicted_for_date && (
@@ -66,7 +68,12 @@ const PredictionDisplay = ({ prediction }) => {
           {meta.blend_weight !== undefined && (
             <span style={{ marginLeft: 12 }}>Blend: {meta.blend_weight}</span>
           )}
-          {meta.used_previous_training !== undefined && (
+          {meta.highest_accuracy != null && (
+            <span style={{ marginLeft: 12 }}>
+              Highest accuracy: {(Number(meta.highest_accuracy) * 100).toFixed(2)}%
+            </span>
+          )}
+        {meta.used_previous_training !== undefined && (
             <span style={{ marginLeft: 12 }}>PrevTrain: {meta.used_previous_training ? 'Yes' : 'No'}</span>
           )}
         </div>
@@ -95,7 +102,15 @@ const PredictionDisplay = ({ prediction }) => {
     : [];
   if (singleNumbers.length === 0) {
     if (prediction.message) {
-      return <div className="text-muted">{prediction.message}</div>;
+      return (
+        <div className="prediction-display">
+          <NextGameScheduleBanner prediction={prediction} />
+          <h6 className="prediction-header">Suggestion Status</h6>
+          <div className="alert alert-info mb-0" role="status">
+            {prediction.message}
+          </div>
+        </div>
+      );
     }
     return null;
   }
@@ -104,25 +119,22 @@ const PredictionDisplay = ({ prediction }) => {
   const meta = prediction.model_metadata || {};
   return (
     <div className="prediction-display">
+      <NextGameScheduleBanner prediction={prediction} />
       <h6 className="prediction-header">Suggested Numbers</h6>
       <div className="text-muted mb-2">
-        {prediction.predicted_for_date && (
-          <span>Date: {prediction.predicted_for_date}</span>
-        )}
-        {singlePrediction.prediction_date && (
-          <span style={{ marginLeft: 12 }}>Draw: {singlePrediction.prediction_date}</span>
-        )}
-        {singlePrediction.prediction_weekday && (
-          <span style={{ marginLeft: 8 }}>({singlePrediction.prediction_weekday})</span>
-        )}
         {singlePrediction.prediction_timezone && (
-          <span style={{ marginLeft: 8 }}>[{singlePrediction.prediction_timezone}]</span>
+          <span>Timezone: {singlePrediction.prediction_timezone}</span>
         )}
         {meta.model_strategy && (
           <span style={{ marginLeft: 12 }}>Strategy: {meta.model_strategy}</span>
         )}
         {meta.blend_weight !== undefined && (
           <span style={{ marginLeft: 12 }}>Blend: {meta.blend_weight}</span>
+        )}
+        {(meta.highest_accuracy != null || prediction.highest_accuracy != null) && (
+          <span style={{ marginLeft: 12 }}>
+            Highest accuracy: {(Number(meta.highest_accuracy ?? prediction.highest_accuracy) * 100).toFixed(2)}%
+          </span>
         )}
         {meta.used_previous_training !== undefined && (
           <span style={{ marginLeft: 12 }}>PrevTrain: {meta.used_previous_training ? 'Yes' : 'No'}</span>

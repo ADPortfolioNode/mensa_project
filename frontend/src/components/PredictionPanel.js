@@ -33,7 +33,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
           axios.post(`${apiBase}/api/predict`, {
             game,
             recent_k: parseInt(recentK, 10),
-          })
+          }, { timeout: 600000 })
         )
       );
 

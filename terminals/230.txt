@@ -1,0 +1,15 @@
+---
+pid: 1552
+cwd: "E:\2024 RESET\mensa_project"
+command: "python \"E:\\2024 RESET\\mensa_project\\scripts\\test_next_scheduled_predict.py\""
+started_at: 2026-07-05T07:50:38.660Z
+running_for_ms: 24175017 
+---
+take5          status=COMPLETED date=2026-07-05 weekday=Sunday numbers=[5, 9, 14, 19, 22] msg=None
+pick3          REQUEST_FAIL timed out
+powerball      status=error date=None weekday=None numbers=[] msg=Not enough historical draws for model window.
+megamillions   status=COMPLETED date=2026-07-07 weekday=Tuesday numbers=[11, 26, 34, 47, 59, 9] msg=None
+pick10         status=COMPLETED date=2026-07-05 weekday=Sunday numbers=[5, 10, 14, 19, 23, 26, 30, 35, 40, 44] msg=None
+cash4life      status=COMPLETED date=2026-07-05 weekday=Sunday numbers=[8, 20, 28, 37, 50, 3] msg=None
+quickdraw      status=error date=None weekday=None numbers=[] msg=Not enough historical draws for model window.
+nylotto        status=COMPLETED date=2026-07-08 weekday=Wednesday numbers=[7, 18, 26, 38, 46, 53, 25] msg=None

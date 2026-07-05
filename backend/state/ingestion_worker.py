@@ -20,20 +20,12 @@ _startup_count_workers = max(1, int(os.getenv("INGEST_STARTUP_COUNT_WORKERS", "4
 
 
 def _prefetch_existing_counts(games: list[str]) -> dict[str, int]:
-    """Parallel read-only Chroma counts to avoid serial round-trips before ingest."""
-    from services.chroma_client import chroma_client
+    """Load cached draw counts; avoid slow Chroma count calls during startup."""
+    from state.draw_counts import get_all_draw_counts
 
-    counts: dict[str, int] = {}
-    workers = min(_startup_count_workers, len(games))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(chroma_client.count_documents, game): game for game in games}
-        for future in as_completed(futures):
-            game = futures[future]
-            try:
-                counts[game] = int(future.result() or 0)
-            except Exception as exc:
-                print(f"⚠ [STARTUP] Could not count existing draws for {game}: {exc}")
-                counts[game] = 0
+    counts = get_all_draw_counts(games)
+    for game in games:
+        counts.setdefault(game, 0)
     return counts
 
 

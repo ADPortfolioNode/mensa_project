@@ -104,6 +104,7 @@ $checks = @(
     @("experiments", "http://127.0.0.1:${BackendPort}/api/experiments?limit=3")
 )
 $passed = 0
+$totalChecks = $checks.Count + 1
 foreach ($c in $checks) {
     if (Invoke-HttpCheck $c[0] $c[1] 12) { $passed++ }
 }
@@ -111,8 +112,27 @@ foreach ($c in $checks) {
 Write-Log "backend logs (tail 20):"
 docker logs mensa_backend --tail 20 2>&1 | ForEach-Object { Write-Log $_ }
 
-Write-Log "SUMMARY: $passed / $($checks.Count) checks passed"
-if ($passed -eq $checks.Count) {
+# Quick predict probe (pick3 is fast)
+try {
+    $predictBody = '{"game":"pick3","recent_k":5}'
+    $predictResp = Invoke-RestMethod -Uri "http://127.0.0.1:${BackendPort}/api/predict" -Method POST -ContentType "application/json" -Body $predictBody -TimeoutSec 90
+    Write-Log "OK predict_direct -> status=$($predictResp.status)"
+    $passed++
+} catch {
+    Write-Log "FAIL predict_direct -> $($_.Exception.Message)"
+}
+
+Write-Log "SUMMARY: $passed / $totalChecks checks passed"
+
+$gatewayScript = Join-Path $ProjectRoot "scripts\diag_gateway_502.ps1"
+if (Test-Path $gatewayScript) {
+    Write-Log "Running runtime gateway probe..."
+    & $gatewayScript -ProjectRoot $ProjectRoot -LogFile $LogFile -BackendPort $BackendPort -FrontendPort $FrontendPort
+    $gatewayExit = $LASTEXITCODE
+    Write-Log "Gateway probe exit code: $gatewayExit"
+}
+
+if ($passed -eq $totalChecks) {
     Write-Log "DIAGNOSTIC PASS"
     exit 0
 }

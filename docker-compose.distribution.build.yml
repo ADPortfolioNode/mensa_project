@@ -1,0 +1,24 @@
+# Build images on the server instead of pulling from GHCR.
+# Use when registry packages are private or you want to deploy from a git checkout.
+#
+#   BUILD_LOCAL=1 ./scripts/deploy-production.sh
+#   docker compose -f docker-compose.distribution.yml -f docker-compose.distribution.build.yml --profile tls up -d --build
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        CACHE_BUSTER: ${BACKEND_CACHE_BUSTER:-distribution}
+    image: ${MENSA_REGISTRY:-ghcr.io/adportfolionode}/mensa-backend:${MENSA_VERSION:-latest}
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NODE_VERSION: 22.13.1
+        REACT_APP_API_BASE: ""
+        CACHE_BUSTER: ${FRONTEND_CACHE_BUSTER:-distribution}
+    image: ${MENSA_REGISTRY:-ghcr.io/adportfolionode}/mensa-frontend:${MENSA_VERSION:-latest}

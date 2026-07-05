@@ -1,0 +1,252 @@
+---
+pid: 7592
+cwd: "E:\2024 RESET\mensa_project"
+command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker compose up -d --build backend frontend"
+started_at: 2026-07-04T22:10:24.142Z
+running_for_ms: 13089984 
+---
+ Image mensa_project-backend Building 
+ Image mensa_project-frontend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.20kB 0.0s done
+#1 DONE 0.0s
+
+#2 [frontend internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 1.43kB 0.2s done
+#2 ...
+
+#3 [backend internal] load build definition from Dockerfile
+#3 transferring dockerfile: 2.02kB 0.1s done
+#3 DONE 0.4s
+
+#2 [frontend internal] load build definition from Dockerfile
+#2 DONE 0.6s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 ...
+
+#5 [auth] library/python:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [frontend internal] load metadata for docker.io/library/node:22.13.1-slim
+#6 DONE 1.4s
+
+#7 [frontend internal] load metadata for docker.io/library/nginx:alpine
+#7 DONE 1.5s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 ...
+
+#8 [frontend internal] load .dockerignore
+#8 transferring context: 891B 0.1s done
+#8 DONE 0.3s
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 ...
+
+#9 [frontend internal] load build context
+#9 DONE 0.0s
+
+#10 [frontend stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#10 resolve docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#10 ...
+
+#4 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#4 DONE 2.7s
+
+#11 [backend internal] load .dockerignore
+#11 transferring context: 762B 0.1s done
+#11 ...
+
+#12 [frontend builder 1/6] FROM docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc
+#12 resolve docker.io/library/node:22.13.1-slim@sha256:83fdfa2a4de32d7f8d79829ea259bd6a4821f8b2d123204ac467fbe3966450fc 0.8s done
+#12 DONE 0.9s
+
+#11 [backend internal] load .dockerignore
+#11 DONE 0.4s
+
+#10 [frontend stage-1 1/5] FROM docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa
+#10 resolve docker.io/library/nginx:alpine@sha256:54f2a904c251d5a34adf545a72d32515a15e08418dae0266e23be2e18c66fefa 0.8s done
+#10 DONE 0.9s
+
+#9 [frontend internal] load build context
+#9 ...
+
+#13 [backend internal] load build context
+#13 DONE 0.0s
+
+#9 [frontend internal] load build context
+#9 transferring context: 59.77kB 0.4s done
+#9 DONE 0.6s
+
+#14 [backend builder 1/4] FROM docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#14 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6
+#14 resolve docker.io/library/python:3.11-slim@sha256:b27df5841f3355e9473f9a516d38a6783b6c8dfeacaf2d14a240f443b368ddb6 0.5s done
+#14 DONE 0.5s
+
+#15 [frontend builder 2/6] WORKDIR /app
+#15 CACHED
+
+#16 [frontend builder 3/6] COPY package*.json ./
+#16 CACHED
+
+#17 [frontend builder 4/6] RUN npm ci --legacy-peer-deps || npm ci
+#17 CACHED
+
+#13 [backend internal] load build context
+#13 transferring context: 202.07kB 0.4s done
+#13 DONE 0.6s
+
+#18 [frontend builder 5/6] COPY . .
+#18 DONE 0.8s
+
+#19 [backend stage-1 4/9] COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+#19 CACHED
+
+#20 [backend builder 2/4] WORKDIR /app
+#20 CACHED
+
+#21 [backend stage-1 3/9] RUN groupadd -r appuser && useradd -r -g appuser appuser
+#21 CACHED
+
+#22 [backend builder 3/4] COPY requirements.txt requirements.txt
+#22 CACHED
+
+#23 [backend builder 4/4] RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt     && python -c "from hypercorn.config import Config; print(f'hypercorn install verified: {Config.__module__}')"
+#23 CACHED
+
+#24 [backend stage-1 5/9] COPY --from=builder /usr/local/bin /usr/local/bin
+#24 CACHED
+
+#25 [backend stage-1 6/9] COPY --chown=appuser:appuser . .
+#25 DONE 1.1s
+
+#26 [frontend builder 6/6] RUN echo "cache_buster=20260703b" && npm run build && test -f /app/build/index.html
+#26 1.812 cache_buster=20260703b
+#26 2.741 
+#26 2.741 > mensa-frontend@1.0.0 build
+#26 2.741 > react-scripts build
+#26 2.741 
+#26 ...
+
+#27 [backend stage-1 7/9] RUN mkdir -p /data && chown -R appuser:appuser /data /app && mkdir -p /data/experiments && chown -R appuser:appuser /data/experiments
+#27 DONE 4.7s
+
+#28 [backend stage-1 8/9] COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+#28 DONE 0.9s
+
+#26 [frontend builder 6/6] RUN echo "cache_buster=20260703b" && npm run build && test -f /app/build/index.html
+#26 ...
+
+#29 [backend stage-1 9/9] RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+#29 DONE 2.9s
+
+#26 [frontend builder 6/6] RUN echo "cache_buster=20260703b" && npm run build && test -f /app/build/index.html
+#26 ...
+
+#30 [backend] exporting to image
+#30 exporting layers
+#30 exporting layers 4.0s done
+#30 exporting manifest sha256:e6785decf4dc4d0c167e6c553a771e8566ba40366524c90e2714f01184943ce5
+#30 exporting manifest sha256:e6785decf4dc4d0c167e6c553a771e8566ba40366524c90e2714f01184943ce5 0.5s done
+#30 exporting config sha256:b1f7ffee64fd41dcb21427a339bfc45e017a874ef2d83f09397d011ff303d7d9
+#30 exporting config sha256:b1f7ffee64fd41dcb21427a339bfc45e017a874ef2d83f09397d011ff303d7d9 0.4s done
+#30 exporting attestation manifest sha256:8520bdb65166adef5264c5ffc93497b8d65b8d839659db5e4942511653d7f93a
+#30 exporting attestation manifest sha256:8520bdb65166adef5264c5ffc93497b8d65b8d839659db5e4942511653d7f93a 0.6s done
+#30 exporting manifest list sha256:44df891c11922f46d891dc803b322e7ad046e7956f4b7f59543dae2fbd377fc1
+#30 exporting manifest list sha256:44df891c11922f46d891dc803b322e7ad046e7956f4b7f59543dae2fbd377fc1 0.2s done
+#30 naming to docker.io/library/mensa_project-backend:latest
+#30 naming to docker.io/library/mensa_project-backend:latest 0.0s done
+#30 unpacking to docker.io/library/mensa_project-backend:latest
+#30 ...
+
+#26 [frontend builder 6/6] RUN echo "cache_buster=20260703b" && npm run build && test -f /app/build/index.html
+#26 17.44 Creating an optimized production build...
+#26 ...
+
+#30 [backend] exporting to image
+#30 unpacking to docker.io/library/mensa_project-backend:latest 1.3s done
+#30 DONE 7.8s
+
+#26 [frontend builder 6/6] RUN echo "cache_buster=20260703b" && npm run build && test -f /app/build/index.html
+#26 19.32 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#26 19.32   npx update-browserslist-db@latest
+#26 19.32   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#26 ...
+
+#31 [backend] resolving provenance for metadata file
+#31 DONE 0.2s
+
+#26 [frontend builder 6/6] RUN echo "cache_buster=20260703b" && npm run build && test -f /app/build/index.html
+#26 77.88 Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+#26 77.88   npx update-browserslist-db@latest
+#26 77.88   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#26 86.70 Compiled successfully.
+#26 86.70 
+#26 86.70 File sizes after gzip:
+#26 86.70 
+#26 86.77   104.92 kB  build/static/js/main.8a7b5ce8.js
+#26 86.77   38.48 kB   build/static/css/main.b3d9b33e.css
+#26 86.77 
+#26 86.77 The project was built assuming it is hosted at /.
+#26 86.78 You can control this with the homepage field in your package.json.
+#26 86.78 
+#26 86.78 The build folder is ready to be deployed.
+#26 86.78 You may serve it with a static server:
+#26 86.78 
+#26 86.78   npm install -g serve
+#26 86.78   serve -s build
+#26 86.78 
+#26 86.78 Find out more about deployment here:
+#26 86.78 
+#26 86.78   https://cra.link/deployment
+#26 86.78 
+#26 DONE 87.3s
+
+#32 [frontend stage-1 2/5] RUN rm -rf /usr/share/nginx/html/*
+#32 CACHED
+
+#33 [frontend stage-1 3/5] COPY --from=builder /app/build/ /usr/share/nginx/html/
+#33 DONE 0.5s
+
+#34 [frontend stage-1 4/5] COPY nginx.conf /etc/nginx/nginx.conf
+#34 DONE 0.7s
+
+#35 [frontend stage-1 5/5] RUN mkdir -p /var/run/nginx /var/cache/nginx /var/log/nginx &&     chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/nginx.conf /var/cache/nginx /var/run/nginx /var/log/nginx &&     chmod -R 755 /usr/share/nginx/html
+#35 DONE 2.7s
+
+#36 [frontend] exporting to image
+#36 exporting layers
+#36 exporting layers 2.8s done
+#36 exporting manifest sha256:7816ea07350cacaa210364333bc22dfc9472fac2841212f5353ae25a8d03ee2e
+#36 exporting manifest sha256:7816ea07350cacaa210364333bc22dfc9472fac2841212f5353ae25a8d03ee2e 0.3s done
+#36 exporting config sha256:91c903b1062a7a0982b4d4d083f95058a7ad70761b8c49fc41ad783da2e9792c
+#36 exporting config sha256:91c903b1062a7a0982b4d4d083f95058a7ad70761b8c49fc41ad783da2e9792c 0.2s done
+#36 exporting attestation manifest sha256:a80fbce26a01b25b1d8a23dfaff5b14cd7193344eb79c35d1c766e8495c8da47
+#36 exporting attestation manifest sha256:a80fbce26a01b25b1d8a23dfaff5b14cd7193344eb79c35d1c766e8495c8da47 0.7s done
+#36 exporting manifest list sha256:d6dc521f28171d2d6603ed53e87c13b768d4f28572847b126289522531c81462
+#36 exporting manifest list sha256:d6dc521f28171d2d6603ed53e87c13b768d4f28572847b126289522531c81462 0.3s done
+#36 naming to docker.io/library/mensa_project-frontend:latest
+#36 naming to docker.io/library/mensa_project-frontend:latest 0.0s done
+#36 unpacking to docker.io/library/mensa_project-frontend:latest
+#36 unpacking to docker.io/library/mensa_project-frontend:latest 1.0s done
+#36 DONE 5.8s
+
+#37 [frontend] resolving provenance for metadata file
+#37 DONE 0.2s
+ Image mensa_project-backend Built 
+ Image mensa_project-frontend Built 
+ Container mensa_chroma Running 
+ Container mensa_backend Recreate 
+ Container mensa_backend Recreated 
+ Container mensa_frontend Recreate 
+ Container mensa_frontend Recreated 
+ Container mensa_chroma Waiting 
+ Container mensa_chroma Healthy 
+ Container mensa_backend Starting 
+ Container mensa_backend Started 
+ Container mensa_backend Waiting 
+ Container mensa_backend Healthy 
+ Container mensa_frontend Starting 
+ Container mensa_frontend Started 

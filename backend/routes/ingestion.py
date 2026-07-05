@@ -28,7 +28,9 @@ def _fast_complete_populated_game(game_key: str) -> dict | None:
 
     from services.chroma_client import chroma_client
 
-    existing_draws = chroma_client.count_documents(game_key)
+    existing_draws = chroma_client.count_documents(game_key, allow_refresh=False)
+    if existing_draws <= 0 and chroma_client.collection_exists(game_key):
+        existing_draws = 1
     if existing_draws <= 0:
         return None
 

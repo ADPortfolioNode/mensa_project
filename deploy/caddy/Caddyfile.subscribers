@@ -1,0 +1,26 @@
+# HTTPS + HTTP basic auth for paying subscribers
+# Generate hash: docker run --rm caddy:2-alpine caddy hash-password --plaintext 'your-password'
+# Set BASIC_AUTH_USER and BASIC_AUTH_HASH in .env
+# Add more users by duplicating the hash line inside basic_auth { }
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	header {
+		-Server
+	}
+
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	reverse_proxy frontend:80
+}
+
+http://{$DOMAIN} {
+	redir https://{host}{uri} permanent
+}
