@@ -42,16 +42,18 @@ export default function ExpandableCard({
     }
   };
 
+  const isMinimized = !expanded;
+
   const cardClasses = [
     'card',
     'p-3',
     'mb-3',
-    'h-100',
+    isMinimized ? '' : 'h-100',
     'shadow-lg',
     'expandable-card',
     'focus-card',
     neonBorder ? 'border-neon' : '',
-    expanded ? 'card-selected card-maximized is-focused' : '',
+    expanded ? 'card-selected card-maximized is-focused' : 'is-minimized',
     className,
   ].filter(Boolean).join(' ');
 
@@ -91,25 +93,27 @@ export default function ExpandableCard({
         </div>
       </div>
 
-      <div className="card-body expandable-card-body">
-        {expanded && Object.keys(metadata).length > 0 && (
-          <div className="expandable-metadata mb-3">
-            <h6 className="mb-2">Metadata</h6>
-            <div className="expandable-metadata-grid">
-              {Object.entries(metadata).map(([key, value]) => (
-                <div key={key} className="expandable-metadata-row">
-                  <span className="expandable-metadata-key">{key}:</span>
-                  <span className="expandable-metadata-value">
-                    {formatMetadataValue(value)}
-                  </span>
-                </div>
-              ))}
+      {!isMinimized && (
+        <div className="card-body expandable-card-body">
+          {Object.keys(metadata).length > 0 && (
+            <div className="expandable-metadata mb-3">
+              <h6 className="mb-2">Metadata</h6>
+              <div className="expandable-metadata-grid">
+                {Object.entries(metadata).map(([key, value]) => (
+                  <div key={key} className="expandable-metadata-row">
+                    <span className="expandable-metadata-key">{key}:</span>
+                    <span className="expandable-metadata-value">
+                      {formatMetadataValue(value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {children}
-      </div>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

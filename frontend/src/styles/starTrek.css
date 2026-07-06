@@ -263,6 +263,25 @@ body {
   position: relative;
 }
 
+.star-trek-app .expandable-card.is-minimized {
+  align-self: start;
+  height: auto !important;
+  padding-bottom: 0.5rem;
+}
+
+.star-trek-app .expandable-card.is-minimized .expandable-card-header {
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.star-trek-app .expandable-card.is-minimized:not(:hover) {
+  opacity: 0.94;
+}
+
+.star-trek-app .expandable-card.is-minimized:hover {
+  opacity: 1;
+}
+
 .star-trek-app .focus-cards-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
