@@ -32,6 +32,19 @@
   margin-bottom: 0.5rem;
 }
 
+.prediction-draw-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.prediction-draw-date {
+  font-size: 0.95em;
+  font-weight: 500;
+}
+
 .prediction-header {
   text-align: center;
   margin-bottom: 1rem;

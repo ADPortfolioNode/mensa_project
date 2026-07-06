@@ -18,10 +18,18 @@ def _experiment_accuracy(experiment: Dict[str, Any]) -> float | None:
 
 
 def _experiment_timestamp(experiment: Dict[str, Any]) -> float:
-    try:
-        return float(experiment.get("timestamp") or 0)
-    except (TypeError, ValueError):
-        return 0.0
+    for key in ("timestamp", "timestamp_seconds"):
+        value = experiment.get(key)
+        if value is None:
+            continue
+        try:
+            ts = float(value)
+        except (TypeError, ValueError):
+            continue
+        if ts >= 1_000_000_000_000:
+            return ts / 1000.0
+        return ts
+    return 0.0
 
 
 def prune_experiments(

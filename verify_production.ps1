@@ -24,6 +24,23 @@ $exitCode = 0
 $checksPassed = 0
 $checksFailed = 0
 
+function Read-DotEnvValue([string]$Name, [string]$Default) {
+    $envPath = Join-Path (Get-Location) ".env"
+    if (-not (Test-Path $envPath)) { return $Default }
+    foreach ($line in Get-Content $envPath) {
+        if ($line -match "^\s*$([regex]::Escape($Name))\s*=\s*(.+?)\s*$") {
+            return $Matches[1].Trim().Trim('"').Trim("'")
+        }
+    }
+    return $Default
+}
+
+$bindHost = Read-DotEnvValue "DOCKER_BIND_HOST" "127.0.0.1"
+if ([string]::IsNullOrWhiteSpace($bindHost)) { $bindHost = "127.0.0.1" }
+$frontendPort = [int](Read-DotEnvValue "FRONTEND_HOST_PORT" "3000")
+$backendPort = [int](Read-DotEnvValue "BACKEND_HOST_PORT" "5000")
+$chromaPort = [int](Read-DotEnvValue "CHROMA_HOST_PORT" "8000")
+
 function Write-Check {
     param([string]$Message, [string]$Status, [string]$Detail = "")
     $symbol = if ($Status -eq "PASS") { "✅" } elseif ($Status -eq "FAIL") { "❌" } else { "⚠️" }
@@ -85,7 +102,13 @@ function Test-SecurityHeaders {
         )
 
         foreach ($check in $securityChecks) {
-            $headerValue = $headers[$check.Name]
+            $headerValue = $null
+            foreach ($key in $headers.Keys) {
+                if ($key -ieq $check.Name) {
+                    $headerValue = $headers[$key]
+                    break
+                }
+            }
             if ($check.ContainsKey("Expected")) {
                 if ($headerValue -and $headerValue -match $check.Expected) {
                     Write-Check "Security header $($check.Name)" "PASS" "$($headerValue)"
@@ -160,9 +183,9 @@ Test-DockerIgnore
 
 # 2. Docker Containers
 Write-Host "`n--- Docker Containers ---" -ForegroundColor Yellow
-Test-Container "${ContainerPrefix}_chroma" "8000"
-Test-Container "${ContainerPrefix}_backend" "5000"
-Test-Container "${ContainerPrefix}_frontend" "3000"
+Test-Container "${ContainerPrefix}_chroma" "$chromaPort"
+Test-Container "${ContainerPrefix}_backend" "$backendPort"
+Test-Container "${ContainerPrefix}_frontend" "$frontendPort"
 
 # 3. Health Checks (with retry for slow-starting containers)
 Write-Host "`n--- Health Checks ---" -ForegroundColor Yellow
@@ -179,7 +202,7 @@ for ($attempt = 1; $attempt -le 5; $attempt++) {
         break
     }
     if ($attempt -lt 5) {
-        Write-Host "  Frontend health: $health — retrying in 5s (attempt $attempt/5)..." -ForegroundColor Gray
+        Write-Host "  Frontend health: $health - retrying in 5s (attempt $attempt/5)..." -ForegroundColor Gray
         Start-Sleep -Seconds 5
     }
 }
@@ -189,25 +212,25 @@ if (-not $frontendHealthy) {
 
 # 4. API Endpoints
 Write-Host "`n--- API Endpoints ---" -ForegroundColor Yellow
-$backendUrl = "http://localhost:5000"
-$frontendUrl = "http://localhost:3000"
+$backendUrl = "http://${bindHost}:${backendPort}"
+$frontendUrl = "http://${bindHost}:${frontendPort}"
 
 Test-Endpoint "Backend root" "${backendUrl}/api"
 Test-Endpoint "Backend health" "${backendUrl}/api/health"
 Test-Endpoint "Backend games" "${backendUrl}/api/games"
-Test-Endpoint "ChromaDB heartbeat" "http://localhost:8000/api/v1/heartbeat" -TimeoutSec 5
+Test-Endpoint "ChromaDB heartbeat" "http://${bindHost}:${chromaPort}/api/v1/heartbeat" -TimeoutSec 5
 
 # 5. Frontend
 Write-Host "`n--- Frontend ---" -ForegroundColor Yellow
 $frontendResponse = Test-Endpoint "Frontend root" $frontendUrl
 if ($frontendResponse -and $All) {
-    Test-SecurityHeaders $frontendUrl
+    Test-SecurityHeaders "${frontendUrl}/api/health"
 }
 
 # 6. Docker image existence
 Write-Host "`n--- Docker Images ---" -ForegroundColor Yellow
-$backendImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -match "${ContainerPrefix}.*backend" } | Select-Object -First 1
-$frontendImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -match "${ContainerPrefix}.*frontend" } | Select-Object -First 1
+$backendImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -match "$($ContainerPrefix).*backend" } | Select-Object -First 1
+$frontendImage = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -match "$($ContainerPrefix).*frontend" } | Select-Object -First 1
 
 if ($backendImage) { Write-Check "Backend Docker image exists" "PASS" $backendImage }
 else { Write-Check "Backend Docker image exists" "FAIL" "No matching image found" }

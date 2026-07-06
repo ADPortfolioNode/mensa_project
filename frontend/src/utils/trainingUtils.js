@@ -1,5 +1,7 @@
 /** Shared training payload + result formatting for Mensa dashboards. */
 
+import { parseExperimentTimestampMs } from './timestampUtils';
+
 export const BASE_MODEL_TYPE = 'Random Forest Regressor';
 
 const STRATEGY_LABELS = {
@@ -100,7 +102,83 @@ export function isTrainSuccessStatus(status) {
   return normalized === 'completed' || normalized === 'success';
 }
 
-/** User-facing training failure text for gateway/proxy failures during long training. */
+export function experimentAccuracy(exp) {
+  for (const key of ['highest_accuracy', 'final_accuracy', 'accuracy', 'score']) {
+    const value = Number(exp?.[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+export function isCompletedTrainingExperiment(exp) {
+  const expType = String(exp?.type || '').toLowerCase();
+  const expStatus = String(exp?.status || '').toLowerCase();
+  return expType === 'training' && (expStatus === 'completed' || expStatus === 'success');
+}
+
+/** Pick the completed training experiment with the highest accuracy (ties: newest). */
+export function pickHighestAccuracyExperiment(experiments, game = null) {
+  const gameKey = game ? String(game).toLowerCase() : null;
+  const rows = (experiments || []).filter((exp) => {
+    if (!isCompletedTrainingExperiment(exp)) return false;
+    if (gameKey && String(exp.game || '').toLowerCase() !== gameKey) return false;
+    return experimentAccuracy(exp) != null;
+  });
+  if (!rows.length) return null;
+  rows.sort((a, b) => {
+    const accDiff = (experimentAccuracy(b) ?? -1) - (experimentAccuracy(a) ?? -1);
+    if (accDiff !== 0) return accDiff;
+    return (parseExperimentTimestampMs(b) ?? 0) - (parseExperimentTimestampMs(a) ?? 0);
+  });
+  return rows[0];
+}
+
+export function mapApiDefaultsToTrainParams(defaults = {}, prev = {}) {
+  return {
+    testSize: normalizeTrainSizeFraction(defaults.train_size ?? prev.testSize ?? 0.25, 0.25),
+    randomState: defaults.random_state ?? prev.randomState ?? 42,
+    nEstimators: normalizeNEstimators(defaults.n_estimators ?? prev.nEstimators ?? 250),
+    maxDepth: normalizeMaxDepth(defaults.max_depth ?? prev.maxDepth ?? 18),
+    maxIterations: normalizeMaxIterations(defaults.max_iterations ?? prev.maxIterations ?? 40),
+    targetAccuracy: defaults.target_accuracy ?? prev.targetAccuracy ?? 0.90,
+    windowSize: defaults.window_size ?? prev.windowSize ?? 3,
+    autoTune: defaults.auto_tune ?? prev.autoTune ?? true,
+    blendStep: defaults.blend_step ?? prev.blendStep ?? 0.05,
+  };
+}
+
+export function experimentToTrainParams(experiment) {
+  if (!experiment) return {};
+  const params = experiment.training_params || experiment.best_training_params || experiment;
+  return mapApiDefaultsToTrainParams({
+    train_size: params.train_size,
+    random_state: params.random_state,
+    n_estimators: params.n_estimators,
+    max_depth: params.max_depth,
+    max_iterations: params.max_iterations,
+    target_accuracy: params.target_accuracy ?? params.training_target,
+    window_size: params.window_size,
+    auto_tune: params.auto_tune,
+    blend_step: params.blend_step,
+  });
+}
+
+/** Merge API recreate defaults with the highest-accuracy experiment snapshot. */
+export function resolveBestTrainParams({
+  defaults = {},
+  recreateDefaults = {},
+  bestTrainingParams = {},
+  experiment = null,
+} = {}) {
+  const fromApi = mapApiDefaultsToTrainParams({
+    ...defaults,
+    ...recreateDefaults,
+    ...bestTrainingParams,
+  });
+  const fromExperiment = experimentToTrainParams(experiment);
+  return { ...fromApi, ...fromExperiment };
+}
+
 export function formatTrainingErrorMessage(error, formatApiError) {
   const status = error?.response?.status;
   const base = formatApiError(error, 'Training request failed.');

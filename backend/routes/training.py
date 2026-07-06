@@ -12,7 +12,7 @@ from utils.training_params import extract_training_params, merge_training_params
 from utils.validation import _require_game_key
 from config import GAME_CONFIGS
 from services.chroma_client import chroma_client
-from datetime import datetime
+from utils.timestamps import normalize_experiment_record, runtime_timestamp_fields
 
 
 router = APIRouter()
@@ -117,7 +117,6 @@ async def train_model(request: TrainingRequest):
     """
     try:
         game_key = _require_game_key(request.game)
-        timestamp = datetime.now().timestamp()
 
         def _run_training():
             if hasattr(trainer_service, "train"):
@@ -155,6 +154,16 @@ async def train_model(request: TrainingRequest):
                 "status": "error",
                 "game": game_key,
                 "message": result.get("message", "Training failed."),
+                "accuracy": result.get("highest_accuracy") or result.get("record_accuracy"),
+                "highest_accuracy": result.get("highest_accuracy"),
+                "record_accuracy": result.get("record_accuracy"),
+                "baseline_accuracy": result.get("baseline_accuracy"),
+                "candidate_accuracy": result.get("candidate_accuracy"),
+                "previous_accuracy": result.get("previous_accuracy"),
+                "training_target": result.get("training_target"),
+                "target_accuracy": result.get("target_accuracy"),
+                "retained_previous_model": result.get("retained_previous_model"),
+                "used_previous_training": result.get("used_previous_training"),
                 "training_time": result.get("training_time"),
                 "leaderboard": result.get("leaderboard", []),
                 "accuracy_history": result.get("accuracy_history", []),
@@ -167,7 +176,8 @@ async def train_model(request: TrainingRequest):
             or result.get("record_accuracy")
             or result.get("accuracy")
         )
-        experiment_id = f"train-{game_key}-{int(timestamp)}"
+        runtime_ts = runtime_timestamp_fields()
+        experiment_id = f"train-{game_key}-{runtime_ts['timestamp_seconds']}"
 
         scored_params = merge_training_params(
             result.get("best_training_params"),
@@ -189,10 +199,10 @@ async def train_model(request: TrainingRequest):
                 "blend_weight": result.get("blend_weight"),
             },
         )
-        exp_store.save_experiment({
+        exp_store.save_experiment(normalize_experiment_record({
             "experiment_id": experiment_id,
             "game": game_key,
-            "timestamp": timestamp,
+            **runtime_ts,
             "status": "COMPLETED",
             "type": "training",
             "target_accuracy": result.get("target_accuracy", request.target_accuracy),
@@ -228,7 +238,7 @@ async def train_model(request: TrainingRequest):
             "accuracy_history": result.get("accuracy_history", []),
             "optimal_config_applied": result.get("optimal_config_applied", False),
             "optimal_config": result.get("optimal_config", {}),
-        })
+        }))
 
         return {
             **result,

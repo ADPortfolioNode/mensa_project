@@ -19,7 +19,49 @@ export default function PredictionPanel({ games = [], disabled = false }) {
     }
   }, [games]);
 
-  const predictAllGamesConcurrently = async () => {
+  const normalizePredictionEntry = (game, payload) => {
+    if (payload?.status === 'error' || payload?.error) {
+      return {
+        game,
+        status: 'error',
+        message: payload?.message || payload?.error || 'Suggestion failed.',
+        prediction: null,
+      };
+    }
+
+    return {
+      game,
+      status: 'success',
+      message: '',
+      prediction: payload,
+    };
+  };
+
+  const predictAllGamesSequentially = async (apiBase) => {
+    const normalized = [];
+    for (const game of games) {
+      try {
+        const response = await axios.post(`${apiBase}/api/predict`, {
+          game,
+          recent_k: parseInt(recentK, 10),
+        }, { timeout: 600000 });
+        normalized.push(normalizePredictionEntry(game, response.data || {}));
+      } catch (error) {
+        normalized.push({
+          game,
+          status: 'error',
+          message: error?.response?.data?.detail
+            || error?.response?.data?.message
+            || error?.message
+            || 'Suggestion request failed.',
+          prediction: null,
+        });
+      }
+    }
+    return normalized;
+  };
+
+  const predictAllGames = async () => {
     if (!games.length) return;
 
     setLoadingAll(true);
@@ -28,42 +70,33 @@ export default function PredictionPanel({ games = [], disabled = false }) {
 
     try {
       const apiBase = getApiBase();
-      const settled = await Promise.allSettled(
-        games.map((game) =>
-          axios.post(`${apiBase}/api/predict`, {
-            game,
-            recent_k: parseInt(recentK, 10),
-          }, { timeout: 600000 })
-        )
-      );
+      let normalized = [];
 
-      const normalized = settled.map((entry, index) => {
-        const game = games[index];
-        if (entry.status === 'fulfilled') {
-          const payload = entry.value?.data || {};
-          if (payload?.status === 'error' || payload?.error) {
-            return {
-              game,
-              status: 'error',
-              message: payload?.message || payload?.error || 'Suggestion failed.',
-              prediction: null,
-            };
-          }
-          return {
-            game,
-            status: 'success',
-            message: '',
-            prediction: payload,
-          };
+      try {
+        const response = await axios.post(`${apiBase}/api/predict_all`, {
+          games,
+          recent_k: parseInt(recentK, 10),
+        }, { timeout: 900000 });
+
+        const payload = response.data || {};
+        if (Array.isArray(payload.results) && payload.results.length > 0) {
+          normalized = payload.results.map((item) => ({
+            game: item.game,
+            status: item.status === 'success' ? 'success' : 'error',
+            message: item.message || '',
+            prediction: item.prediction || null,
+          }));
+        } else if (payload.status === 'error') {
+          throw new Error(payload.message || 'Batch suggestion request failed.');
         }
-
-        return {
-          game,
-          status: 'error',
-          message: entry.reason?.response?.data?.detail || entry.reason?.message || 'Suggestion request failed.',
-          prediction: null,
-        };
-      });
+      } catch (batchError) {
+        const status = batchError?.response?.status;
+        if (status === 404 || status === 405) {
+          normalized = await predictAllGamesSequentially(apiBase);
+        } else {
+          throw batchError;
+        }
+      }
 
       setAllPredictions(normalized);
 
@@ -74,7 +107,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
         setAllError(`${failedCount} game suggestion(s) failed. Showing successful results.`);
       }
     } catch (error) {
-      setAllError(error?.message || 'Failed to run all-game suggestions.');
+      setAllError(error?.response?.data?.message || error?.message || 'Failed to run all-game suggestions.');
     } finally {
       setLoadingAll(false);
     }
@@ -89,7 +122,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
       ) : games.length > 0 ? (
         <>
           <select className="form-select mb-3" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
-            <option value={ALL_GAMES_VALUE}>All Games (Concurrent)</option>
+            <option value={ALL_GAMES_VALUE}>All Games</option>
             {games.map(game => (
               <option key={game} value={game}>{game}</option>
             ))}
@@ -98,7 +131,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
           {selectedGame === ALL_GAMES_VALUE ? (
             <div className="card p-3 mb-3">
               <h5>Suggestions for All Games</h5>
-              <p>Runs one suggestion request per game concurrently.</p>
+              <p>Runs one batch suggestion request for every game (processed sequentially on the server).</p>
               <div className="input-group mb-2">
                 <input
                   type="number"
@@ -108,7 +141,7 @@ export default function PredictionPanel({ games = [], disabled = false }) {
                   disabled={loadingAll}
                   min="1"
                 />
-                <button className="btn btn-success" onClick={predictAllGamesConcurrently} disabled={loadingAll}>
+                <button className="btn btn-success" onClick={predictAllGames} disabled={loadingAll}>
                   {loadingAll ? 'Running...' : 'Suggest All Games'}
                 </button>
               </div>

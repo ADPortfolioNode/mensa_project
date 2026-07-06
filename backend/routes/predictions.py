@@ -5,11 +5,11 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
+from typing import List, Optional
 from services.predictor import predictor_service
 from experiments.store import ExperimentStore
 from utils.validation import _require_game_key
+from utils.timestamps import normalize_experiment_record, runtime_timestamp_fields
 
 
 router = APIRouter()
@@ -18,6 +18,11 @@ exp_store = ExperimentStore("/data/experiments/experiments.json")
 
 class PredictionRequest(BaseModel):
     game: str
+    recent_k: int = 10
+
+
+class PredictAllRequest(BaseModel):
+    games: Optional[List[str]] = None
     recent_k: int = 10
 
 
@@ -57,6 +62,79 @@ async def get_all_predictions():
         }
 
 
+def _normalize_prediction_result(game_key: str, result: dict, recent_k: int) -> dict:
+    if result.get("status") == "error":
+        return {
+            "status": "error",
+            "game": game_key,
+            "message": result.get("message", "Suggestion failed."),
+        }
+
+    next_draw_date = (
+        result.get("prediction_date")
+        or result.get("predicted_for_date")
+        or None
+    )
+
+    runtime_ts = runtime_timestamp_fields()
+    exp_store.save_experiment(normalize_experiment_record({
+        "experiment_id": f"predict-{game_key}-{runtime_ts['timestamp_seconds']}",
+        "game": game_key,
+        **runtime_ts,
+        "status": "COMPLETED",
+        "type": "prediction",
+        "recent_k": recent_k,
+        "prediction": result,
+        "next_draw_date": next_draw_date,
+    }))
+
+    return {
+        **result,
+        "status": "COMPLETED",
+        "game": game_key,
+        "next_draw_date": next_draw_date,
+        "highest_accuracy": result.get("highest_accuracy"),
+        "model_metadata": result.get("model_metadata"),
+    }
+
+
+@router.post("/api/predict_all")
+async def predict_all_games(request: PredictAllRequest):
+    """
+    Generate suggestions for multiple games in one request (processed sequentially).
+    """
+    try:
+        from config import GAME_CONFIGS
+
+        requested_games = request.games or list(GAME_CONFIGS.keys())
+        game_keys = []
+        for game in requested_games:
+            game_keys.append(_require_game_key(game))
+
+        def _run_predictions():
+            return predictor_service.predict_all_games(game_keys, request.recent_k)
+
+        results = await asyncio.to_thread(_run_predictions)
+        failed_count = sum(1 for item in results if item.get("status") == "error")
+
+        return {
+            "status": "ok",
+            "results": results,
+            "failed_count": failed_count,
+            "total": len(results),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "results": [],
+            "failed_count": 0,
+            "total": 0,
+        }
+
+
 @router.post("/api/predict")
 async def make_prediction(request: PredictionRequest):
     """
@@ -64,8 +142,6 @@ async def make_prediction(request: PredictionRequest):
     """
     try:
         game_key = _require_game_key(request.game)
-        timestamp = datetime.now().timestamp()
-        
         def _run_prediction():
             if hasattr(predictor_service, "predict_next_draw"):
                 return predictor_service.predict_next_draw(game_key, request.recent_k)
@@ -74,39 +150,7 @@ async def make_prediction(request: PredictionRequest):
             raise RuntimeError("PredictorService is missing predict_next_draw/predict methods")
 
         result = await asyncio.to_thread(_run_prediction)
-
-        if result.get("status") == "error":
-            return {
-                "status": "error",
-                "game": game_key,
-                "message": result.get("message", "Suggestion failed."),
-            }
-
-        next_draw_date = (
-            result.get("prediction_date")
-            or result.get("predicted_for_date")
-            or None
-        )
-
-        exp_store.save_experiment({
-            "experiment_id": f"predict-{game_key}-{int(timestamp)}",
-            "game": game_key,
-            "timestamp": timestamp,
-            "status": "COMPLETED",
-            "type": "prediction",
-            "recent_k": request.recent_k,
-            "prediction": result,
-            "next_draw_date": next_draw_date,
-        })
-        
-        return {
-            **result,
-            "status": "COMPLETED",
-            "game": game_key,
-            "next_draw_date": next_draw_date,
-            "highest_accuracy": result.get("highest_accuracy"),
-            "model_metadata": result.get("model_metadata"),
-        }
+        return _normalize_prediction_result(game_key, result, request.recent_k)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

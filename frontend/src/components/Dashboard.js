@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import getApiBase from '../utils/apiBase';
 import PredictionPanel from './PredictionPanel';
@@ -14,6 +14,7 @@ import ProgressiveProgressBar from './ProgressiveProgressBar';
 import chromaStateManager from '../utils/chromaStateManager';
 import { startPolling } from '../utils/polling';
 import { formatApiError } from '../utils/errorUtils';
+import { formatExperimentTimestamp, parseExperimentTimestampMs } from '../utils/timestampUtils';
 import {
   BASE_MODEL_TYPE,
   buildTrainRequestBody,
@@ -26,6 +27,10 @@ import {
   formatTrainingSuccessMessage,
   isTrainSuccessStatus,
   formatTrainingErrorMessage,
+  isCompletedTrainingExperiment,
+  pickHighestAccuracyExperiment,
+  resolveBestTrainParams,
+  experimentToTrainParams,
 } from '../utils/trainingUtils';
 
 const ALL_GAMES_VALUE = '__all_games__';
@@ -155,58 +160,6 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     };
   }, [ingestStatus, selectedGame, ingestingGame, API_BASE, games]);
 
-  useEffect(() => {
-    if (!selectedTrainGame) return;
-    let cancelled = false;
-
-    const mapDefaults = (defaults, prev) => ({
-      testSize: normalizeTrainSizeFraction(
-        defaults.train_size ?? prev?.testSize ?? 0.25,
-        0.25,
-      ),
-      randomState: defaults.random_state ?? prev?.randomState ?? 42,
-      nEstimators: normalizeNEstimators(defaults.n_estimators ?? prev?.nEstimators ?? 250),
-      maxDepth: normalizeMaxDepth(defaults.max_depth ?? prev?.maxDepth ?? 18),
-      maxIterations: normalizeMaxIterations(defaults.max_iterations ?? prev?.maxIterations ?? 40),
-      targetAccuracy: defaults.target_accuracy ?? prev?.targetAccuracy ?? 0.90,
-      windowSize: defaults.window_size ?? prev?.windowSize ?? 3,
-      autoTune: defaults.auto_tune ?? prev?.autoTune ?? true,
-      blendStep: defaults.blend_step ?? prev?.blendStep ?? 0.05,
-    });
-
-    const shallowEqual = (a, b, keys) => {
-      if (!a || !b) return false;
-      return keys.every((key) => (a[key] ?? null) === (b[key] ?? null));
-    };
-
-    const fetchSettings = async () => {
-      try {
-        const response = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
-        if (cancelled || !response?.data) return;
-        const recreateDefaults = response.data.recreate_defaults
-          || response.data.incremental?.recreate_defaults
-          || response.data.incremental?.best_training_params
-          || {};
-        const mapped = mapDefaults(
-          { ...(response.data.defaults || {}), ...recreateDefaults },
-          trainParams,
-        );
-        const keys = ['testSize', 'randomState', 'nEstimators', 'maxDepth', 'maxIterations', 'targetAccuracy', 'windowSize', 'autoTune', 'blendStep'];
-        const shouldOverwrite = trainDefaultsForGame === null || shallowEqual(trainParams, trainDefaultsForGame, keys);
-        if (shouldOverwrite) {
-          setTrainParams((prev) => ({ ...prev, ...mapped }));
-        }
-        setTrainDefaultsForGame(mapped);
-        setTrainIncremental(response.data.incremental || null);
-      } catch (_) {
-        // Keep current params when settings endpoint is unavailable.
-      }
-    };
-
-    fetchSettings();
-    return () => { cancelled = true; };
-  }, [selectedTrainGame, API_BASE]);
-  
   // Training parameters
   const [trainParams, setTrainParams] = useState({
     testSize: 0.25,
@@ -221,6 +174,8 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   });
   const [trainDefaultsForGame, setTrainDefaultsForGame] = useState(null);
   const [trainIncremental, setTrainIncremental] = useState(null);
+  const trainParamsAutoAppliedForGame = useRef(null);
+  const trainParamsExperimentSource = useRef(null);
 
   useEffect(() => {
     async function fetchGamesAndContents() {
@@ -543,12 +498,8 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
 
   const completedTrainingExperiments = useMemo(() => {
     return (experiments || [])
-      .filter((exp) => {
-        const expType = String(exp?.type || '').toLowerCase();
-        const expStatus = String(exp?.status || '').toLowerCase();
-        return expType === 'training' && (expStatus === 'completed' || expStatus === 'success');
-      })
-      .sort((a, b) => Number(b?.timestamp || 0) - Number(a?.timestamp || 0));
+      .filter((exp) => isCompletedTrainingExperiment(exp))
+      .sort((a, b) => (parseExperimentTimestampMs(b) ?? 0) - (parseExperimentTimestampMs(a) ?? 0));
   }, [experiments]);
 
   const trainingReadyGames = useMemo(() => {
@@ -557,7 +508,14 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
 
   const experimentsForReadyGame = useMemo(() => {
     if (!selectedExperimentReadyGame) return [];
-    return completedTrainingExperiments.filter((exp) => exp.game === selectedExperimentReadyGame);
+    return completedTrainingExperiments
+      .filter((exp) => exp.game === selectedExperimentReadyGame)
+      .sort((a, b) => {
+        const scoreA = Number(a.score ?? a.final_accuracy ?? a.accuracy ?? 0);
+        const scoreB = Number(b.score ?? b.final_accuracy ?? b.accuracy ?? 0);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        return (parseExperimentTimestampMs(b) ?? 0) - (parseExperimentTimestampMs(a) ?? 0);
+      });
   }, [completedTrainingExperiments, selectedExperimentReadyGame]);
 
   const selectedTrainingExperiment = useMemo(() => {
@@ -584,9 +542,62 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
 
     const selectedStillExists = experimentsForReadyGame.some((exp) => exp.experiment_id === selectedTrainingExperimentId);
     if (!selectedStillExists) {
-      setSelectedTrainingExperimentId(experimentsForReadyGame[0].experiment_id);
+      const bestForGame = pickHighestAccuracyExperiment(experimentsForReadyGame, selectedExperimentReadyGame);
+      setSelectedTrainingExperimentId(bestForGame?.experiment_id || experimentsForReadyGame[0].experiment_id);
     }
-  }, [experimentsForReadyGame, selectedTrainingExperimentId]);
+  }, [experimentsForReadyGame, selectedTrainingExperimentId, selectedExperimentReadyGame]);
+
+  useEffect(() => {
+    if (!selectedTrainGame) return;
+    let cancelled = false;
+
+    const applyHighestAccuracySettings = async () => {
+      const shouldAutoApply = trainParamsAutoAppliedForGame.current !== selectedTrainGame;
+      const bestExperiment = pickHighestAccuracyExperiment(completedTrainingExperiments, selectedTrainGame);
+      const shouldMergeExperiment = Boolean(
+        bestExperiment
+        && trainParamsExperimentSource.current !== bestExperiment.experiment_id,
+      );
+      try {
+        const response = await axios.get(
+          `${API_BASE}/api/train_settings?game=${selectedTrainGame}`,
+          { timeout: 15000 },
+        );
+        if (cancelled || !response?.data) return;
+
+        const mapped = resolveBestTrainParams({
+          defaults: response.data.defaults || {},
+          recreateDefaults: response.data.recreate_defaults
+            || response.data.incremental?.recreate_defaults
+            || {},
+          bestTrainingParams: response.data.best_training_params
+            || response.data.incremental?.best_training_params
+            || {},
+          experiment: bestExperiment,
+        });
+
+        if (shouldAutoApply || shouldMergeExperiment || trainParamsAutoAppliedForGame.current === null) {
+          setTrainParams(mapped);
+          trainParamsAutoAppliedForGame.current = selectedTrainGame;
+          if (bestExperiment) {
+            trainParamsExperimentSource.current = bestExperiment.experiment_id;
+          }
+        }
+        setTrainDefaultsForGame(mapped);
+        setTrainIncremental(response.data.incremental || null);
+
+        if (bestExperiment) {
+          setSelectedExperimentReadyGame(selectedTrainGame);
+          setSelectedTrainingExperimentId(bestExperiment.experiment_id);
+        }
+      } catch (_) {
+        // Keep current params when settings endpoint is unavailable.
+      }
+    };
+
+    applyHighestAccuracySettings();
+    return () => { cancelled = true; };
+  }, [selectedTrainGame, API_BASE, completedTrainingExperiments]);
 
   const selectedTrainGameStoredDraws = useMemo(
     () => Number(gameContents[selectedTrainGame] || 0),
@@ -656,6 +667,25 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         setExperimentsErrorMessage('');
         try {
           const settingsRes = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
+          const bestExperiment = pickHighestAccuracyExperiment(experimentsPayload, selectedTrainGame);
+          const mapped = resolveBestTrainParams({
+            defaults: settingsRes.data?.defaults || {},
+            recreateDefaults: settingsRes.data?.recreate_defaults
+              || settingsRes.data?.incremental?.recreate_defaults
+              || {},
+            bestTrainingParams: settingsRes.data?.best_training_params
+              || settingsRes.data?.incremental?.best_training_params
+              || {},
+            experiment: bestExperiment,
+          });
+          setTrainParams(mapped);
+          setTrainDefaultsForGame(mapped);
+          trainParamsAutoAppliedForGame.current = selectedTrainGame;
+          if (bestExperiment) {
+            trainParamsExperimentSource.current = bestExperiment.experiment_id;
+            setSelectedExperimentReadyGame(selectedTrainGame);
+            setSelectedTrainingExperimentId(bestExperiment.experiment_id);
+          }
           setTrainIncremental(settingsRes.data?.incremental || null);
         } catch (_) {
           // ignore refresh errors
@@ -1005,7 +1035,11 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
                 id="trainGameSelect"
                 className="form-select"
                 value={selectedTrainGame}
-                onChange={(e) => setSelectedTrainGame(e.target.value)}
+                onChange={(e) => {
+                  trainParamsAutoAppliedForGame.current = null;
+                  trainParamsExperimentSource.current = null;
+                  setSelectedTrainGame(e.target.value);
+                }}
                 disabled={trainStatus === 'in progress'}
               >
                 <option value="">Select game</option>
@@ -1037,13 +1071,20 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
                 id="trainingExperimentSelect"
                 className="form-select"
                 value={selectedTrainingExperimentId}
-                onChange={(e) => setSelectedTrainingExperimentId(e.target.value)}
+                onChange={(e) => {
+                  const experimentId = e.target.value;
+                  setSelectedTrainingExperimentId(experimentId);
+                  const picked = experimentsForReadyGame.find((exp) => exp.experiment_id === experimentId);
+                  if (picked) {
+                    setTrainParams((prev) => ({ ...prev, ...experimentToTrainParams(picked) }));
+                  }
+                }}
                 disabled={trainStatus === 'in progress' || experimentsForReadyGame.length === 0}
               >
                 <option value="">Select experiment</option>
                 {experimentsForReadyGame.map((exp) => (
                   <option key={exp.experiment_id} value={exp.experiment_id}>
-                    {`${exp.experiment_id} | Accuracy: ${(Number(exp.score ?? exp.final_accuracy ?? exp.accuracy ?? 0) * 100).toFixed(2)}% | ${new Date(exp.timestamp).toLocaleString()}`}
+                    {`${exp.experiment_id} | Accuracy: ${(Number(exp.score ?? exp.final_accuracy ?? exp.accuracy ?? 0) * 100).toFixed(2)}% | ${formatExperimentTimestamp(exp)}`}
                   </option>
                 ))}
               </select>

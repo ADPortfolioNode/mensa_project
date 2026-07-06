@@ -246,6 +246,7 @@ GAME_PREDICTION_SCHEDULES = {
     },
     "quickdraw": {
         "daily_draws": 360,
+        "suggestion_session_draws": 1,
         "weekday_draws": {},
     },
     "nylotto": {

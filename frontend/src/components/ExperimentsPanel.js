@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatExperimentTimestamp } from '../utils/timestampUtils';
 
 export default function ExperimentsPanel({ experiments }) {
   return (
@@ -27,7 +28,7 @@ export default function ExperimentsPanel({ experiments }) {
                   <td>{exp.status || 'N/A'}</td>
                   <td>{((exp.score ?? exp.final_accuracy ?? exp.accuracy) != null ? `${(Number(exp.score ?? exp.final_accuracy ?? exp.accuracy) * 100).toFixed(2)}%` : 'N/A')}</td>
                   <td>{exp.description || exp.message || exp.error || 'N/A'}</td>
-                  <td>{new Date(exp.timestamp).toLocaleString()}</td>
+                  <td>{formatExperimentTimestamp(exp)}</td>
                 </tr>
               ))}
             </tbody>

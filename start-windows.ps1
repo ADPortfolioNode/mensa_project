@@ -58,9 +58,23 @@ function Wait-DockerDaemon([int]$MaxSeconds = 180) {
 }
 
 function Invoke-Compose([string[]]$ComposeArgs) {
-    docker compose @ComposeArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "docker compose failed ($LASTEXITCODE): $($ComposeArgs -join ' ')"
+    # Docker Compose logs progress to stderr; with $ErrorActionPreference=Stop that becomes a terminating error.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = & docker compose @ComposeArgs 2>&1
+        foreach ($line in $output) {
+            if ($line -is [System.Management.Automation.ErrorRecord]) {
+                Write-Host $line.ToString()
+            } else {
+                Write-Host $line
+            }
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker compose failed ($LASTEXITCODE): $($ComposeArgs -join ' ')"
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
     }
 }
 
@@ -122,12 +136,12 @@ if (-not $result.Ok) {
     Write-Host "  1. Restart Docker Desktop (tray icon -> Restart)"
     Write-Host "  2. Re-run: .\start-windows.ps1 -Recreate"
     Write-Host "  3. Open: http://${bindHost}:${frontendPort}/  (not localhost if IPv6 conflicts)"
-    docker compose ps
+    Invoke-Compose @("ps")
     exit 1
 }
 
 Write-Step "Stack healthy"
-docker compose ps
+Invoke-Compose @("ps")
 Write-Host "`nApp ready: $($result.FrontendUrl)" -ForegroundColor Green
 Write-Host "Use http://${bindHost}:${frontendPort}/ (not localhost) if you see timeouts on Windows." -ForegroundColor Gray
 

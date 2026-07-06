@@ -34,6 +34,10 @@ class PredictorService:
         else:
             draw_count = daily_draws
 
+        suggestion_cap = schedule.get("suggestion_session_draws")
+        if suggestion_cap is not None:
+            draw_count = min(draw_count, int(suggestion_cap))
+
         draw_count = max(0, draw_count)
         if self.max_session_draws > 0:
             draw_count = min(draw_count, self.max_session_draws)
@@ -131,25 +135,13 @@ class PredictorService:
 
         return normalized[:bonus_count]
 
-    def _extract_sequence(self, metadata):
+    def _extract_sequence(self, metadata, game: str | None = None):
         if not isinstance(metadata, dict):
             return []
 
-        winning_value = None
-        for key, value in metadata.items():
-            key_lower = str(key).lower()
-            if "winning" in key_lower and "number" in key_lower:
-                winning_value = value
-                break
+        from services.trainer import TrainerService
 
-        if winning_value is None:
-            for key, value in metadata.items():
-                key_lower = str(key).lower()
-                if "numbers" in key_lower or "result" in key_lower:
-                    winning_value = value
-                    break
-
-        return self._parse_numbers(winning_value)
+        return TrainerService()._extract_primary_candidate(metadata, game=game)
 
     def _clamp_number(self, value, minimum, maximum):
         parsed = int(np.round(value))
@@ -334,7 +326,7 @@ class PredictorService:
             return {"status": "error", "message": "Not enough data to make a suggestion."}
 
         metadatas = TrainerService()._sort_metadatas_chronologically(data["metadatas"])
-        sequences = [self._extract_sequence(meta) for meta in metadatas]
+        sequences = [self._extract_sequence(meta, game_key) for meta in metadatas]
         sequences = [seq for seq in sequences if seq]
 
         if len(sequences) < window_size:
@@ -403,13 +395,38 @@ class PredictorService:
         }
 
     def predict_all_games(self, games, recent_k: int = 10):
-        results = {}
+        normalized = []
         for game in games:
+            game_key = str(game or "").strip().lower()
             try:
-                results[game] = self.predict_next_draw(game, recent_k)
+                result = self.predict_next_draw(game_key, recent_k)
+                if result.get("status") == "error":
+                    normalized.append({
+                        "game": game_key,
+                        "status": "error",
+                        "message": result.get("message", "Suggestion failed."),
+                        "prediction": None,
+                    })
+                    continue
+
+                normalized.append({
+                    "game": game_key,
+                    "status": "success",
+                    "message": "",
+                    "prediction": {
+                        **result,
+                        "status": "COMPLETED",
+                        "game": game_key,
+                    },
+                })
             except Exception as exc:
-                results[game] = {"error": str(exc)}
-        return results
+                normalized.append({
+                    "game": game_key,
+                    "status": "error",
+                    "message": str(exc),
+                    "prediction": None,
+                })
+        return normalized
 
     def predict(self, game: str, recent_k: int = 10):
         """Backward-compatible alias used by API routes and tooling."""

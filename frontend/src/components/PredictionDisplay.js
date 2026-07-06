@@ -2,6 +2,8 @@ import React from 'react';
 import NextGameScheduleBanner from './NextGameScheduleBanner';
 import './PredictionDisplay.css';
 
+const hasBlendWeight = (value) => value !== undefined && value !== null && value !== '';
+
 const PredictionDisplay = ({ prediction }) => {
   if (!prediction) {
     return null;
@@ -65,7 +67,7 @@ const PredictionDisplay = ({ prediction }) => {
           {meta.model_strategy && (
             <span style={{ marginLeft: 12 }}>Strategy: {meta.model_strategy}</span>
           )}
-          {meta.blend_weight !== undefined && (
+          {hasBlendWeight(meta.blend_weight) && (
             <span style={{ marginLeft: 12 }}>Blend: {meta.blend_weight}</span>
           )}
           {meta.highest_accuracy != null && (
@@ -79,10 +81,10 @@ const PredictionDisplay = ({ prediction }) => {
         </div>
         {session.map((draw) => (
           <div key={`draw-${draw.draw_index}`} className="mb-3">
-            <div className="prediction-label mb-1">
-              Draw {draw.draw_index}
+            <div className="prediction-label mb-1 prediction-draw-header">
+              <span className="prediction-draw-index">Draw {draw.draw_index}</span>
               {draw.prediction_date && (
-                <span className="text-muted" style={{ marginLeft: 8, fontSize: '0.95em' }}>
+                <span className="text-muted prediction-draw-date">
                   {draw.prediction_date}
                   {draw.prediction_weekday ? ` (${draw.prediction_weekday})` : ''}
                   {draw.prediction_timezone ? ` [${draw.prediction_timezone}]` : ''}
@@ -128,7 +130,7 @@ const PredictionDisplay = ({ prediction }) => {
         {meta.model_strategy && (
           <span style={{ marginLeft: 12 }}>Strategy: {meta.model_strategy}</span>
         )}
-        {meta.blend_weight !== undefined && (
+        {hasBlendWeight(meta.blend_weight) && (
           <span style={{ marginLeft: 12 }}>Blend: {meta.blend_weight}</span>
         )}
         {(meta.highest_accuracy != null || prediction.highest_accuracy != null) && (

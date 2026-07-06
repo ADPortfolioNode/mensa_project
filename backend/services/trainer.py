@@ -593,6 +593,67 @@ class TrainerService:
 
         return max(values) if values else None
 
+    def _load_score_leaderboard_for_game(self, game_key: str) -> list[dict]:
+        """Build a merged accuracy leaderboard from metadata and saved experiments."""
+        from experiments.store import ExperimentStore, _experiment_accuracy
+
+        experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
+        metadata_path = os.path.join(experiments_dir, f"{game_key}_model_metadata.json")
+        entries: list[dict] = []
+
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, "r") as handle:
+                    metadata = json.load(handle)
+                for item in metadata.get("score_leaderboard") or []:
+                    normalized = normalize_leaderboard_entry(
+                        item,
+                        default_timestamp=float(item.get("timestamp") or 0.0)
+                        if isinstance(item, dict)
+                        else 0.0,
+                    )
+                    if normalized:
+                        entries.append(normalized)
+            except Exception:
+                pass
+
+        experiments_path = os.path.join(experiments_dir, "experiments.json")
+        if os.path.exists(experiments_path):
+            try:
+                store = ExperimentStore(experiments_path)
+                for experiment in store.list_experiments():
+                    if str(experiment.get("game") or "").strip().lower() != game_key:
+                        continue
+                    if str(experiment.get("type") or "").lower() != "training":
+                        continue
+                    accuracy = _experiment_accuracy(experiment)
+                    if accuracy is None:
+                        continue
+                    entry = normalize_leaderboard_entry(
+                        {
+                            "accuracy": float(accuracy),
+                            "timestamp": float(experiment.get("timestamp") or 0.0),
+                            "source": "experiment",
+                            "training_params": extract_training_params(experiment),
+                            **extract_training_params(experiment),
+                            "model_strategy": experiment.get("model_strategy"),
+                        },
+                        default_timestamp=float(experiment.get("timestamp") or 0.0),
+                    )
+                    if entry:
+                        entries.append(entry)
+            except Exception:
+                pass
+
+        entries.sort(
+            key=lambda item: (
+                float(item.get("accuracy") if item.get("accuracy") is not None else -1.0),
+                float(item.get("timestamp") or 0.0),
+            ),
+            reverse=True,
+        )
+        return entries
+
     def get_incremental_training_context(
         self,
         game: str,
@@ -621,7 +682,9 @@ class TrainerService:
             except Exception:
                 stored_meta = {}
 
-        score_leaderboard = stored_meta.get("score_leaderboard") or []
+        score_leaderboard = self._load_score_leaderboard_for_game(game_key)
+        if not score_leaderboard:
+            score_leaderboard = stored_meta.get("score_leaderboard") or []
         best_training_params = merge_training_params(
             stored_meta.get("best_training_params"),
             extract_training_params(stored_meta),

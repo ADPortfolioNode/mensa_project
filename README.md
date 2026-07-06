@@ -1,425 +1,224 @@
-# Mensa Predictive RAG — Production-Ready Docker Application
+# Mensa Predictive RAG
 
-A full-stack predictive analytics and RAG (Retrieval-Augmented Generation) application for lottery data analysis, featuring a React frontend, Python FastAPI backend with ChromaDB vector database, and multi-model AI integration (Gemini, GPT, Grok).
+Lottery data pipeline with ingestion, model training, suggestions, and optional AI chat (Gemini, OpenAI, Grok). Stack: **React** frontend, **FastAPI** backend, **ChromaDB** vector store — all orchestrated with Docker Compose.
 
-## 🚀 Quick Start
+## Quick start (Windows)
 
-### Prerequisites
-- Docker 20.10+ and Docker Compose 2.0+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and wait until it is running.
+2. Open the `mensa_project` folder.
+3. Double-click **`StartMensa.bat`**
+   - First run: creates `.env` from `.env.example` (optional API keys for chat).
+   - Builds images, starts containers, opens the dashboard in your browser.
+4. Double-click **`StopMensa.bat`** when finished (data volumes are kept).
 
-### One-Command Deployment (local development)
+First build can take 10–20 minutes. Later starts are faster.
+
+| Launcher | Purpose |
+|----------|---------|
+| `StartMensa.bat` (or `Start Mensa.bat`) | Build + start stack, open app |
+| `StopMensa.bat` (or `Stop Mensa.bat`) | Stop containers cleanly |
+| `start-windows.ps1` | PowerShell launcher used by the `.bat` file |
+| `recover_stack.ps1` | Recovery when Docker port-forwarding fails |
+| `rebuild.ps1` | Rebuild frontend/backend and restart |
+
+**App URL:** `http://127.0.0.1:3000` (or `FRONTEND_HOST_PORT` from `.env`)
+
+**Windows tips**
+
+- Prefer `http://127.0.0.1:3000` over `localhost` if you see timeouts (IPv6/WSL relay issues).
+- Wait for **Stack healthy** in the startup window, then hard-refresh (`Ctrl+Shift+R`).
+- Gateway errors: `.\scripts\diag_gateway_502.ps1` or `.\scripts\run_full_diag.ps1`
+
+## Quick start (Mac / Linux)
 
 ```bash
-# Clone the repository
 git clone https://github.com/ADPortfolioNode/mensa_project.git
 cd mensa_project
-
-# Copy environment template and configure API keys
-cp .env.example .env
-# Edit .env with your API keys (see Required Keys below)
-
-# Build and start all services
+cp .env.example .env   # add API keys if you want AI chat
 docker compose up --build -d
-
-# Access the application
-# Frontend:  http://localhost:3000
-# Backend:   http://localhost:5000
-# ChromaDB:  http://localhost:8000
 ```
 
-### Public web server (subscribing customers)
+Open **http://localhost:3000**. The frontend nginx proxy serves `/api/*` to the backend — you normally only need port 3000.
 
-Deploy with HTTPS, internal-only API/Chroma, and optional subscriber login:
+## Ports and URLs
+
+Host ports come from `.env`. Compose defaults vs common Windows overrides:
+
+| Service | Container port | Default host port | Often in `.env` (Windows) |
+|---------|----------------|-------------------|---------------------------|
+| Frontend | 80 | 3000 | 3000 |
+| Backend | 5000 | 5000 | **5001** |
+| ChromaDB | 8000 | 8000 | **8001** |
+
+Check your active ports:
 
 ```bash
-cp .env.production.example .env
-# Edit DOMAIN, ACME_EMAIL, API keys; set CADDY_PROFILE=subscribers for paid access
-./scripts/deploy-production.sh
+docker compose ps
 ```
 
-Full guide: [docs/deployment/PUBLIC_DISTRIBUTION.md](docs/deployment/PUBLIC_DISTRIBUTION.md)
+Health checks (adjust port if you use `BACKEND_HOST_PORT` / `CHROMA_HOST_PORT`):
 
-### Required API Keys
+```bash
+curl http://127.0.0.1:3000/
+curl http://127.0.0.1:5001/api/health    # or :5000
+curl http://127.0.0.1:8001/api/v1/heartbeat
+```
 
-At least one of these is needed for AI chat features. Set them in `.env`:
+## API keys (optional)
 
-| Provider   | Env Variable       | Get Key At                                      |
-|------------|--------------------|-------------------------------------------------|
-| Google     | `GEMINI_API_KEY`   | https://aistudio.google.com/app/apikey          |
-| OpenAI     | `OPENAI_API_KEY`   | https://platform.openai.com/api-keys            |
-| xAI (Grok) | `GROK_API_KEY`     | https://console.x.ai                            |
+Training, ingestion, and suggestions work without keys. At least one key enables AI chat:
 
-The app runs **without** keys — ingestion, training, and predictions work in local mode. Only AI chat requires configuration.
+| Provider | Variable | Get a key |
+|----------|----------|-----------|
+| Google Gemini | `GEMINI_API_KEY` | https://aistudio.google.com/app/apikey |
+| OpenAI | `OPENAI_API_KEY` / `CHAT_GPT_API_KEY` | https://platform.openai.com/api-keys |
+| xAI Grok | `GROK_API_KEY` | https://console.x.ai |
 
-## � Documentation
+## Typical workflow
 
-Comprehensive documentation is organized in the `docs/` directory:
+1. **Ingest** — pull draw history into ChromaDB for a game.
+2. **Train** — build a Random Forest model; experiments are saved with accuracy and parameters.
+3. **Suggest** — generate next-draw suggestions from the trained model.
+4. **Chat** (optional) — RAG concierge when API keys are set.
 
-- **[docs/README.md](docs/README.md)** - Documentation index and navigation
-- **[docs/architecture/](docs/architecture/)** - Architecture documentation and diagrams
-- **[docs/deployment/](docs/deployment/)** - Deployment guides and configurations
-- **[docs/guides/](docs/guides/)** - User guides and operational documentation
-- **[docs/testing/](docs/testing/)** - Testing documentation and reports
-- **[docs/status/](docs/status/)** - Project status and completion reports
-- **[docs/changes/](docs/changes/)** - Change logs and summaries
+Training uses **incremental learning**: new runs build on the prior best model. The dashboard loads **highest-accuracy settings** from saved experiments when you select a game or restart.
 
-## �📁 Project Structure
+**Large games (e.g. Powerball):** if training hits 502/504, lower target accuracy (~85–88%), max iterations (10–12), N estimators (~150), and disable auto-tune.
+
+## Project layout
 
 ```
 mensa_project/
-├── frontend/                  # React app (Create React App)
-│   ├── Dockerfile             # Multi-stage: node build + nginx serve
-│   ├── nginx.conf             # Production nginx with security headers + rate limiting
-│   └── src/                   # React components
-├── backend/                   # Python FastAPI backend
-│   ├── Dockerfile             # Multi-stage: builder + slim runtime
-│   ├── main.py                # FastAPI app bootstrap (<100 lines)
-│   ├── routes/                # API endpoint definitions
-│   ├── middleware/            # CORS, rate limiting
-│   ├── state/                 # State management
-│   ├── utils/                 # Helper functions
-│   ├── config.py              # Game configs, schedules, aliases
-│   └── services/              # Ingest, trainer, predictor, RAG, Chroma, LM router
-├── docs/                      # Consolidated documentation
-│   ├── architecture/          # Architecture docs and diagrams
-│   ├── deployment/            # Deployment guides
-│   ├── guides/                # Quick start, troubleshooting, operations
-│   ├── testing/               # Test reports and plans
-│   ├── status/                # Project status and completion reports
-│   └── changes/               # Change logs and summaries
-├── docker-compose.yml         # Single Docker Compose configuration
-├── .github/workflows/         # CI/CD: build, test, lint, push, release
-│   ├── docker-build-push.yml  # Build + push to GHCR + Docker Hub
-│   └── lint-and-quality.yml   # Flake8, Black, Hadolint, YAML lint
-├── .env.example               # Environment template
-├── .dockerignore              # Build exclusions
-├── verify_production.ps1      # Production readiness checker
-└── vercel.json                # Vercel deploy config
+├── StartMensa.bat / StopMensa.bat     # Windows one-click launchers
+├── start-windows.ps1                  # Staged Docker startup (Windows)
+├── docker-compose.yml                 # Local dev stack
+├── docker-compose.prod.yml            # Loopback-only port overrides
+├── docker-compose.distribution.yml    # Production / subscriber deployment
+├── .env.example                       # Local env template
+├── frontend/                          # React + nginx (production serve)
+├── backend/
+│   ├── main.py                        # FastAPI entry
+│   ├── routes/                        # API: games, ingest, train, predict, chat, …
+│   ├── services/                      # ingest, trainer, predictor, chroma, RAG
+│   └── utils/                         # training params, timestamps, validation
+├── scripts/                           # deploy, diagnostics, port helpers
+├── docs/                              # Architecture, deployment, guides, testing
+└── verify_*.ps1 / verify_*.py         # Smoke and workflow checks
 ```
 
-## 🐳 Docker Setup
-
-### Architecture
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Frontend   │────▶│   Backend    │────▶│   ChromaDB   │
-│  (nginx:80)  │     │  (FastAPI)   │     │  (Vector DB) │
-│  Port: 3000  │     │  Port: 5000  │     │  Port: 8000  │
-└──────────────┘     └──────────────┘     └──────────────┘
-       │                     │                     │
-       ▼                     ▼                     ▼
-  mensa-net (internal bridge network)
-```
-
-### Services
-
-| Service   | Image                                   | Base Image         | Key Features                         |
-|-----------|-----------------------------------------|--------------------|--------------------------------------|
-| frontend  | `ghcr.io/adportfolionode/mensa-frontend` | nginx:alpine       | Security headers, rate limiting, SPA |
-| backend   | `ghcr.io/adportfolionode/mensa-backend`  | python:3.11-slim   | RAG, predictions, training, AI chat |
-| chroma    | `chromadb/chroma:0.5.3`                 | official           | Vector database, persistent storage  |
-
-### Security
-
-- **Non-root users**: nginx (frontend) and appuser (backend) — never run as root
-- **Multi-stage builds**: Minimal final images with only runtime dependencies
-- **Health checks**: All services self-monitor with configurable intervals
-- **Security headers**: HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy
-- **Rate limiting**: 30 req/s at nginx, 100 req/min at backend (exempts health checks)
-- **Network isolation**: Internal bridge network, no exposed ports except ingress
-- **server_tokens off**: nginx version hidden from HTTP responses
-- **Hidden file blocking**: `.env`, `.git`, secrets inaccessible via nginx
-
-### Dockerfile Optimizations
-
-**Backend (`backend/Dockerfile`)**:
-- Multi-stage: `python:3.11-slim` builder → slim runtime
-- Layer caching: `requirements.txt` copied and installed first
-- Cache busting via `CACHE_BUSTER` arg for app code changes
-- Chroma embedding warmup during build to speed first request
-- Single hypercorn worker for consistent in-memory state
-- Data directory at `/data` (mounted volume)
-
-**Frontend (`frontend/Dockerfile`)**:
-- Multi-stage: `node:22.13.1-slim` build → nginx:alpine serve
-- `npm ci` installs locked dependencies (no lockfile needed — pure CRA)
-- Custom nginx config with security + proxying
-
-### Docker Commands
+## Docker commands
 
 ```bash
 # Build and start
 docker compose up --build -d
 
-# Build specific service
+# Rebuild one service
 docker compose build backend
 docker compose build frontend
 
-# View logs
+# Logs
 docker compose logs -f backend
 docker compose logs -f frontend
 
-# Stop everything
+# Stop (keep data)
 docker compose down
 
-# Stop and remove volumes (destroys data)
+# Full reset (destroys volumes)
 docker compose down -v
+```
 
-# Rebuild backend with cache busting
+Force backend rebuild after code changes:
+
+```bash
 BACKEND_CACHE_BUSTER=$(date +%s) docker compose build backend
 ```
 
-## 🔧 Environment Variables
+## Environment variables
 
-Copy `.env.example` to `.env`:
+Copy `.env.example` → `.env`. Important entries:
 
-```bash
-cp .env.example .env
-```
+| Variable | Description |
+|----------|-------------|
+| `DOCKER_BIND_HOST` | Host bind address (`127.0.0.1` on Windows) |
+| `FRONTEND_HOST_PORT` | Dashboard port (default `3000`) |
+| `BACKEND_HOST_PORT` | Direct API port (default `5000`, often `5001`) |
+| `CHROMA_HOST_PORT` | Chroma host port (default `8000`, often `8001`) |
+| `REACT_APP_API_BASE` | Empty in Docker (nginx proxies `/api`); set for Vercel |
+| `BACKEND_CACHE_BUSTER` / `FRONTEND_CACHE_BUSTER` | Cache-bust Docker builds |
 
-Key variables:
+Training defaults can be tuned via `TRAIN_*` variables (see `.env.example` and `docker-compose.yml`).
 
-| Variable              | Required | Default                  | Description                      |
-|-----------------------|----------|--------------------------|----------------------------------|
-| `GEMINI_API_KEY`      | No       | —                        | Google Gemini API key            |
-| `OPENAI_API_KEY`      | No       | —                        | OpenAI API key                   |
-| `CHAT_GPT_API_KEY`    | No       | —                        | ChatGPT API key                  |
-| `GROK_API_KEY`        | No       | —                        | xAI Grok API key                 |
-| `GROK_API_BASE`       | No       | `https://api.x.ai/v1`    | Grok API base URL                |
-| `GROK_MODEL`          | No       | `grok-3-mini-beta`       | Grok model name                  |
-| `CHROMA_HOST`         | No       | `mensa_chroma`           | ChromaDB container hostname      |
-| `CHROMA_PORT`         | No       | `8000`                   | ChromaDB port                    |
-| `REACT_APP_API_BASE`  | Yes      | `http://localhost:5000`  | Backend URL for frontend         |
-| `MAX_CONCURRENT_CLONES` | No     | `3`                      | Max parallel data fetches        |
-
-## 🧪 Testing
-
-### Quick Health Check
-
-```bash
-# Backend
-curl http://localhost:5000/api/health
-
-# Frontend
-curl -I http://localhost:3000
-
-# ChromaDB
-curl http://localhost:8000/api/v1/heartbeat
-```
-
-### Automated Verification
+## Verification
 
 ```powershell
-# Windows (PowerShell)
+# Windows — containers, health, endpoints
 .\verify_production.ps1
+.\verify_production.ps1 -All   # includes security headers
 
-# Run all checks including security headers
-.\verify_production.ps1 -All
+.\verify_frontend.ps1
+.\scripts\run_full_diag.ps1
 ```
-
-### Manual Endpoint Tests
 
 ```bash
-# List available games
-curl http://localhost:5000/api/games
-
-# Get startup/ingestion status
-curl http://localhost:5000/api/startup_status
-
-# Check Chroma collections
-curl http://localhost:5000/api/chroma/collections
-
-# Get game summary (replace take5 with any game)
-curl http://localhost:5000/api/games/take5/summary
+# Python workflow checks (backend should be up; set port if not 5000)
+python verify_training_learning.py
+python verify_all_games_training.py
 ```
 
-## 🛠️ Development
+## Production deployment
 
-### Local (Without Docker)
+Public HTTPS deployment with internal-only API/Chroma:
 
 ```bash
-# Backend
-cd backend
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-hypercorn main:app --bind 0.0.0.0:5000
-
-# Frontend
-cd frontend
-npm install
-npm start
+cp .env.production.example .env
+# Edit DOMAIN, ACME_EMAIL, API keys
+./scripts/deploy-production.sh    # Linux
+.\scripts\deploy-production.ps1   # Windows
 ```
 
-### Docker Development
+Details: [docs/deployment/PUBLIC_DISTRIBUTION.md](docs/deployment/PUBLIC_DISTRIBUTION.md)
+
+## Supported games
+
+| Game | Main numbers | Bonus | Schedule |
+|------|--------------|-------|----------|
+| Take 5 | 5 (1–39) | 1 (1–39) | 2× daily |
+| Pick 3 | 3 (0–9) | — | 2× daily |
+| Powerball | 5 (1–69) | 1 (1–26) | Mon, Wed, Sat |
+| Mega Millions | 5 (1–70) | 1 (1–25) | Tue, Fri |
+| Pick 10 | 20 (1–80) | — | Daily |
+| Cash4Life | 5 (1–60) | 1 (1–4) | Daily |
+| Quick Draw | 20 (1–80) | — | Frequent |
+| NY Lotto | 6 (1–59) | 1 (1–59) | Wed, Sat |
+
+## Documentation
+
+| Topic | Location |
+|-------|----------|
+| Doc index | [docs/README.md](docs/README.md) |
+| Operations | [docs/guides/OPERATIONS_GUIDE.md](docs/guides/OPERATIONS_GUIDE.md) |
+| Troubleshooting | [docs/guides/TROUBLESHOOTING.md](docs/guides/TROUBLESHOOTING.md) |
+| Architecture | [docs/architecture/](docs/architecture/) |
+| Release notes | [docs/changes/RELEASE_NOTES.md](docs/changes/RELEASE_NOTES.md) |
+
+## Troubleshooting
+
+**Port conflicts** — set in `.env`:
+
+```env
+FRONTEND_HOST_PORT=3001
+BACKEND_HOST_PORT=5001
+CHROMA_HOST_PORT=8001
+```
+
+**Container unhealthy**
 
 ```bash
-# Build with cache busting for fresh installs
-BACKEND_CACHE_BUSTER=$(date +%s) docker compose build backend
-
-# Rebuild frontend with different Node version
-docker compose build --build-arg NODE_VERSION=20.11.0 frontend
-
-# Watch logs for a specific service
-docker compose logs -f backend
-```
-
-## ☁️ Deploy to Vercel (Frontend Only)
-
-The frontend can be deployed to Vercel for free. The backend must remain containerized.
-
-### Setup
-
-1. In Vercel dashboard: New Project → Import Git Repository
-2. Build command: `npm --prefix frontend run build`
-3. Output directory: `frontend/build`
-4. Add environment variable in Vercel:
-   - Key: `REACT_APP_API_BASE`
-   - Value: `@backend_url` (Vercel secret reference)
-5. Create secret: `backend_url` = your backend public URL
-
-### Deploy
-
-```bash
-npx vercel login
-npx vercel --prod
-```
-
-See `frontend/VERCEL_DEPLOYMENT.md` for full walkthrough.
-
-## 🐳 Docker Hub Distribution
-
-### Build & Push
-
-```bash
-# Login
-docker login
-
-# Tag and push
-docker tag mensa-frontend:latest yourusername/mensa-frontend:latest
-docker tag mensa-backend:latest yourusername/mensa-backend:latest
-docker push yourusername/mensa-frontend:latest
-docker push yourusername/mensa-backend:latest
-```
-
-### One-Click Run From Docker Hub
-
-```bash
-# 1. Edit docker-compose.hub.yml — set image: to your Docker Hub images
-# 2. Copy .env.example → .env and configure
-# 3. Run
-docker compose -f docker-compose.hub.yml up -d
-```
-
-**Or run individual containers:**
-
-```bash
-docker run -d -p 3000:80 \
-  -e REACT_APP_API_BASE=https://your-backend.com \
-  yourusername/mensa-frontend:latest
-```
-
-## 🤖 CI/CD Pipeline
-
-Two GitHub Actions workflows are included:
-
-### 1. Build & Push (`docker-build-push.yml`)
-
-Triggers:
-- Push to `main` or `mensa`
-- Pull request to `main` or `mensa`
-- Tag push (`v*`)
-
-Stages:
-1. **Build & Test**: Builds both images, verifies backend imports and frontend build
-2. **Push to Registry**: Pushes to GHCR and Docker Hub (on non-PR events)
-3. **Draft Release**: Creates GitHub Release when a version tag is pushed
-
-### 2. Lint & Quality (`lint-and-quality.yml`)
-
-Triggers: push/PR to `main`/`mensa`
-- `flake8` Python linting with error checking
-- `black` Python formatting check (non-blocking)
-- `hadolint` Dockerfile linting
-- `yamllint` YAML validation
-
-### Secrets Required
-
-| Secret             | Description                     |
-|--------------------|---------------------------------|
-| `DOCKER_USERNAME`  | Docker Hub username             |
-| `DOCKER_PASSWORD`  | Docker Hub access token         |
-
-(No GHCR setup needed — `GITHUB_TOKEN` is auto-provided.)
-
-## 🔄 Versioning & Releases
-
-See `RELEASE_NOTES.md` for full changelog.
-
-```bash
-# Tag a release
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin main --tags
-
-# CI automatically:
-# 1. Builds and pushes images to GHCR + Docker Hub
-# 2. Creates a GitHub Release with auto-generated notes
-```
-
-Version scheme: [SemVer](https://semver.org/)
-- **MAJOR**: Breaking API changes
-- **MINOR**: New games, providers, features
-- **PATCH**: Bug fixes, security patches
-
-## 📊 Supported Games
-
-| Game         | Main Numbers   | Bonus      | Schedule         |
-|--------------|----------------|------------|------------------|
-| Take 5       | 5 (1–39)       | 1 (1–39)   | 2× daily         |
-| Pick 3       | 3 (0–9)        | —          | 2× daily         |
-| Powerball    | 5 (1–69)       | 1 (1–26)   | Mon, Wed, Sat    |
-| Mega Millions| 5 (1–70)       | 1 (1–25)   | Tue, Fri         |
-| Pick 10      | 20 (1–80)      | —          | Daily            |
-| Cash4Life    | 5 (1–60)       | 1 (1–4)    | Daily            |
-| Quick Draw   | 20 (1–80)      | —          | ~360× daily      |
-| NY Lotto     | 6 (1–59)       | 1 (1–59)   | Wed, Sat         |
-
-## 🔒 Security Best Practices
-
-1. **Never commit `.env` files** — `.env` is gitignored; use `.env.example`
-2. **Rotate API keys regularly**
-3. **Keep base images updated**: `docker compose build --no-cache --pull`
-4. **Use specific version tags** in production, not `latest`
-5. **Scan images**: `docker scan yourusername/mensa-frontend:latest`
-6. **Limit exposed ports**: Only `3000` (frontend) should be public; restrict `5000` and `8000`
-7. **Enable Docker content trust** for supply chain security
-
-## 🐛 Troubleshooting
-
-### Port Conflicts
-
-```yaml
-# In compose.yaml, change host ports:
-ports:
-  - "3001:80"   # Frontend on 3001
-  - "5001:5000" # Backend on 5001
-```
-
-### Container Won't Start
-
-```bash
-# Check logs
-docker compose logs backend
-
-# Verify health
-docker inspect mensa_backend | jq '.[].State.Health'
-
-# Restart specific service
+docker compose logs backend --tail 80
 docker compose restart backend
 ```
 
-### Volume Permissions
+**Volume permissions**
 
 ```bash
 docker compose down
@@ -427,27 +226,30 @@ docker compose run --rm backend chown -R appuser:appuser /data
 docker compose up -d
 ```
 
-### Reset Everything
+**Nuclear reset**
 
 ```bash
-docker compose down -v        # Stops and removes volumes
-docker system prune -a -f     # Cleans all unused images
-docker compose up --build -d  # Fresh start
+docker compose down -v
+docker compose up --build -d
 ```
 
-## 📄 License
+## CI/CD
 
-See `LICENSE` file details.
+GitHub Actions (`.github/workflows/`):
 
-## 🤝 Contributing
+- `docker-build-push.yml` — build images, push to GHCR/Docker Hub on `main`
+- `lint-and-quality.yml` — flake8, black, hadolint, yamllint
+- `build-and-push-backend.yml` — backend image pipeline
 
-1. Fork the repository
-2. Create a feature branch (`feat/your-feature`)
-3. Make changes
-4. Submit a pull request to `mensa` branch
+## Contributing
 
-Run the CI checks locally before pushing:
+1. Fork the repo and branch from `main`.
+2. Run local checks before pushing:
+
 ```bash
 pip install flake8 black
 flake8 backend/ --select=E9,F63,F7,F82 --show-source
-black --check backend/ --diff
+black --check backend/
+```
+
+3. Open a pull request against `main`.

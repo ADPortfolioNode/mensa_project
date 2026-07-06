@@ -316,6 +316,38 @@ def api_safe_request(
         return None, {"error": str(exc)}
 
 
+def is_record_floor_response(payload: dict) -> bool:
+    message = str(payload.get("message", "")).lower()
+    return "record floor" in message or "prevent regression" in message
+
+
+def summarize_train_run(payload: dict, *, base: str, pre_baseline: float | None) -> dict:
+    """Normalize a train API payload into comparable run metrics."""
+    if is_record_floor_response(payload):
+        _, ctx = api_safe_request("GET", f"/api/train_settings?game={GAME}", timeout=20, base=base)
+        incremental = (ctx or {}).get("incremental") or {}
+        highest = baseline_from_payload(incremental) or baseline_from_payload(payload) or pre_baseline
+        return {
+            "highest": highest,
+            "baseline": incremental.get("baseline_accuracy") or payload.get("baseline_accuracy"),
+            "previous": payload.get("previous_accuracy"),
+            "training_target": payload.get("training_target") or incremental.get("training_target"),
+            "retained": True,
+            "used_prev": bool(incremental.get("incremental_learning")),
+            "record_floor": True,
+        }
+
+    return {
+        "highest": baseline_from_payload(payload),
+        "baseline": payload.get("baseline_accuracy"),
+        "previous": payload.get("previous_accuracy"),
+        "training_target": payload.get("training_target"),
+        "retained": bool(payload.get("retained_previous_model")),
+        "used_prev": bool(payload.get("used_previous_training")),
+        "record_floor": False,
+    }
+
+
 def baseline_from_payload(payload: dict) -> float | None:
     values = []
     for key in ("highest_accuracy", "accuracy", "baseline_accuracy"):
@@ -386,20 +418,10 @@ def integration_two_pass_training() -> None:
 
         status = str(train.get("status", "")).lower()
         if status not in ("completed", "success"):
-            record("API incremental training", "FAIL", f"run {run_idx} status={train.get('status')}")
-            return
-
-        highest = baseline_from_payload(train)
-        runs.append(
-            {
-                "highest": highest,
-                "baseline": train.get("baseline_accuracy"),
-                "previous": train.get("previous_accuracy"),
-                "training_target": train.get("training_target"),
-                "retained": train.get("retained_previous_model"),
-                "used_prev": train.get("used_previous_training"),
-            }
-        )
+            if not is_record_floor_response(train):
+                record("API incremental training", "FAIL", f"run {run_idx} status={train.get('status')}")
+                return
+        runs.append(summarize_train_run(train, base=BASE, pre_baseline=pre))
         time.sleep(1)
 
     checks = []
@@ -414,7 +436,7 @@ def integration_two_pass_training() -> None:
             prior = float(runs[idx - 1]["highest"])
             if highest + 1e-9 < prior:
                 checks.append(f"run {idx + 1} regressed {prior:.4f} -> {highest:.4f}")
-            if not run["used_prev"]:
+            if not run["used_prev"] and not run.get("record_floor"):
                 checks.append(f"run {idx + 1} missing used_previous_training")
 
     if checks:

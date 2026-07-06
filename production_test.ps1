@@ -9,6 +9,25 @@ param(
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $reportFile = ".\production_test_report_$timestamp.txt"
 
+function Read-DotEnvValue([string]$Name, [string]$Default) {
+    $envPath = Join-Path $PSScriptRoot ".env"
+    if (-not (Test-Path $envPath)) { return $Default }
+    foreach ($line in Get-Content $envPath) {
+        if ($line -match "^\s*$([regex]::Escape($Name))\s*=\s*(.+?)\s*$") {
+            return $Matches[1].Trim().Trim('"').Trim("'")
+        }
+    }
+    return $Default
+}
+
+$bindHost = Read-DotEnvValue "DOCKER_BIND_HOST" "127.0.0.1"
+if ([string]::IsNullOrWhiteSpace($bindHost)) { $bindHost = "127.0.0.1" }
+$frontendPort = [int](Read-DotEnvValue "FRONTEND_HOST_PORT" "3000")
+$backendPort = [int](Read-DotEnvValue "BACKEND_HOST_PORT" "5000")
+$chromaPort = [int](Read-DotEnvValue "CHROMA_HOST_PORT" "8000")
+$frontendBase = "http://${bindHost}:${frontendPort}"
+$backendBase = "http://${bindHost}:${backendPort}"
+
 function Write-Report {
     param([string]$Message, [string]$Color = "White")
     Write-Host $Message -ForegroundColor $Color
@@ -73,7 +92,7 @@ Write-Report "Summary: $healthyCount/$containerCount containers healthy`n" -Colo
 
 Write-Report "[2] FRONTEND HTML VALIDATION" -Color Yellow
 Write-Report "------------------------------------------------------------"
-$htmlResult = Test-Endpoint "http://localhost:3000" "Frontend HTML"
+$htmlResult = Test-Endpoint "$frontendBase" "Frontend HTML"
 if ($htmlResult.status -eq "pass") {
     if ($htmlResult.body -match 'id="root"') {
         Write-Report "  [PASS] React root element present" -Color Green
@@ -86,11 +105,13 @@ Write-Report ""
 Write-Report "[3] CRITICAL API ENDPOINTS" -Color Yellow
 Write-Report "------------------------------------------------------------"
 $endpoints = @(
-    @{ url = "http://localhost:3000/api/health"; desc = "/api/health" }
-    @{ url = "http://localhost:3000/api/games"; desc = "/api/games" }
-    @{ url = "http://localhost:3000/api/startup_status"; desc = "/api/startup_status" }
-    @{ url = "http://localhost:3000/api/chroma/collections"; desc = "/api/chroma/collections" }
-    @{ url = "http://localhost:3000/api/experiments"; desc = "/api/experiments" }
+    @{ url = "$frontendBase/api/health"; desc = "/api/health (proxy)" }
+    @{ url = "$frontendBase/api/games"; desc = "/api/games (proxy)" }
+    @{ url = "$frontendBase/api/startup_status"; desc = "/api/startup_status (proxy)" }
+    @{ url = "$frontendBase/api/chroma/collections"; desc = "/api/chroma/collections (proxy)" }
+    @{ url = "$frontendBase/api/experiments"; desc = "/api/experiments (proxy)" }
+    @{ url = "$backendBase/api/health"; desc = "/api/health (direct)" }
+    @{ url = "$backendBase/api/train_settings?game=pick3"; desc = "/api/train_settings (direct)" }
 )
 
 $apiPassCount = 0
@@ -106,7 +127,7 @@ Write-Report "[4] RESPONSE CONTRACT CHECKS" -Color Yellow
 Write-Report "------------------------------------------------------------"
 
 try {
-    $gamesResp = Invoke-WebRequest -Uri "http://localhost:3000/api/games" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
+    $gamesResp = Invoke-WebRequest -Uri "$frontendBase/api/games" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
     $gamesPayload = $gamesResp.Content | ConvertFrom-Json
     if ($gamesPayload -is [System.Array]) {
         $games = $gamesPayload
@@ -126,7 +147,7 @@ try {
 }
 
 try {
-    $statusResp = Invoke-WebRequest -Uri "http://localhost:3000/api/startup_status" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
+    $statusResp = Invoke-WebRequest -Uri "$frontendBase/api/startup_status" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
     $status = $statusResp.Content | ConvertFrom-Json
     $requiredFields = @("status", "progress", "total", "games")
     $fieldCount = 0
@@ -142,7 +163,7 @@ Write-Report ""
 Write-Report "[5] REGRESSION CHECKS" -Color Yellow
 Write-Report "------------------------------------------------------------"
 try {
-    $htmlResp = Invoke-WebRequest -Uri "http://localhost:3000" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
+    $htmlResp = Invoke-WebRequest -Uri "$frontendBase" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
     if ($htmlResp.Content -match '/api/api') {
         Write-Report "  [FAIL] Double /api path found" -Color Red
     } else {
@@ -156,9 +177,9 @@ Write-Report ""
 Write-Report "[6] CONNECTIVITY" -Color Yellow
 Write-Report "------------------------------------------------------------"
 @(
-    @{ host = "localhost"; port = 3000; service = "Frontend (Nginx)" }
-    @{ host = "localhost"; port = 5000; service = "Backend (FastAPI)" }
-    @{ host = "localhost"; port = 8000; service = "ChromaDB" }
+    @{ host = $bindHost; port = $frontendPort; service = "Frontend (Nginx)" }
+    @{ host = $bindHost; port = $backendPort; service = "Backend (FastAPI)" }
+    @{ host = $bindHost; port = $chromaPort; service = "ChromaDB" }
 ) | ForEach-Object {
     $isReachable = Test-NetConnection -ComputerName $_.host -Port $_.port -InformationLevel Quiet -WarningAction SilentlyContinue
     if ($isReachable) {
@@ -173,7 +194,8 @@ Write-Report "TEST SUMMARY" -Color Cyan
 Write-Report "============================================================" -Color Cyan
 Write-Report "Containers healthy: $healthyCount/$containerCount" -Color Cyan
 Write-Report "Critical API endpoints responding: $apiPassCount/$($endpoints.Count)" -Color Cyan
-Write-Report "Ready URL: http://localhost:3000" -Color Green
+Write-Report "Ready URL: $frontendBase" -Color Green
+Write-Report "Backend URL: $backendBase" -Color Green
 
 if ($WriteFile) {
     Write-Host "`nReport saved to: $reportFile" -ForegroundColor Cyan
