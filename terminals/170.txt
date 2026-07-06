@@ -1,0 +1,8 @@
+---
+pid: 2420
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend python -c \"import chromadb,inspect; import chromadb.api.client as c; print(chromadb.__file__)\""
+started_at: 2026-07-04T14:03:09.272Z
+running_for_ms: 305005   
+---
+/usr/local/lib/python3.11/site-packages/chromadb/__init__.py

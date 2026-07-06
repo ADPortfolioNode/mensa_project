@@ -1,0 +1,69 @@
+---
+pid: 12252
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_backend sh -c \"cat /data/ingest_state.json 2>/dev/null | head -c 2000\""
+started_at: 2026-07-04T15:32:51.771Z
+running_for_ms: 2219993  
+---
+{
+  "quickdraw": {
+    "status": "completed",
+    "rows_fetched": 656000,
+    "total_rows": 656000,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  },
+  "pick3": {
+    "status": "error",
+    "error": "No data was successfully ingested for game 'pick3'. Check backend logs for details."
+  },
+  "take5": {
+    "status": "completed",
+    "rows_fetched": 84256,
+    "total_rows": 84256,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  },
+  "nylotto": {
+    "status": "completed",
+    "rows_fetched": 12026,
+    "total_rows": 12026,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  },
+  "powerball": {
+    "status": "completed",
+    "rows_fetched": 3872,
+    "total_rows": 3872,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  },
+  "megamillions": {
+    "status": "completed",
+    "rows_fetched": 2515,
+    "total_rows": 2515,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  },
+  "pick10": {
+    "status": "completed",
+    "rows_fetched": 14369,
+    "total_rows": 14369,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  },
+  "cash4life": {
+    "status": "completed",
+    "rows_fetched": 2949,
+    "total_rows": 2949,
+    "progress": 100,
+    "added": 0,
+    "skipped_fetch": true
+  }
+}

@@ -178,6 +178,58 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   const trainParamsExperimentSource = useRef(null);
 
   useEffect(() => {
+    if (!selectedTrainGame) return;
+    let cancelled = false;
+
+    const mapDefaults = (defaults, prev) => ({
+      testSize: normalizeTrainSizeFraction(
+        defaults.train_size ?? prev?.testSize ?? 0.25,
+        0.25,
+      ),
+      randomState: defaults.random_state ?? prev?.randomState ?? 42,
+      nEstimators: normalizeNEstimators(defaults.n_estimators ?? prev?.nEstimators ?? 250),
+      maxDepth: normalizeMaxDepth(defaults.max_depth ?? prev?.maxDepth ?? 18),
+      maxIterations: normalizeMaxIterations(defaults.max_iterations ?? prev?.maxIterations ?? 40),
+      targetAccuracy: defaults.target_accuracy ?? prev?.targetAccuracy ?? 0.90,
+      windowSize: defaults.window_size ?? prev?.windowSize ?? 3,
+      autoTune: defaults.auto_tune ?? prev?.autoTune ?? true,
+      blendStep: defaults.blend_step ?? prev?.blendStep ?? 0.05,
+    });
+
+    const shallowEqual = (a, b, keys) => {
+      if (!a || !b) return false;
+      return keys.every((key) => (a[key] ?? null) === (b[key] ?? null));
+    };
+
+    const fetchSettings = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/api/train_settings?game=${selectedTrainGame}`, { timeout: 15000 });
+        if (cancelled || !response?.data) return;
+        const recreateDefaults = response.data.recreate_defaults
+          || response.data.incremental?.recreate_defaults
+          || response.data.incremental?.best_training_params
+          || {};
+        const mapped = mapDefaults(
+          { ...(response.data.defaults || {}), ...recreateDefaults },
+          trainParams,
+        );
+        const keys = ['testSize', 'randomState', 'nEstimators', 'maxDepth', 'maxIterations', 'targetAccuracy', 'windowSize', 'autoTune', 'blendStep'];
+        const shouldOverwrite = trainDefaultsForGame === null || shallowEqual(trainParams, trainDefaultsForGame, keys);
+        if (shouldOverwrite) {
+          setTrainParams((prev) => ({ ...prev, ...mapped }));
+        }
+        setTrainDefaultsForGame(mapped);
+        setTrainIncremental(response.data.incremental || null);
+      } catch (_) {
+        // Keep current params when settings endpoint is unavailable.
+      }
+    };
+
+    fetchSettings();
+    return () => { cancelled = true; };
+  }, [selectedTrainGame, API_BASE]);
+
+  useEffect(() => {
     async function fetchGamesAndContents() {
       try {
         const r = await axios.get(`${API_BASE}/api/games`, { timeout: 15000 });

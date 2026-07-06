@@ -1,0 +1,7 @@
+---
+pid: 2584
+cwd: "E:\2024 RESET\mensa_project"
+command: "docker exec mensa_chroma curl -s -m 20 http://localhost:8000/api/v1/collections/faf20147-dd61-4726-b10b-b965ae84cc85/count"
+started_at: 2026-07-04T15:30:17.380Z
+running_for_ms: 2370003  
+---

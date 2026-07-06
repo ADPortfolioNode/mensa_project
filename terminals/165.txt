@@ -1,0 +1,7 @@
+---
+pid: 7468
+cwd: "E:\2024 RESET\mensa_project"
+command: "curl.exe -s -m 15 http://127.0.0.1:5001/api/games/summaries"
+started_at: 2026-07-04T14:00:13.667Z
+running_for_ms: 475009   
+---

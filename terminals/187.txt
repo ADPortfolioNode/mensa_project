@@ -1,0 +1,51 @@
+---
+pid: 4760
+cwd: "E:\2024 RESET\mensa_project"
+command: "Start-Sleep -Seconds 30; try { Invoke-RestMethod -Uri \"http://localhost:3000/api/ingest_progress?game=pick3\" -TimeoutSec 15 | ConvertTo-Json } catch { Write-Output $_ }; try { Invoke-RestMethod -Uri \"http://localhost:3000/api/games/summaries\" -TimeoutSec 15 | ConvertTo-Json -Depth 4 } catch { Write-Output $_ }"
+started_at: 2026-07-04T20:27:35.981Z
+running_for_ms: 14105006 
+---
+{
+    "game":  "pick3",
+    "status":  "completed",
+    "rows_fetched":  1,
+    "total_rows":  1,
+    "progress":  100,
+    "added":  0
+}
+{
+    "summaries":  {
+                      "take5":  {
+                                    "game":  "take5",
+                                    "draw_count":  84256
+                                },
+                      "pick3":  {
+                                    "game":  "pick3",
+                                    "draw_count":  1
+                                },
+                      "powerball":  {
+                                        "game":  "powerball",
+                                        "draw_count":  3872
+                                    },
+                      "megamillions":  {
+                                           "game":  "megamillions",
+                                           "draw_count":  2515
+                                       },
+                      "pick10":  {
+                                     "game":  "pick10",
+                                     "draw_count":  14369
+                                 },
+                      "cash4life":  {
+                                        "game":  "cash4life",
+                                        "draw_count":  2949
+                                    },
+                      "quickdraw":  {
+                                        "game":  "quickdraw",
+                                        "draw_count":  656000
+                                    },
+                      "nylotto":  {
+                                      "game":  "nylotto",
+                                      "draw_count":  12026
+                                  }
+                  }
+}
