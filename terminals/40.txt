@@ -1,8 +1,0 @@
----
-pid: 2780
-cwd: "E:\2024 RESET\mensa_project"
-command: "Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; $ready = $false; for ($i = 1; $i -le 24; $i++) { Start-Sleep -Seconds 5; docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { $ready = $true; Write-Host \"Docker ready after $($i*5)s\"; break } Write-Host \"Waiting for Docker... ($($i*5)s)\" }; if (-not $ready) { Write-Host \"Docker not ready\"; exit 1 }"
-started_at: 2026-07-01T13:17:59.481Z
-running_for_ms: 24660002 
----
-Docker ready after 5s

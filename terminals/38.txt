@@ -1,9 +1,0 @@
----
-pid: 14516
-cwd: "E:\2024 RESET\mensa_project"
-command: "Start-Sleep -Seconds 35; curl.exe -s -o NUL -w \"all-games:%{http_code}\\n\" --max-time 5 http://localhost:5000/api/ingest_stream; curl.exe -s -o NUL -w \"pick3:%{http_code}\\n\" --max-time 5 \"http://localhost:5000/api/ingest_stream?game=pick3\""
-started_at: 2026-07-01T12:57:50.224Z
-running_for_ms: 25870157 
----
-all-games:200
-pick3:200

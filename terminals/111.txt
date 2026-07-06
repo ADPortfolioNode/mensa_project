@@ -1,8 +1,0 @@
----
-pid: 13836
-cwd: "E:\2024 RESET\mensa_project"
-command: "Start-Sleep -Seconds 22; curl.exe -s -m 120 -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@E:\\2024 RESET\\mensa_project\\train_powerball.json\""
-started_at: 2026-07-01T19:14:58.439Z
-running_for_ms: 3240003  
----
-{"status":"COMPLETED","message":"Training completed for powerball. Using highest current accuracy (0.9040) — new candidate (0.8704) did not improve.","accuracy":0.9040453359615023,"highest_accuracy":0.9040453359615023,"previous_accuracy":0.9040453359615023,"candidate_accuracy":0.8703636750790011,"new_accuracy":0.8703636750790011,"mae":8.485077999756095,"model_path":"/data/models/powerball_model.joblib","feature_len":6,"output_len":6,"samples":3871,"target_accuracy":0.8,"training_target":0.9040453359615023,"baseline_accuracy":0.9040453359615023,"attempts":8,"reached_target":true,"retained_previous_model":true,"used_previous_training":true,"model_strategy":"ensemble","blend_weight":0.1,"train_size":0.33,"validation_size":0.67,"game":"powerball","experiment_id":"train-powerball-1782933322","score":0.9040453359615023}

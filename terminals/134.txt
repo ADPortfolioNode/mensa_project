@@ -1,8 +1,0 @@
----
-pid: 2436
-cwd: "E:\2024 RESET\mensa_project"
-command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; '{\"game\":\"pick3\",\"target_accuracy\":0.90,\"max_iterations\":8,\"train_size\":0.25,\"n_estimators\":250,\"max_depth\":18,\"random_state\":42}' | Out-File -Encoding ascii train_pick3_opt.json; curl.exe -s -m 600 -X POST http://localhost:5001/api/train -H \"Content-Type: application/json\" --data-binary \"@train_pick3_opt.json\""
-started_at: 2026-07-03T06:48:57.746Z
-running_for_ms: 2590009  
----
-{"status":"COMPLETED","message":"Training completed for pick3. Using highest current accuracy (0.8599) — new candidate (0.8476) did not improve.","accuracy":0.8599463309783281,"highest_accuracy":0.8599463309783281,"previous_accuracy":0.8599463309783281,"candidate_accuracy":0.847600379456931,"new_accuracy":0.847600379456931,"mae":1.4337898069932329,"model_path":"/data/models/pick3_model.joblib","feature_len":3,"output_len":3,"samples":6769,"target_accuracy":0.9,"training_target":0.9,"baseline_accuracy":0.8599463309783281,"attempts":8,"reached_target":false,"retained_previous_model":true,"used_previous_training":true,"model_strategy":"single","blend_weight":null,"train_size":0.25,"validation_size":0.75,"game":"pick3","experiment_id":"train-pick3-1783061341","score":0.8599463309783281}

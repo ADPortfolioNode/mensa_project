@@ -1,8 +1,0 @@
----
-pid: 8084
-cwd: "E:\2024 RESET\mensa_project"
-command: "Start-Sleep -Seconds 15; curl.exe -s -m 5 http://127.0.0.1:5001/api/health; Write-Host \"\"; curl.exe -s -m 30 http://127.0.0.1:5001/api/games/summaries"
-started_at: 2026-07-04T14:07:39.978Z
-running_for_ms: 25052    
----
-

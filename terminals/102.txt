@@ -1,8 +1,0 @@
----
-pid: 10992
-cwd: "E:\2024 RESET\mensa_project"
-command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; for ($i=1; $i -le 20; $i++) { $h = curl.exe -s -m 5 http://localhost:5000/api/health; if ($h -match 'healthy') { break }; Start-Sleep 3 }; '{\"game\":\"take5\",\"target_accuracy\":0.90,\"max_iterations\":12}' | Out-File -Encoding ascii train_take5.json; curl.exe -s -m 300 -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@train_take5.json\""
-started_at: 2026-07-01T18:38:14.664Z
-running_for_ms: 5445133  
----
-{"status":"success","game":"take5","experiment_id":"train-take5-1782931123","score":0.8967400781424194,"message":"Training completed for take5, but previous model was retained to minimize regression (new accuracy=0.8625 < previous accuracy=0.8967).","accuracy":0.8967400781424194,"new_accuracy":0.8624798857856014,"mae":4.027136952445643,"model_path":"/data/models/take5_model.joblib","feature_len":6,"output_len":6,"samples":1917,"target_accuracy":0.9,"attempts":12,"reached_target":false,"retained_previous_model":true,"used_previous_training":true,"model_strategy":"single","blend_weight":null,"train_size":0.33,"validation_size":0.67}

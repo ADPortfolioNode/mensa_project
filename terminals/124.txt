@@ -1,7 +1,0 @@
----
-pid: 18236
-cwd: "E:\2024 RESET\mensa_project"
-command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker version --format \"Server={{.Server.Version}}\" 2>&1"
-started_at: 2026-07-02T15:09:25.397Z
-running_for_ms: 1230000  
----

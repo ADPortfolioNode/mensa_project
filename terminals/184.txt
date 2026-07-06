@@ -1,9 +1,0 @@
----
-pid: 12152
-cwd: "E:\2024 RESET\mensa_project"
-command: "Start-Sleep -Seconds 25; curl.exe -s -m 5 http://127.0.0.1:5001/api/health; Write-Host \"\"; curl.exe -s -m 10 http://127.0.0.1:5001/api/games/summaries"
-started_at: 2026-07-04T15:34:01.659Z
-running_for_ms: 2150012  
----
-{"status":"healthy"}
-{"summaries":{"take5":{"game":"take5","draw_count":84256},"pick3":{"game":"pick3","draw_count":0},"powerball":{"game":"powerball","draw_count":3872},"megamillions":{"game":"megamillions","draw_count":2515},"pick10":{"game":"pick10","draw_count":14369},"cash4life":{"game":"cash4life","draw_count":2949},"quickdraw":{"game":"quickdraw","draw_count":656000},"nylotto":{"game":"nylotto","draw_count":12026}}}

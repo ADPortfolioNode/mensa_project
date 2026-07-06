@@ -1,7 +1,0 @@
----
-pid: 4928
-cwd: "E:\2024 RESET\mensa_project"
-command: "Get-Content \"E:\\2024 RESET\\mensa_project\\test_all_workflows.py\" | docker exec -i mensa_backend python -"
-started_at: 2026-07-01T13:56:44.976Z
-running_for_ms: 22335254 
----

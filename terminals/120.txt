@@ -1,7 +1,0 @@
----
-pid: 11640
-cwd: "E:\2024 RESET\mensa_project"
-command: "& \"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe\" version --format \"{{.Server.Version}}\" 2>&1"
-started_at: 2026-07-02T15:01:06.947Z
-running_for_ms: 1735003  
----

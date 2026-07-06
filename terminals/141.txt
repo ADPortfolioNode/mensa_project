@@ -1,8 +1,0 @@
----
-pid: 26860
-cwd: "E:\2024 RESET\mensa_project"
-command: "Get-Process -Id 3584 -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,Path; docker ps -a --filter \"name=mensa\" --format \"{{.Names}} {{.Status}}\" 2>&1"
-started_at: 2026-07-03T19:19:07.055Z
-running_for_ms: 12444998 
----
-

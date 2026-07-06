@@ -1,7 +1,0 @@
----
-pid: 10360
-cwd: "E:\2024 RESET\mensa_project"
-command: "Remove-Item \"E:\\2024 RESET\\mensa_project\\.diag_start.lock\" -Force -ErrorAction SilentlyContinue; $ok=$false; foreach ($i in 1..30) { $p = Start-Process -FilePath \"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe\" -ArgumentList \"info\" -PassThru -WindowStyle Hidden; if ($p.WaitForExit(8000)) { if ($p.ExitCode -eq 0) { Write-Host \"Docker ready after $($i*8)s\"; $ok=$true; break } } else { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }; Start-Sleep 8 }; if (-not $ok) { Write-Host \"Docker still not responding after 240s\" }"
-started_at: 2026-07-02T15:01:50.402Z
-running_for_ms: 1685009  
----

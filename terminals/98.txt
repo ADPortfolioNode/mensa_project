@@ -1,7 +1,0 @@
----
-pid: 14396
-cwd: "E:\2024 RESET\mensa_project"
-command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; '{\"game\":\"pick3\",\"max_iterations\":5,\"target_accuracy\":0.85}' | Out-File -Encoding ascii train_quick.json; curl.exe -s -m 180 -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@train_quick.json\""
-started_at: 2026-07-01T17:39:12.117Z
-running_for_ms: 8984997  
----

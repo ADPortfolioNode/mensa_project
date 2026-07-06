@@ -1,8 +1,0 @@
----
-pid: 13316
-cwd: "E:\2024 RESET\mensa_project"
-command: "docker restart mensa_backend"
-started_at: 2026-07-01T08:15:07.259Z
-running_for_ms: 16465001 
----
-mensa_backend

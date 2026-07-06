@@ -1,8 +1,0 @@
----
-pid: 3780
-cwd: "E:\2024 RESET\mensa_project"
-command: "curl.exe -s -m 300 -X POST http://localhost:5000/api/train -H \"Content-Type: application/json\" --data-binary \"@E:\\2024 RESET\\mensa_project\\train_take5.json\""
-started_at: 2026-07-01T18:56:14.258Z
-running_for_ms: 4365019  
----
-{"status":"COMPLETED","message":"Training completed for take5. Using highest current accuracy (0.8967) — new candidate (0.8625) did not improve.","accuracy":0.8967400781424194,"highest_accuracy":0.8967400781424194,"previous_accuracy":0.8967400781424194,"candidate_accuracy":0.8624798857856014,"new_accuracy":0.8624798857856014,"mae":4.027136952445643,"model_path":"/data/models/take5_model.joblib","feature_len":6,"output_len":6,"samples":1917,"target_accuracy":0.9,"training_target":0.9,"baseline_accuracy":0.8967400781424194,"attempts":12,"reached_target":false,"retained_previous_model":true,"used_previous_training":true,"model_strategy":"single","blend_weight":null,"train_size":0.33,"validation_size":0.67,"game":"take5","experiment_id":"train-take5-1782932175","score":0.8967400781424194}

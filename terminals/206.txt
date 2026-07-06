@@ -1,7 +1,0 @@
----
-pid: 21868
-cwd: "E:\2024 RESET\mensa_project"
-command: "docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\" 2>&1"
-started_at: 2026-07-05T02:14:02.523Z
-running_for_ms: 89993    
----

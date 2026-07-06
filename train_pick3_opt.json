@@ -1,1 +1,0 @@
-{"game":"pick3","target_accuracy":0.90,"max_iterations":8,"train_size":0.25,"n_estimators":250,"max_depth":18,"random_state":42}

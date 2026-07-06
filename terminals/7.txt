@@ -1,9 +1,0 @@
----
-pid: 5384
-cwd: "E:\2024 RESET\mensa_project"
-command: "docker inspect --format \"{{.State.Health.Status}}\" mensa_backend; Start-Sleep -Seconds 15; docker inspect --format \"{{.State.Health.Status}}\" mensa_backend"
-started_at: 2026-07-01T08:16:31.838Z
-running_for_ms: 16380001 
----
-unhealthy
-unhealthy

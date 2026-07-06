@@ -1,3 +1,0 @@
-I have identified and fixed the error in the frontend Docker build. The `NODE_VERSION` was not being passed correctly.
-
-I have updated the `compose.yaml` file to include the necessary build argument. Please run the diagnostic script again.

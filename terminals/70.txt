@@ -1,8 +1,0 @@
----
-pid: 12836
-cwd: "E:\2024 RESET\mensa_project"
-command: "curl.exe -s -o NUL -w \"health:%{http_code} \" http://localhost:3000/api/health; curl.exe -s -o NUL -w \"startup:%{http_code} \" http://localhost:3000/api/startup_status; curl.exe -s -o NUL -w \"experiments:%{http_code} \" http://localhost:3000/api/experiments; curl.exe -s -o NUL -w \"summaries:%{http_code} \" http://localhost:3000/api/games/summaries; curl.exe -s -o NUL -w \"pick3:%{http_code}\" http://localhost:3000/api/games/pick3/summary; Write-Host \"\""
-started_at: 2026-07-01T14:18:14.540Z
-running_for_ms: 21044992 
----
-health:200 startup:200 experiments:200 summaries:200 pick3:200

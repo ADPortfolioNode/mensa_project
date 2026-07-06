@@ -1,8 +1,0 @@
----
-pid: 10592
-cwd: "E:\2024 RESET\mensa_project"
-command: "$maxWait = 90; $elapsed = 0; while ($elapsed -lt $maxWait) { docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"Docker ready\"; break }; Start-Sleep -Seconds 5; $elapsed += 5 }; docker ps --filter \"name=mensa\" --format \"table {{.Names}}\\t{{.Status}}\""
-started_at: 2026-07-01T13:52:25.790Z
-running_for_ms: 22595018 
----
-failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.

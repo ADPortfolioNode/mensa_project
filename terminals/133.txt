@@ -1,8 +1,0 @@
----
-pid: 16256
-cwd: "E:\2024 RESET\mensa_project"
-command: "for ($i=1; $i -le 20; $i++) { $h = curl.exe -s -m 5 http://localhost:5001/api/health; if ($h -match 'healthy') { Write-Host 'backend ready'; break }; Start-Sleep 3 }"
-started_at: 2026-07-03T06:46:50.821Z
-running_for_ms: 2715030  
----
-backend ready

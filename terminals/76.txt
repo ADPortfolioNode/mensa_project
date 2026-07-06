@@ -1,8 +1,0 @@
----
-pid: 8292
-cwd: "E:\2024 RESET\mensa_project"
-command: "Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; for ($i=1; $i -le 30; $i++) { Start-Sleep 5; docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"docker up\"; break } }"
-started_at: 2026-07-01T14:27:53.568Z
-running_for_ms: 20464956 
----
-docker up

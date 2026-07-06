@@ -1,8 +1,0 @@
----
-pid: 11308
-cwd: "E:\2024 RESET\mensa_project"
-command: "docker info 2>$null | Out-Null; if ($LASTEXITCODE -ne 0) { Start-Process \"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\"; for ($i=1; $i -le 24; $i++) { Start-Sleep 5; docker info 2>$null | Out-Null; if ($LASTEXITCODE -eq 0) { Write-Host \"docker ready\"; break } } }"
-started_at: 2026-07-01T14:20:42.589Z
-running_for_ms: 20895059 
----
-docker ready

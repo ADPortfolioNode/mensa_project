@@ -1,7 +1,0 @@
----
-pid: 49452
-cwd: "E:\2024 RESET\mensa_project"
-command: "docker version --format \"{{.Server.Version}}\" 2>&1"
-started_at: 2026-07-03T22:39:31.110Z
-running_for_ms: 420003   
----

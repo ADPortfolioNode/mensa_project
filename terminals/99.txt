@@ -1,8 +1,0 @@
----
-pid: 4180
-cwd: "E:\2024 RESET\mensa_project"
-command: "Set-Location \"E:\\2024 RESET\\mensa_project\"; docker cp backend/services/ingest.py mensa_backend:/app/services/ingest.py; docker cp backend/routes/ingestion.py mensa_backend:/app/routes/ingestion.py; docker cp backend/routes/health.py mensa_backend:/app/routes/health.py; docker cp backend/state/ingestion_worker.py mensa_backend:/app/state/ingestion_worker.py; docker restart mensa_backend"
-started_at: 2026-07-01T17:44:12.130Z
-running_for_ms: 8684985  
----
-mensa_backend

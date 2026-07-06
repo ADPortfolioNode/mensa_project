@@ -1,8 +1,0 @@
----
-pid: 13340
-cwd: "E:\2024 RESET\mensa_project"
-command: "docker exec mensa_backend python -c \"import inspect, chromadb; print(inspect.signature(chromadb.HttpClient.__init__))\""
-started_at: 2026-07-04T14:01:19.058Z
-running_for_ms: 410004   
----
-(*args, **kwargs)
