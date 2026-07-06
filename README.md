@@ -165,6 +165,28 @@ python verify_training_learning.py
 python verify_all_games_training.py
 ```
 
+## Client distribution (zip / tar.gz)
+
+Package the app for delivery to a client (source, launchers, optional pre-built Docker images):
+
+```powershell
+.\scripts\package-distribution.ps1 -Version 20260706b
+.\scripts\zip-distribution.ps1 -PackageDir release\mensa_client_20260706b
+```
+
+Output under `release/`:
+
+| Artifact | Purpose |
+|----------|---------|
+| `mensa_client_<version>.tar.gz` | Single-file bundle (~300 MB with images) |
+| `mensa_client_<version>_app.tar.gz` | Source + docs only |
+| `mensa_client_<version>_images.tar.gz` | Pre-built backend + frontend images |
+| `SEND_TO_CLIENT.txt` | What to email/upload |
+
+Client Windows flow: extract → `images\load-images.ps1` → `StartMensa.bat` (uses pre-loaded images when `.env` has `MENSA_REGISTRY=mensa-local`). See `INSTALL.md` inside the package.
+
+Do **not** include your `.env` (API keys).
+
 ## Production deployment
 
 Public HTTPS deployment with internal-only API/Chroma:

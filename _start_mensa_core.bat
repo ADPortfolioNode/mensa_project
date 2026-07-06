@@ -18,6 +18,11 @@ echo.
 if exist ".env" (
     echo [OK] Using your existing .env file ^(unchanged^).
 ) else (
+    if exist ".env.client.example" if exist "images\mensa-backend.tar" (
+        echo [SETUP] Client package: creating .env from .env.client.example ...
+        copy /Y ".env.client.example" ".env" >nul
+        goto :env_ready
+    )
     if not exist ".env.example" (
         echo [ERROR] .env.example is missing. Cannot create .env.
         goto :fail
@@ -39,9 +44,20 @@ if exist ".env" (
     pause >nul
 )
 
+:env_ready
+
 echo.
 echo [START] Docker check and stack startup via PowerShell ...
-echo         ^(first run may take 10-20 minutes^)
+if exist ".env" (
+    findstr /B /C:"MENSA_REGISTRY=mensa-local" ".env" >nul 2>&1
+    if not errorlevel 1 (
+        echo         ^(offline client package — uses pre-loaded images^)
+    ) else (
+        echo         ^(first dev build may take 10-20 minutes^)
+    )
+) else (
+    echo         ^(first run may take 10-20 minutes^)
+)
 echo.
 
 if not exist "%~dp0start-windows.ps1" (
@@ -53,7 +69,14 @@ if errorlevel 1 (
     echo [ERROR] PowerShell is not on your PATH.
     goto :fail
 )
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-windows.ps1" -Build -OpenBrowser
+set "START_ARGS=-OpenBrowser"
+if exist ".env" (
+    findstr /B /C:"MENSA_REGISTRY=mensa-local" ".env" >nul 2>&1
+    if errorlevel 1 set "START_ARGS=-Build -OpenBrowser"
+) else (
+    set "START_ARGS=-Build -OpenBrowser"
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-windows.ps1" %START_ARGS%
 if errorlevel 1 (
     echo.
     echo [ERROR] Startup did not complete successfully.

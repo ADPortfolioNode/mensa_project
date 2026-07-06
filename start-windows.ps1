@@ -57,12 +57,23 @@ function Wait-DockerDaemon([int]$MaxSeconds = 180) {
     throw "Docker daemon not reachable after ${MaxSeconds}s. Open Docker Desktop manually."
 }
 
+function Test-OfflineClientMode {
+    $registry = Read-DotEnvValue "MENSA_REGISTRY" ""
+    $version = Read-DotEnvValue "MENSA_VERSION" ""
+    if ($registry -eq "mensa-local" -and -not [string]::IsNullOrWhiteSpace($version)) {
+        return $true
+    }
+    $buildLocal = Read-DotEnvValue "BUILD_LOCAL" ""
+    return ($buildLocal -eq "0" -and -not [string]::IsNullOrWhiteSpace($registry) -and -not [string]::IsNullOrWhiteSpace($version))
+}
+
 function Invoke-Compose([string[]]$ComposeArgs) {
     # Docker Compose logs progress to stderr; with $ErrorActionPreference=Stop that becomes a terminating error.
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        $output = & docker compose @ComposeArgs 2>&1
+        $allArgs = $script:ComposeFileArgs + $ComposeArgs
+        $output = & docker compose @allArgs 2>&1
         foreach ($line in $output) {
             if ($line -is [System.Management.Automation.ErrorRecord]) {
                 Write-Host $line.ToString()
@@ -71,7 +82,7 @@ function Invoke-Compose([string[]]$ComposeArgs) {
             }
         }
         if ($LASTEXITCODE -ne 0) {
-            throw "docker compose failed ($LASTEXITCODE): $($ComposeArgs -join ' ')"
+            throw "docker compose failed ($LASTEXITCODE): $($allArgs -join ' ')"
         }
     } finally {
         $ErrorActionPreference = $prevEap
@@ -86,6 +97,20 @@ function Repair-PortForwarding {
     Start-Sleep -Seconds 10
 }
 
+$script:ComposeFileArgs = @()
+$offlineClientMode = Test-OfflineClientMode
+if ($offlineClientMode) {
+    $script:ComposeFileArgs = @(
+        "-f", "docker-compose.distribution.yml",
+        "-f", "docker-compose.distribution.offline.yml",
+        "-f", "docker-compose.direct.yml"
+    )
+    if ($Build) {
+        Write-Host "Offline client mode: using pre-loaded images (skipping build)" -ForegroundColor Yellow
+        $Build = $false
+    }
+}
+
 $bindHost = Read-DotEnvValue "DOCKER_BIND_HOST" "127.0.0.1"
 $frontendPort = [int](Read-DotEnvValue "FRONTEND_HOST_PORT" "3000")
 $backendPort = [int](Read-DotEnvValue "BACKEND_HOST_PORT" "5001")
@@ -94,6 +119,9 @@ $chromaPort = [int](Read-DotEnvValue "CHROMA_HOST_PORT" "8001")
 if ([string]::IsNullOrWhiteSpace($bindHost)) { $bindHost = "127.0.0.1" }
 
 Write-Host "Mensa Windows Start" -ForegroundColor White
+if ($offlineClientMode) {
+    Write-Host "  mode      : offline (pre-built images)" -ForegroundColor Cyan
+}
 Write-Host "  bind host : $bindHost"
 Write-Host "  ports     : frontend=$frontendPort backend=$backendPort chroma=$chromaPort"
 Write-Host "  app URL   : http://${bindHost}:${frontendPort}/" -ForegroundColor Green
