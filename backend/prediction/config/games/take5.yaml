@@ -1,0 +1,21 @@
+game: take5
+enabled_strategies:
+  - frequency
+  - delta
+  - hot_cold
+  - distribution
+enabled_agents:
+  - repeats
+  - sums
+  - gaps
+  - last_digit
+ensemble:
+  initial_weights:
+    frequency: 0.22
+    delta: 0.18
+    hot_cold: 0.18
+    distribution: 0.12
+    repeats: 0.10
+    sums: 0.08
+    gaps: 0.07
+    last_digit: 0.05

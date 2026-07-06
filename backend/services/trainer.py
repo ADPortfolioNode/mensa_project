@@ -828,6 +828,10 @@ class TrainerService:
         )
 
     def train_model(self, game: str):
+        if os.environ.get("PREDICTION_ENGINE", "modular").lower() != "legacy":
+            from services.prediction_adapter import prediction_adapter
+            return prediction_adapter.train_or_backtest(game)
+
         from .chroma_client import chroma_client
 
         collection = chroma_client.client.get_collection(game)

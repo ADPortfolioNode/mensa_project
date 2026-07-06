@@ -1,0 +1,23 @@
+# Global defaults for the modular prediction engine.
+ensemble:
+  enabled: true
+  learning_rate: 0.05
+  min_weight: 0.01
+
+nn:
+  enabled: true
+  backend: feedforward
+  lookback: 30
+  blend_weight: 0.15
+  hidden_layers: [64, 32]
+  max_iter: 200
+
+metrics:
+  backtest_window: 200
+  min_backtest_draws: 50
+  random_trials: 500
+
+strategies:
+  hot_cold:
+    hot_window: 20
+    cold_window: 100

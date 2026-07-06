@@ -556,6 +556,16 @@ class IngestService:
             f"✓ [{game_key.upper()}] Ingestion complete: processed={total_rows_processed}, "
             f"added_in_run={total_rows_added}, net_added={net_added}, total={final_total}"
         )
+        if total_rows_added > 0 and os.environ.get("PREDICTION_ENGINE", "modular").lower() != "legacy":
+            try:
+                latest = collection.get(limit=1, include=["metadatas", "ids"])
+                metas = latest.get("metadatas") or []
+                ids = latest.get("ids") or []
+                if metas:
+                    from prediction.adapter_hooks import on_new_draw_metadata
+                    on_new_draw_metadata(game_key, metas[0], ids[0] if ids else None)
+            except Exception as hook_error:
+                print(f"⚠ [{game_key.upper()}] Weight update hook skipped: {hook_error}")
         return self._build_success_result(
             existing_count=existing_count,
             total_rows_processed=total_rows_processed,

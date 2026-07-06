@@ -1,0 +1,1 @@
+"""Persisted ensemble weight state."""

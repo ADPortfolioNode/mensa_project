@@ -26,6 +26,13 @@ class PredictAllRequest(BaseModel):
     recent_k: int = 10
 
 
+class PredictionFeedbackRequest(BaseModel):
+    game: str
+    primary: List[int]
+    bonus: Optional[List[int]] = None
+    draw_id: Optional[str] = None
+
+
 @router.get("/api/predictions/all")
 async def get_all_predictions():
     """
@@ -96,6 +103,23 @@ def _normalize_prediction_result(game_key: str, result: dict, recent_k: int) -> 
         "highest_accuracy": result.get("highest_accuracy"),
         "model_metadata": result.get("model_metadata"),
     }
+
+
+@router.post("/api/prediction/feedback")
+async def prediction_feedback(request: PredictionFeedbackRequest):
+    """Record an actual draw and update ensemble strategy weights."""
+    try:
+        game_key = _require_game_key(request.game)
+        from prediction.core.types import Draw
+        from services.prediction_adapter import prediction_adapter
+
+        actual = Draw(primary=request.primary, bonus=request.bonus or [], draw_id=request.draw_id)
+        result = await asyncio.to_thread(prediction_adapter.engine.update_weights, game_key, actual)
+        return {"status": "ok", "game": game_key, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/api/predict_all")

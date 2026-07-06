@@ -1,0 +1,1 @@
+"""YAML configuration loader for per-game prediction settings."""

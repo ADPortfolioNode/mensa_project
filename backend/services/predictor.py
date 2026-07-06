@@ -11,6 +11,11 @@ from utils.model_utils import (
     resolve_highest_accuracy,
 )
 
+
+def _use_modular_engine() -> bool:
+    return os.environ.get("PREDICTION_ENGINE", "modular").lower() != "legacy"
+
+
 class PredictorService:
     def __init__(self):
         self.models_dir = "/data/models"
@@ -251,6 +256,10 @@ class PredictorService:
 
     def get_prediction_summary(self, game: str):
         """Summarize saved model readiness and highest known accuracy for suggestions."""
+        if _use_modular_engine():
+            from services.prediction_adapter import prediction_adapter
+            return prediction_adapter.get_prediction_summary(game)
+
         game_key = str(game or "").strip().lower()
         artifact, error = load_model_artifact(game_key, self.models_dir)
         metadata = _load_model_metadata(game_key)
@@ -269,6 +278,10 @@ class PredictorService:
         }
 
     def predict_next_draw(self, game: str, recent_k: int = 10):
+        if _use_modular_engine():
+            from services.prediction_adapter import prediction_adapter
+            return prediction_adapter.predict_next_draw(game, recent_k)
+
         session_result = self.predict_prediction_session(game=game, recent_k=recent_k)
         if session_result.get("status") != "success":
             return session_result
