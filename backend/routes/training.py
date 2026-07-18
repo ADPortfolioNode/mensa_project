@@ -3,6 +3,8 @@ Training API routes.
 """
 import asyncio
 import hashlib
+import json
+import os
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -64,6 +66,154 @@ def _dataset_snapshot(game: str) -> dict:
         return {"dataset_hash": None, "record_count": 0}
 
 
+def _experiment_timestamp(experiment: dict) -> float:
+    for key in ("timestamp", "timestamp_seconds"):
+        value = experiment.get(key)
+        if value is None:
+            continue
+        try:
+            ts = float(value)
+        except (TypeError, ValueError):
+            continue
+        if ts >= 1_000_000_000_000:
+            return ts / 1000.0
+        return ts
+    return 0.0
+
+
+def _last_trained_dataset_snapshot(game_key: str) -> dict:
+    """Best-effort snapshot of the dataset size/hash at last successful training."""
+    game_key = str(game_key or "").strip().lower()
+    last_count = 0
+    last_hash = None
+    last_trained_at = 0.0
+
+    for experiment in exp_store.list_experiments() or []:
+        if str(experiment.get("game") or "").strip().lower() != game_key:
+            continue
+        if str(experiment.get("type") or "").strip().lower() != "training":
+            continue
+        if str(experiment.get("status") or "").strip().lower() not in ("completed", "success"):
+            continue
+        ts = _experiment_timestamp(experiment)
+        if ts >= last_trained_at:
+            last_trained_at = ts
+            last_count = int(experiment.get("record_count") or 0)
+            last_hash = experiment.get("dataset_hash")
+
+    data_dir = os.environ.get("DATA_DIR", "/data")
+    metadata_path = os.path.join(data_dir, "experiments", f"{game_key}_model_metadata.json")
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, encoding="utf-8") as handle:
+                metadata = json.load(handle)
+            if isinstance(metadata, dict):
+                meta_count = int(metadata.get("last_trained_record_count") or 0)
+                meta_ts = float(metadata.get("last_trained_at") or 0.0)
+                if meta_ts >= last_trained_at and meta_count > 0:
+                    last_trained_at = meta_ts
+                    last_count = meta_count
+                    last_hash = metadata.get("last_trained_dataset_hash") or last_hash
+        except Exception:
+            pass
+
+    ready_path = os.path.join(
+        os.environ.get("PREDICTION_STATE_DIR", "/data/prediction"),
+        f"{game_key}_ready.json",
+    )
+    if os.path.exists(ready_path):
+        try:
+            with open(ready_path, encoding="utf-8") as handle:
+                ready = json.load(handle)
+            if isinstance(ready, dict):
+                ready_count = int(ready.get("record_count") or 0)
+                ready_ts = float(ready.get("trained_at") or 0.0)
+                if ready_ts >= last_trained_at and ready_count > 0:
+                    last_trained_at = ready_ts
+                    last_count = ready_count
+                    last_hash = ready.get("dataset_hash") or last_hash
+        except Exception:
+            pass
+
+    return {
+        "record_count": last_count,
+        "dataset_hash": last_hash,
+        "last_trained_at": last_trained_at or None,
+    }
+
+
+def _training_data_status(game_key: str, *, incremental: dict | None = None) -> dict:
+    """
+    Compare ingested draw count vs last training snapshot.
+
+    status:
+      - no_data: nothing ingested
+      - never_trained: draws exist but no model trained on them
+      - stale: new draws since last training
+      - current: trained on latest dataset size
+    """
+    game_key = str(game_key or "").strip().lower()
+    current = _dataset_snapshot(game_key)
+    last = _last_trained_dataset_snapshot(game_key)
+    current_count = int(current.get("record_count") or 0)
+    last_count = int(last.get("record_count") or 0)
+    incremental = incremental or {}
+    has_model = bool(
+        incremental.get("has_saved_model")
+        or incremental.get("incremental_learning")
+        or last_count > 0
+    )
+
+    if current_count <= 0:
+        return {
+            "status": "no_data",
+            "has_untrained_data": False,
+            "current_record_count": 0,
+            "last_trained_record_count": last_count,
+            "new_draws": 0,
+            "message": "No ingested draws for this game.",
+        }
+
+    if not has_model and last_count <= 0:
+        return {
+            "status": "never_trained",
+            "has_untrained_data": True,
+            "current_record_count": current_count,
+            "last_trained_record_count": 0,
+            "new_draws": current_count,
+            "message": f"{current_count:,} draws ingested — model has never been trained.",
+        }
+
+    current_hash = current.get("dataset_hash")
+    last_hash = last.get("dataset_hash")
+    hash_changed = bool(current_hash and last_hash and current_hash != last_hash)
+    new_draws = max(0, current_count - last_count)
+
+    if new_draws > 0 or hash_changed:
+        return {
+            "status": "stale",
+            "has_untrained_data": True,
+            "current_record_count": current_count,
+            "last_trained_record_count": last_count,
+            "new_draws": new_draws if new_draws > 0 else max(1, current_count - last_count),
+            "message": (
+                f"{new_draws:,} new draw(s) since last training "
+                f"({last_count:,} → {current_count:,})."
+                if new_draws > 0
+                else f"Dataset changed since last training ({last_count:,} → {current_count:,})."
+            ),
+        }
+
+    return {
+        "status": "current",
+        "has_untrained_data": False,
+        "current_record_count": current_count,
+        "last_trained_record_count": last_count,
+        "new_draws": 0,
+        "message": f"Model trained on current dataset ({current_count:,} draws).",
+    }
+
+
 @router.get("/api/train_settings")
 async def get_train_settings(game: str = None):
     defaults = trainer_service.get_training_defaults()
@@ -80,11 +230,13 @@ async def get_train_settings(game: str = None):
             **defaults,
             **{key: value for key, value in recreate_defaults.items() if value is not None},
         }
+        training_data = _training_data_status(game_key, incremental=incremental)
         return {
             "game": game_key,
             "defaults": merged_defaults,
             "dataset": _dataset_snapshot(game_key),
             "incremental": incremental,
+            "training_data": training_data,
             "best_training_params": incremental.get("best_training_params") or {},
             "recreate_defaults": recreate_defaults,
         }
@@ -97,10 +249,13 @@ async def get_train_settings(game: str = None):
         )
         per_game[game_name] = {
             **_dataset_snapshot(game_name),
+            "has_saved_model": incremental.get("has_saved_model"),
+            "engine": incremental.get("engine"),
             "highest_accuracy": incremental.get("highest_accuracy"),
             "best_training_params": incremental.get("best_training_params") or {},
             "recreate_defaults": incremental.get("recreate_defaults") or {},
             "score_leaderboard": incremental.get("score_leaderboard") or [],
+            "training_data": _training_data_status(game_name, incremental=incremental),
         }
     return {"game": None, "defaults": defaults, "per_game": per_game}
 
@@ -178,6 +333,7 @@ async def train_model(request: TrainingRequest):
         )
         runtime_ts = runtime_timestamp_fields()
         experiment_id = f"train-{game_key}-{runtime_ts['timestamp_seconds']}"
+        dataset = _dataset_snapshot(game_key)
 
         scored_params = merge_training_params(
             result.get("best_training_params"),
@@ -238,6 +394,8 @@ async def train_model(request: TrainingRequest):
             "accuracy_history": result.get("accuracy_history", []),
             "optimal_config_applied": result.get("optimal_config_applied", False),
             "optimal_config": result.get("optimal_config", {}),
+            "record_count": dataset.get("record_count"),
+            "dataset_hash": dataset.get("dataset_hash"),
         }))
 
         return {
@@ -245,6 +403,15 @@ async def train_model(request: TrainingRequest):
             "status": "COMPLETED",
             "game": game_key,
             "experiment_id": experiment_id,
+            "record_count": dataset.get("record_count"),
+            "dataset_hash": dataset.get("dataset_hash"),
+            "training_data": _training_data_status(
+                game_key,
+                incremental=trainer_service.get_incremental_training_context(
+                    game_key,
+                    requested_target=result.get("target_accuracy", request.target_accuracy),
+                ),
+            ),
             "score": accuracy,
             "accuracy": accuracy,
             "highest_accuracy": result.get("highest_accuracy", accuracy),

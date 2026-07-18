@@ -1,0 +1,24 @@
+game: quickdraw
+enabled_strategies:
+  - frequency
+  - delta
+  - hot_cold
+  - distribution
+enabled_agents:
+  - repeats
+  - sums
+  - gaps
+ensemble:
+  initial_weights:
+    frequency: 0.24
+    delta: 0.18
+    hot_cold: 0.18
+    distribution: 0.14
+    repeats: 0.10
+    sums: 0.08
+    gaps: 0.08
+metrics:
+  backtest_window: 500
+  min_backtest_draws: 100
+nn:
+  blend_weight: 0.10

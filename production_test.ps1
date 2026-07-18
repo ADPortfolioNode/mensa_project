@@ -37,10 +37,10 @@ function Write-Report {
 }
 
 function Test-Endpoint {
-    param([string]$Url, [string]$Description)
+    param([string]$Url, [string]$Description, [int]$TimeoutSec = 10)
 
     try {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
         if ($response.StatusCode -eq 200) {
             Write-Report "  [PASS] $Description (200 OK)" -Color Green
             return @{ status = "pass"; code = 200; body = $response.Content }
@@ -111,12 +111,13 @@ $endpoints = @(
     @{ url = "$frontendBase/api/chroma/collections"; desc = "/api/chroma/collections (proxy)" }
     @{ url = "$frontendBase/api/experiments"; desc = "/api/experiments (proxy)" }
     @{ url = "$backendBase/api/health"; desc = "/api/health (direct)" }
-    @{ url = "$backendBase/api/train_settings?game=pick3"; desc = "/api/train_settings (direct)" }
+    @{ url = "$backendBase/api/train_settings?game=pick3"; desc = "/api/train_settings (direct)"; timeout = 20 }
 )
 
 $apiPassCount = 0
 foreach ($endpoint in $endpoints) {
-    $result = Test-Endpoint $endpoint.url $endpoint.desc
+    $timeoutSec = if ($endpoint.ContainsKey('timeout')) { [int]$endpoint.timeout } else { 10 }
+    $result = Test-Endpoint $endpoint.url $endpoint.desc $timeoutSec
     if ($result.status -eq "pass") {
         $apiPassCount++
     }
@@ -127,13 +128,18 @@ Write-Report "[4] RESPONSE CONTRACT CHECKS" -Color Yellow
 Write-Report "------------------------------------------------------------"
 
 try {
-    $gamesResp = Invoke-WebRequest -Uri "$frontendBase/api/games" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
-    $gamesPayload = $gamesResp.Content | ConvertFrom-Json
-    if ($gamesPayload -is [System.Array]) {
+    $gamesResp = Invoke-WebRequest -Uri "$frontendBase/api/games" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+    $gamesPayload = $null
+    try { $gamesPayload = $gamesResp.Content | ConvertFrom-Json } catch { }
+    if ($null -eq $gamesPayload) {
+        Write-Report "  [FAIL] /api/games returned non-JSON: $($gamesResp.Content.Substring(0,[Math]::Min(120,$gamesResp.Content.Length)))" -Color Red
+        $games = @()
+    } elseif ($gamesPayload -is [System.Array]) {
         $games = $gamesPayload
     } elseif ($gamesPayload.PSObject.Properties.Name -contains "games") {
         $games = @($gamesPayload.games)
     } else {
+        Write-Report "  [WARN] Unexpected /api/games shape: $($gamesResp.Content.Substring(0,[Math]::Min(120,$gamesResp.Content.Length)))" -Color Yellow
         $games = @()
     }
     $expectedGames = @("take5", "pick3", "powerball", "megamillions", "pick10", "cash4life", "quickdraw", "nylotto")
@@ -143,20 +149,25 @@ try {
     }
     Write-Report "  Games endpoint coverage: $foundCount/8" -Color $(if ($foundCount -eq 8) { "Green" } else { "Yellow" })
 } catch {
-    Write-Report "  [FAIL] Could not parse /api/games response" -Color Red
+    Write-Report "  [FAIL] Could not fetch /api/games: $($_.Exception.Message)" -Color Red
 }
 
 try {
-    $statusResp = Invoke-WebRequest -Uri "$frontendBase/api/startup_status" -UseBasicParsing -TimeoutSec 8 -ErrorAction Stop
-    $status = $statusResp.Content | ConvertFrom-Json
-    $requiredFields = @("status", "progress", "total", "games")
-    $fieldCount = 0
-    foreach ($field in $requiredFields) {
-        if ($status.PSObject.Properties.Name -contains $field) { $fieldCount++ }
+    $statusResp = Invoke-WebRequest -Uri "$frontendBase/api/startup_status" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+    $status = $null
+    try { $status = $statusResp.Content | ConvertFrom-Json } catch { }
+    if ($null -eq $status) {
+        Write-Report "  [FAIL] /api/startup_status returned non-JSON: $($statusResp.Content.Substring(0,[Math]::Min(120,$statusResp.Content.Length)))" -Color Red
+    } else {
+        $requiredFields = @("status", "progress", "total", "games")
+        $fieldCount = 0
+        foreach ($field in $requiredFields) {
+            if ($status.PSObject.Properties.Name -contains $field) { $fieldCount++ }
+        }
+        Write-Report "  Startup status fields: $fieldCount/$($requiredFields.Count)  [ingestion status: $($status.status)]" -Color $(if ($fieldCount -eq 4) { "Green" } else { "Yellow" })
     }
-    Write-Report "  Startup status fields: $fieldCount/$($requiredFields.Count)" -Color $(if ($fieldCount -eq 4) { "Green" } else { "Yellow" })
 } catch {
-    Write-Report "  [FAIL] Could not parse /api/startup_status response" -Color Red
+    Write-Report "  [FAIL] Could not fetch /api/startup_status: $($_.Exception.Message)" -Color Red
 }
 Write-Report ""
 

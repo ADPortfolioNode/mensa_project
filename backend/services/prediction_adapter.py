@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
@@ -9,8 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from config import GAME_PREDICTION_FORMATS, GAME_PREDICTION_SCHEDULES
-from prediction.config.loader import list_configured_games, load_game_config
+from config import GAME_CONFIGS, GAME_PREDICTION_FORMATS, GAME_PREDICTION_SCHEDULES
+from prediction.config.loader import load_game_config
 from prediction.core.draw_loader import from_chroma
 from prediction.engine import LotteryPredictionEngine
 
@@ -106,8 +107,20 @@ class PredictionAdapter:
     def is_ready(self, game: str) -> bool:
         return self._ready_marker(game).exists()
 
+    def _dataset_snapshot(self, game: str) -> dict:
+        from services.chroma_client import chroma_client
+
+        try:
+            count = chroma_client.count_documents(game)
+            return {
+                "dataset_hash": hashlib.md5(f"{game}|{count}".encode("utf-8")).hexdigest(),
+                "record_count": int(count or 0),
+            }
+        except Exception:
+            return {"dataset_hash": None, "record_count": 0}
+
     def predict_next_draw(self, game: str, recent_k: int = 10) -> dict:
-        if game not in list_configured_games():
+        if game not in GAME_CONFIGS:
             return {"status": "error", "message": f"Game '{game}' has no modular prediction config."}
 
         try:
@@ -151,12 +164,70 @@ class PredictionAdapter:
             "engine": "modular",
         }
 
-    def train_or_backtest(self, game: str) -> dict:
+    def _load_ready_payload(self, game: str) -> dict:
+        path = self._ready_marker(game)
+        if not path.exists():
+            return {}
+        try:
+            with open(path, encoding="utf-8") as handle:
+                loaded = json.load(handle)
+            return loaded if isinstance(loaded, dict) else {}
+        except Exception:
+            return {}
+
+    def train_or_backtest(
+        self,
+        game: str,
+        *,
+        refresh_only: bool = False,
+        baseline_accuracy: float | None = None,
+    ) -> dict:
         """Run walk-forward backtest and persist readiness marker."""
-        if game not in list_configured_games():
+        if game not in GAME_CONFIGS:
             return {"status": "error", "message": f"Game '{game}' has no modular prediction config."}
 
         start = time.time()
+        dataset = self._dataset_snapshot(game)
+        existing = self._load_ready_payload(game) if refresh_only else {}
+        metrics = existing.get("metrics") if isinstance(existing.get("metrics"), dict) else None
+
+        if refresh_only:
+            if not metrics:
+                metrics = {
+                    "status": "ok",
+                    "note": "Readiness refresh without walk-forward backtest.",
+                    "legacy_baseline_accuracy": baseline_accuracy,
+                }
+            mean_hits = metrics.get("mean_partial_hits", 0.0)
+            lift = metrics.get("lift_vs_random", 0.0)
+            payload = {
+                **existing,
+                "game": game,
+                "trained_at": time.time(),
+                "metrics": metrics,
+                "engine": "modular",
+                "record_count": dataset.get("record_count"),
+                "dataset_hash": dataset.get("dataset_hash"),
+                "refreshed": True,
+            }
+            self.mark_ready(game, payload)
+            return {
+                "status": "success",
+                "game": game,
+                "message": "Modular engine readiness refreshed.",
+                "training_time": round(time.time() - start, 2),
+                "metrics": metrics,
+                "engine": "modular",
+                "mean_partial_hits": mean_hits,
+                "lift_vs_random": lift,
+                "exact_match_rate": metrics.get("exact_match_rate"),
+                "model_strategy": "ensemble",
+                "attempts": 1,
+                "record_count": dataset.get("record_count"),
+                "dataset_hash": dataset.get("dataset_hash"),
+                "refreshed": True,
+            }
+
         try:
             metrics = self.engine.backtest(game)
         except Exception as exc:
@@ -170,6 +241,8 @@ class PredictionAdapter:
             "trained_at": time.time(),
             "metrics": metrics,
             "engine": "modular",
+            "record_count": dataset.get("record_count"),
+            "dataset_hash": dataset.get("dataset_hash"),
         }
         self.mark_ready(game, payload)
 
@@ -179,13 +252,14 @@ class PredictionAdapter:
             "message": "Modular engine backtest complete.",
             "training_time": round(time.time() - start, 2),
             "metrics": metrics,
-            # Honest fields for experiment log (not inflated accuracy)
+            "engine": "modular",
             "mean_partial_hits": mean_hits,
             "lift_vs_random": lift,
             "exact_match_rate": metrics.get("exact_match_rate"),
-            "accuracy": mean_hits,  # UI compatibility: partial hits, not % accuracy
             "model_strategy": "ensemble",
             "attempts": 1,
+            "record_count": dataset.get("record_count"),
+            "dataset_hash": dataset.get("dataset_hash"),
         }
 
     def get_prediction_summary(self, game: str) -> dict:

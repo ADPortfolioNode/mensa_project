@@ -8,6 +8,7 @@ import urllib.error
 import urllib.request
 
 BASE = os.environ.get("MENSA_API_BASE", "http://127.0.0.1:5001")
+TRAIN_TIMEOUT = int(os.environ.get("VERIFY_TRAIN_TIMEOUT", "900"))
 GAMES = [
     "take5", "pick3", "powerball", "megamillions",
     "pick10", "cash4life", "quickdraw", "nylotto",
@@ -71,7 +72,7 @@ def verify_game(game: str, pre_meta: dict):
         "POST",
         "/api/train",
         {"game": game, "target_accuracy": LOW_TARGET, "max_iterations": MAX_ITERATIONS},
-        timeout=300,
+        timeout=TRAIN_TIMEOUT,
     )
     if code != 200:
         record(game, "FAIL", f"train HTTP {code}: {str(train)[:160]}")

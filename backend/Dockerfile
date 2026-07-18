@@ -1,4 +1,4 @@
-﻿# Multi-stage build for smaller final image
+# Multi-stage build for smaller final image
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -13,6 +13,20 @@ COPY ${REQUIREMENTS_FILE} requirements.txt
 RUN pip --default-timeout=300 --retries 5 install --no-cache-dir -r requirements.txt \
     && python -c "from hypercorn.config import Config; print(f'hypercorn install verified: {Config.__module__}')"
 
+# Pre-download the ChromaDB ONNX embedding model at build time so it is baked
+# into the image. Without this, the 79 MB all-MiniLM-L6-v2 download happens
+# synchronously on the first request and blocks the single Hypercorn worker,
+# causing every HTTP endpoint to time out for ~30+ seconds on cold start.
+RUN python -c "\
+import os; \
+os.environ.setdefault('ANONYMIZED_TELEMETRY', 'FALSE'); \
+from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2; \
+print('Downloading ONNX embedding model...'); \
+ef = ONNXMiniLM_L6_V2(); \
+ef(['warmup']); \
+print('ONNX model pre-download complete.')" \
+    || echo "ONNX pre-download failed (non-fatal; model will download at runtime)"
+
 # Final stage with minimal runtime
 FROM python:3.11-slim
 
@@ -21,9 +35,11 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Copy Python dependencies from builder
+# Copy Python dependencies from builder (includes cached ONNX model)
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+# Copy pre-downloaded ONNX model cache from builder stage
+COPY --from=builder /root/.cache/chroma /root/.cache/chroma
 
 # Copy application code
 ARG CACHE_BUSTER=1

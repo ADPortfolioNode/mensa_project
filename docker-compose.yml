@@ -62,20 +62,22 @@ services:
         condition: service_healthy
     volumes:
       - backend_data:/data
+      # Persist the ChromaDB ONNX embedding model cache so the 79 MB
+      # all-MiniLM-L6-v2 download does not block HTTP endpoints on every restart
+      - chroma_model_cache:/root/.cache/chroma
     networks:
       - mensa-net
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import socket; socket.create_connection(('127.0.0.1', 5000), timeout=2).close()",
-        ]
+      # Use HTTP probe (not TCP) so 'healthy' truly means the API is serving.
+      # TCP becomes available before Hypercorn finishes startup; HTTP does not.
+      test: [
+        "CMD", "python", "-c",
+        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5)"
+      ]
       interval: 15s
-      timeout: 8s
-      retries: 6
-      start_period: 90s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -128,3 +130,4 @@ networks:
 volumes:
   backend_data:
   chroma_data:
+  chroma_model_cache:

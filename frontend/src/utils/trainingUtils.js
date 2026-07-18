@@ -179,6 +179,50 @@ export function resolveBestTrainParams({
   return { ...fromApi, ...fromExperiment };
 }
 
+/** Training dataset freshness vs last successful train. */
+export function trainingDataBadgeClass(status) {
+  switch (String(status || '').toLowerCase()) {
+    case 'never_trained':
+      return 'bg-warning text-dark';
+    case 'stale':
+      return 'bg-info text-dark';
+    case 'current':
+      return 'bg-success';
+    default:
+      return 'bg-secondary';
+  }
+}
+
+export function trainingDataStatusLabel(status, details = {}) {
+  const key = String(status || '').toLowerCase();
+  const current = Number(details.current_record_count ?? 0);
+  const last = Number(details.last_trained_record_count ?? 0);
+  const newDraws = Number(details.new_draws ?? 0);
+
+  if (key === 'never_trained') {
+    return current > 0
+      ? `Never trained (${current.toLocaleString()} draws waiting)`
+      : 'Never trained';
+  }
+  if (key === 'stale') {
+    if (newDraws > 0) {
+      return `${newDraws.toLocaleString()} new draw(s) (${last.toLocaleString()} → ${current.toLocaleString()})`;
+    }
+    return `Dataset changed (${last.toLocaleString()} → ${current.toLocaleString()})`;
+  }
+  if (key === 'current') {
+    return `Up to date (${current.toLocaleString()} draws)`;
+  }
+  if (key === 'no_data') {
+    return 'No ingested data';
+  }
+  return details.message || 'Unknown';
+}
+
+export function gameNeedsTraining(trainingData) {
+  return Boolean(trainingData?.has_untrained_data);
+}
+
 export function formatTrainingErrorMessage(error, formatApiError) {
   const status = error?.response?.status;
   const base = formatApiError(error, 'Training request failed.');

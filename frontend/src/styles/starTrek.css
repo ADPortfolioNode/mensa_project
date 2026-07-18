@@ -353,6 +353,23 @@ body {
   font-size: 13px;
 }
 
+.star-trek-app .training-data-summary {
+  background: rgba(8, 15, 36, 0.75);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.star-trek-app .training-data-chip {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.star-trek-app .training-data-alert {
+  border-radius: 10px;
+}
+
 .star-trek-app .expandable-metadata-row {
   display: grid;
   grid-template-columns: minmax(9rem, 42%) minmax(0, 1fr);

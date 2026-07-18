@@ -31,6 +31,9 @@ import {
   pickHighestAccuracyExperiment,
   resolveBestTrainParams,
   experimentToTrainParams,
+  trainingDataBadgeClass,
+  trainingDataStatusLabel,
+  gameNeedsTraining,
 } from '../utils/trainingUtils';
 
 const ALL_GAMES_VALUE = '__all_games__';
@@ -174,6 +177,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   });
   const [trainDefaultsForGame, setTrainDefaultsForGame] = useState(null);
   const [trainIncremental, setTrainIncremental] = useState(null);
+  const [trainDataByGame, setTrainDataByGame] = useState({});
   const trainParamsAutoAppliedForGame = useRef(null);
   const trainParamsExperimentSource = useRef(null);
 
@@ -220,6 +224,12 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
         }
         setTrainDefaultsForGame(mapped);
         setTrainIncremental(response.data.incremental || null);
+        if (response.data.training_data) {
+          setTrainDataByGame((prev) => ({
+            ...prev,
+            [selectedTrainGame]: response.data.training_data,
+          }));
+        }
       } catch (_) {
         // Keep current params when settings endpoint is unavailable.
       }
@@ -228,6 +238,29 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
     fetchSettings();
     return () => { cancelled = true; };
   }, [selectedTrainGame, API_BASE]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshTrainingDataStatus = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/api/train_settings`, { timeout: 30000 });
+        if (cancelled || !response?.data?.per_game) return;
+        const next = {};
+        for (const [gameKey, payload] of Object.entries(response.data.per_game)) {
+          if (payload?.training_data) {
+            next[gameKey] = payload.training_data;
+          }
+        }
+        setTrainDataByGame(next);
+      } catch (_) {
+        // Non-fatal: training screen still works without freshness badges.
+      }
+    };
+
+    refreshTrainingDataStatus();
+    return () => { cancelled = true; };
+  }, [API_BASE, summaryRefreshKey, ingestStatus, trainStatus, experiments.length, gameContents]);
 
   useEffect(() => {
     async function fetchGamesAndContents() {
@@ -710,6 +743,7 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
       if (isTrainSuccessStatus(response?.data?.status)) {
         setTrainStatus('completed');
         setTrainErrorMessage('');
+        setSummaryRefreshKey((prev) => prev + 1);
         // Refresh experiments
         const r = await axios.get(`${API_BASE}/api/experiments`);
         const experimentsPayload = Array.isArray(r.data)
@@ -772,6 +806,29 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
   }, [selectedTrainingExperiment, trainIncremental]);
 
   const isTrained = completedTrainingExperiments.length > 0;
+
+  const selectedTrainData = useMemo(
+    () => (selectedTrainGame ? trainDataByGame[selectedTrainGame] : null),
+    [selectedTrainGame, trainDataByGame],
+  );
+
+  const gamesWithUntrainedData = useMemo(
+    () => games.filter((game) => gameNeedsTraining(trainDataByGame[game])),
+    [games, trainDataByGame],
+  );
+
+  const formatTrainGameOptionLabel = useCallback((game) => {
+    const data = trainDataByGame[game];
+    const base = game.toUpperCase();
+    if (!data) return base;
+    if (data.status === 'never_trained') return `${base} — untrained data`;
+    if (data.status === 'stale') {
+      const n = Number(data.new_draws || 0);
+      return n > 0 ? `${base} — +${n.toLocaleString()} new draws` : `${base} — new data`;
+    }
+    if (data.status === 'current') return `${base} — up to date`;
+    return base;
+  }, [trainDataByGame]);
 
   const getGameColorScheme = (gameName) => {
     const idx = games.findIndex((name) => name === gameName);
@@ -1054,14 +1111,25 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
                 : {}),
               'Random State': trainParams.randomState,
               'Ready Games': trainingReadyGames.length,
+              'Games Needing Training': gamesWithUntrainedData.length,
+              ...(selectedTrainData
+                ? { 'Selected Game Data': trainingDataStatusLabel(selectedTrainData.status, selectedTrainData) }
+                : {}),
               ...(selectedTrainingExperiment ? { 'Selected Experiment': selectedTrainingExperiment.experiment_id } : {}),
               'Status': trainStatus,
               ...(trainErrorMessage ? { 'Error Message': trainErrorMessage } : {})
             }}
             statusBadge={
-              <span className={`badge ${trainStatus === 'completed' ? 'bg-success' : trainStatus === 'in progress' ? 'bg-warning' : trainStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>
-                {trainStatus}
-              </span>
+              <>
+                {gamesWithUntrainedData.length > 0 && (
+                  <span className="badge bg-warning text-dark" title="Games with ingested data not yet reflected in the latest model">
+                    {gamesWithUntrainedData.length} untrained
+                  </span>
+                )}
+                <span className={`badge ${trainStatus === 'completed' ? 'bg-success' : trainStatus === 'in progress' ? 'bg-warning' : trainStatus === 'error' ? 'bg-danger' : 'bg-secondary'}`}>
+                  {trainStatus}
+                </span>
+              </>
             }
             onToggle={handleCardFocus('train')}
           >
@@ -1081,6 +1149,46 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
               </div>
             )}
 
+            {gamesWithUntrainedData.length > 0 && (
+              <div className="training-data-summary mb-3">
+                <div className="small text-neon mb-2">Games with untrained ingested data</div>
+                <div className="d-flex flex-wrap gap-2">
+                  {gamesWithUntrainedData.map((game) => {
+                    const data = trainDataByGame[game] || {};
+                    return (
+                      <button
+                        key={game}
+                        type="button"
+                        className={`btn btn-sm training-data-chip ${trainingDataBadgeClass(data.status)}`}
+                        onClick={() => {
+                          trainParamsAutoAppliedForGame.current = null;
+                          trainParamsExperimentSource.current = null;
+                          setSelectedTrainGame(game);
+                          setExpandedCard('train');
+                        }}
+                        disabled={trainStatus === 'in progress'}
+                        title={data.message || trainingDataStatusLabel(data.status, data)}
+                      >
+                        {game.toUpperCase()}
+                        {data.new_draws > 0 ? ` +${Number(data.new_draws).toLocaleString()}` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {selectedTrainData?.has_untrained_data && (
+              <div className={`alert mb-3 training-data-alert ${selectedTrainData.status === 'never_trained' ? 'alert-warning' : 'alert-info'}`}>
+                <strong>
+                  {selectedTrainData.status === 'never_trained' ? 'Untrained data' : 'New data since last training'}
+                </strong>
+                <div className="small mt-1 mb-0">
+                  {selectedTrainData.message || trainingDataStatusLabel(selectedTrainData.status, selectedTrainData)}
+                </div>
+              </div>
+            )}
+
             <div className="mb-3">
               <label htmlFor="trainGameSelect" className="form-label text-neon">Game for Training</label>
               <select
@@ -1096,9 +1204,16 @@ export default function Dashboard({ startupStatus = { status: 'unknown', progres
               >
                 <option value="">Select game</option>
                 {games.map((game) => (
-                  <option key={game} value={game}>{game.toUpperCase()}</option>
+                  <option key={game} value={game}>{formatTrainGameOptionLabel(game)}</option>
                 ))}
               </select>
+              {selectedTrainData && (
+                <div className="form-text">
+                  <span className={`badge ${trainingDataBadgeClass(selectedTrainData.status)}`}>
+                    {trainingDataStatusLabel(selectedTrainData.status, selectedTrainData)}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="mb-3">

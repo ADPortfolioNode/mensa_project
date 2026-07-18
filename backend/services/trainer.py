@@ -48,6 +48,80 @@ class TrainerService:
             "auto_tune": True,
         }
 
+    @staticmethod
+    def _uses_modular_engine() -> bool:
+        return os.environ.get("PREDICTION_ENGINE", "modular").lower() != "legacy"
+
+    def _enrich_modular_train_result(self, result: dict, *, record_before: float | None) -> dict:
+        """Map modular backtest output to the legacy incremental-training contract."""
+        if str(result.get("status", "")).lower() != "success":
+            return result
+
+        baseline = record_before
+        modular_metrics = result.get("metrics") or {}
+        mean_hits = None
+        for key in ("mean_partial_hits",):
+            value = result.get(key)
+            if value is None:
+                value = modular_metrics.get(key)
+            if value is not None:
+                try:
+                    mean_hits = float(value)
+                    break
+                except (TypeError, ValueError):
+                    pass
+
+        lift = result.get("lift_vs_random")
+        if lift is None:
+            lift = modular_metrics.get("lift_vs_random")
+        exact_rate = result.get("exact_match_rate")
+        if exact_rate is None:
+            exact_rate = modular_metrics.get("exact_match_rate")
+
+        has_prior = baseline is not None
+        training_target = max(float(self.target_accuracy or 0.0), baseline or 0.0)
+        highest_accuracy = baseline
+
+        refreshed = bool(result.get("refreshed"))
+        message = "Modular engine backtest complete."
+        if refreshed and has_prior and highest_accuracy is not None:
+            message = (
+                f"Modular engine readiness refreshed. "
+                f"Record accuracy held at {highest_accuracy * 100:.2f}%."
+            )
+        elif has_prior and highest_accuracy is not None:
+            message = (
+                f"Modular engine backtest complete. "
+                f"Record accuracy held at {highest_accuracy * 100:.2f}%."
+            )
+        elif mean_hits is not None:
+            lift_text = f"{float(lift):.4f}" if lift is not None else "n/a"
+            message = (
+                f"Modular engine backtest complete. "
+                f"mean_partial_hits={mean_hits:.4f}, lift_vs_random={lift_text}."
+            )
+
+        return {
+            **result,
+            "engine": "modular",
+            "baseline_accuracy": baseline,
+            "highest_accuracy": highest_accuracy,
+            "record_accuracy": highest_accuracy,
+            "accuracy": highest_accuracy,
+            "training_target": training_target,
+            "target_accuracy": float(self.target_accuracy or 0.0),
+            "used_previous_training": has_prior,
+            "retained_previous_model": has_prior,
+            "previous_accuracy": baseline,
+            "candidate_accuracy": mean_hits,
+            "modular_metrics": modular_metrics,
+            "mean_partial_hits": mean_hits,
+            "lift_vs_random": lift,
+            "exact_match_rate": exact_rate,
+            "message": message,
+            "model_strategy": result.get("model_strategy") or "ensemble",
+        }
+
     def configure_training(
         self,
         *,
@@ -664,6 +738,15 @@ class TrainerService:
         game_key = str(game or "").strip().lower()
         model_path = os.path.join(self.models_dir, f"{game_key}_model.joblib")
         has_saved_model = os.path.exists(model_path)
+        modular_ready = False
+        if self._uses_modular_engine():
+            try:
+                from services.prediction_adapter import prediction_adapter
+
+                modular_ready = prediction_adapter.is_ready(game_key)
+            except Exception:
+                modular_ready = False
+        has_saved_model = has_saved_model or modular_ready
         baseline = self._load_stored_baseline(game_key)
         requested = float(
             requested_target if requested_target is not None else self.target_accuracy
@@ -700,7 +783,8 @@ class TrainerService:
             "training_target": training_target,
             "incremental_learning": bool(has_saved_model or baseline is not None),
             "blend_step": float(self.blend_step),
-            "model_type": "RandomForestRegressor",
+            "model_type": "modular_ensemble" if modular_ready else "RandomForestRegressor",
+            "engine": "modular" if self._uses_modular_engine() else "legacy",
             "model_strategy": stored_meta.get("model_strategy"),
             "blend_weight": stored_meta.get("blend_weight"),
             "accuracy_history": stored_meta.get("accuracy_history") or [],
@@ -828,9 +912,16 @@ class TrainerService:
         )
 
     def train_model(self, game: str):
-        if os.environ.get("PREDICTION_ENGINE", "modular").lower() != "legacy":
+        if self._uses_modular_engine():
             from services.prediction_adapter import prediction_adapter
-            return prediction_adapter.train_or_backtest(game)
+
+            baseline = self._load_stored_baseline(game)
+            refresh_only = baseline is not None
+            return prediction_adapter.train_or_backtest(
+                game,
+                refresh_only=refresh_only,
+                baseline_accuracy=baseline,
+            )
 
         from .chroma_client import chroma_client
 
@@ -1225,6 +1316,7 @@ class TrainerService:
             "training_params": run_training_params,
             "best_training_params": best_training_params,
             "last_trained_at": time.time(),
+            "last_trained_record_count": len(metadatas),
             "accuracy_history": accuracy_history,
             "recent_runs": recent_runs,
         }
@@ -1732,7 +1824,13 @@ class TrainerService:
                     break
             return trimmed
 
-        def _persist_leaderboard(leaderboard: list[dict], accuracy_history: list[float]):
+        def _persist_leaderboard(
+            leaderboard: list[dict],
+            accuracy_history: list[float],
+            *,
+            trained_record_count: int | None = None,
+            trained_dataset_hash: str | None = None,
+        ):
             experiments_dir = os.path.join(os.path.dirname(self.models_dir), "experiments")
             os.makedirs(experiments_dir, exist_ok=True)
             metadata_path = os.path.join(experiments_dir, f"{game_key}_model_metadata.json")
@@ -1747,6 +1845,11 @@ class TrainerService:
                     metadata = {}
             metadata["score_leaderboard"] = leaderboard
             metadata["accuracy_history"] = accuracy_history
+            if trained_record_count is not None and trained_record_count > 0:
+                metadata["last_trained_record_count"] = int(trained_record_count)
+                metadata["last_trained_at"] = time.time()
+                if trained_dataset_hash:
+                    metadata["last_trained_dataset_hash"] = trained_dataset_hash
             top_params = top_scored_params(leaderboard)
             if top_params:
                 metadata["best_training_params"] = top_params
@@ -1875,10 +1978,14 @@ class TrainerService:
             existing_leaderboard = _load_existing_leaderboard()
             result = self.train_model(game_key)
 
+            if self._uses_modular_engine() and str(result.get("status", "")).lower() == "success":
+                result = self._enrich_modular_train_result(result, record_before=record_baseline)
+
             record_before = _coerce_float(self._load_stored_baseline(game_key))
             candidate_acc = _coerce_float(result.get("candidate_accuracy"))
             should_recreate = (
-                str(result.get("status", "")).lower() == "success"
+                not self._uses_modular_engine()
+                and str(result.get("status", "")).lower() == "success"
                 and bool(result.get("retained_previous_model"))
                 and record_before is not None
                 and candidate_acc is not None
@@ -1953,7 +2060,12 @@ class TrainerService:
                 result_accuracy,
                 limit=MAX_STORED_PER_GAME,
             )
-            _persist_leaderboard(leaderboard, accuracy_history)
+            _persist_leaderboard(
+                leaderboard,
+                accuracy_history,
+                trained_record_count=record_count,
+                trained_dataset_hash=result.get("dataset_hash"),
+            )
 
             if str(result.get("status", "")).lower() == "error":
                 logger.error(
